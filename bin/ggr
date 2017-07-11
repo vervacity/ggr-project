@@ -18,7 +18,6 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Run GGR analysis')
     parser.add_argument("--out_dir", dest="out_dir", type=str, default='./',
                         help = "If specified all output files will be written to that directory. Default: the current working directory")
-
     load_data_files(parser)
     
     args = parser.parse_args()
@@ -38,24 +37,30 @@ def load_data_files(parser):
             parser.add_argument("--{}".format(key_name), type=dict, default=json.load(fp),
                                 help="Support data files")
             
-            
-            #data_files[key_name] = json.load(fp)
-            
-    return 
+    return
+
+
+def track_commit():
+    """Keep track of which commit
+    """
+    # TODO
+    
+    return
 
 
 def main():
     """Run all code
     """
     args = parse_args()
-    #args.data_files = load_data_files()
-
     
     # setup annotations
     from ggr.annotations import run
     args = run(args)
 
-    quit()
+    # run atac analyses
+    from ggr.atac_analysis import run
+    args = run(args)
+    
     
     # generate normalized matrices etc
     
