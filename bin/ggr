@@ -1,0 +1,84 @@
+#!/usr/bin/env python
+
+"""Runs GGR analysis
+"""
+
+import os
+import sys
+import subprocess
+import argparse
+import glob
+import pkg_resources
+import json
+
+
+def parse_args():
+    """Set up arguments
+    """
+    parser = argparse.ArgumentParser(description='Run GGR analysis')
+    parser.add_argument("--out_dir", dest="out_dir", type=str, default='./',
+                        help = "If specified all output files will be written to that directory. Default: the current working directory")
+
+    load_data_files(parser)
+    
+    args = parser.parse_args()
+    
+    return args
+
+
+def load_data_files(parser):
+    """Load all json files in so that we have handles on all data
+    """
+    json_files = glob.glob(pkg_resources.resource_filename('ggr', 'data/*.json'))
+    data_files = {}
+    
+    for json_file in json_files:
+        key_name = os.path.basename(json_file).split('.json')[0]
+        with open(json_file, 'r') as fp:
+            parser.add_argument("--{}".format(key_name), type=dict, default=json.load(fp),
+                                help="Support data files")
+            
+            
+            #data_files[key_name] = json.load(fp)
+            
+    return 
+
+
+def main():
+    """Run all code
+    """
+    args = parse_args()
+    #args.data_files = load_data_files()
+
+    
+    # setup annotations
+    from ggr.annotations import run
+    args = run(args)
+
+    quit()
+    
+    # generate normalized matrices etc
+    
+    
+    # atac trajectories analysis
+
+
+    # deep learning
+    
+    
+
+    # extract grammars
+
+
+    
+    
+    
+    
+
+
+    return None
+
+
+
+if __name__ == '__main__':
+        main()

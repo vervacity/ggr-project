@@ -1,0 +1,9 @@
+{
+    "annot_dir":"annotations",
+    "data_dir":"data",
+    "results_dir":"results",
+    "atac_dir":"results/atac",
+    "rna_dir":"results/rna",
+    "histone_dir":"results/histones",
+    "tf_dir":"results/tf"
+}
