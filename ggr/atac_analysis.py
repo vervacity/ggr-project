@@ -5,8 +5,11 @@ import os
 import glob
 import signal
 
+import pandas as pd
+
 from ggr.util.bed_utils import merge_regions
 from ggr.util.parallelize import *
+from ggr.util.filtering import remove_media_timepoints, filter_for_ids
 
 def make_ends_file(tagAlign_file, out_file):
     '''
@@ -26,7 +29,6 @@ def make_ends_file(tagAlign_file, out_file):
     os.system(make_ends)
 
     return None
-
 
 
 def make_atac_count_matrix(master_regions_file, tagalign_file_list, out_mat_file, tmp_dir='.'):
@@ -51,7 +53,7 @@ def make_atac_count_matrix(master_regions_file, tagalign_file_list, out_mat_file
     # Overlap with master regions and save into a master file
     # and then run bedtools coverage
     cuts_files = sorted(glob.glob('{}/cuts/*.tagAlign.gz'.format(tmp_dir)))
-    count_cuts_queue = ggr_utils.make_queue()
+    count_cuts_queue = setup_multiprocessing_queue()
     counts_dir = '{}/counts'.format(tmp_dir)
     os.system('mkdir -p {}'.format(counts_dir))
     for cuts_file in cuts_files:
@@ -66,7 +68,7 @@ def make_atac_count_matrix(master_regions_file, tagalign_file_list, out_mat_file
                                                     cuts_in_regions_file)
             print get_coverage
             count_cuts_queue.put([os.system, [get_coverage]])
-    ggr_utils.run_queue(count_cuts_queue)
+    run_in_parallel(count_cuts_queue)
 
     # Now combine into cuts for all timepoints file
     counts_files = sorted(glob.glob('{}/counts/*counts.txt.gz'.format(tmp_dir)))
@@ -102,6 +104,11 @@ def run(args):
                                                  args.atac['idr_peak_glob']))
     merge_regions(atac_peak_files, args.atac['master_bed'])
 
+    # TODO any plots here?
+    # chromatin state annotations? enh/prom/etc?
+    # ChromHMM enrichments
+    
+    
     # get read counts in these regions
     args.atac['counts_mat'] = '{0}/{1}.cuts.counts.mat.txt.gz'.format(DATA_DIR, atac_prefix)
     atac_tagalign_files = glob.glob('{0}/{1}'.format(args.atac['data_dir'],
@@ -112,24 +119,78 @@ def run(args):
                                args.atac['counts_mat'],
                                tmp_dir=ATAC_DIR)
 
-    # with read counts run DESeq2 as timeseries mode
-    
-    
+    # use DESeq to run rlog normalization (for visualization and timeseries)
+    args.atac['counts_rlog_mat'] = '{0}/{1}.cuts.rlog.mat.txt.gz'.format(DATA_DIR, atac_prefix)
+    if not os.path.isfile(args.atac['counts_rlog_mat']):
+        run_rlog = 'normalize_count_mat.R {0} {1}'.format(args.atac['counts_mat'], 
+        	                                          args.atac['counts_rlog_mat'])
+        print run_rlog
+        os.system(run_rlog)
         
+    # Remove media influenced timepoints first (both counts and rlog norm matrices)
+    args.atac['counts_nomedia_mat'] = '{}.nomedia.mat.txt.gz'.format(args.atac['counts_mat'].split('.mat')[0])
+    if not os.path.isfile(args.atac['counts_nomedia_mat']):
+	remove_media_timepoints(args.atac['counts_mat'], args, args.atac['counts_nomedia_mat'])
+    args.atac['counts_rlog_nomedia_mat'] = '{}.nomedia.mat.txt.gz'.format(args.atac['counts_rlog_mat'].split('.mat')[0])
+    if not os.path.isfile(args.atac['counts_rlog_nomedia_mat']):
+	remove_media_timepoints(args.atac['counts_rlog_mat'], args, args.atac['counts_rlog_nomedia_mat'])
+    
+    # with read counts run DESeq2 as timeseries mode
+    args.atac['dynamic_region_ids'] = '{0}/{1}.dynamic.ids.txt.gz'.format(args.folders['atac_timeseries_dir'],
+                                                                       atac_prefix)
+    if not os.path.isfile(args.atac['dynamic_region_ids']):
+	run_timeseries_deseq2 = "run_deseq2_timediff.R {0} {1} {2} {3}".format(args.atac['counts_nomedia_mat'],
+                                                                               '{0}/deseq2/{1}'.format(args.folders['atac_timeseries_dir'], atac_prefix),
+                                                                               args.params['deseq2_fdr'],
+                                                                               args.atac['dynamic_region_ids'])
+        print run_timeseries_deseq2
+        os.system(run_timeseries_deseq2)
+        
+    # filter matrix for the dynamic and stable ones
+    args.atac['dynamic_mat'] = '{0}/{1}.dynamic.mat.txt.gz'.format(args.folders['atac_dynamic_dir'], atac_prefix)
+    os.system('mkdir -p {}'.format(args.folders['atac_dynamic_dir']))
+    if not os.path.isfile(args.atac['dynamic_mat']):
+        filter_for_ids(args.atac['counts_rlog_nomedia_mat'],
+                       args.atac['dynamic_region_ids'],
+                       args.atac['dynamic_mat'])
+
+    args.atac['stable_mat'] = '{0}/{1}.stable.mat.txt.gz'.format(args.folders['atac_stable_dir'], atac_prefix)
+    os.system('mkdir -p {}'.format(args.folders['atac_stable_dir']))
+    if not os.path.isfile(args.atac['stable_mat']):
+        filter_for_ids(args.atac['counts_rlog_nomedia_mat'],
+                       args.atac['dynamic_region_ids'],
+                       args.atac['stable_mat'],
+                       opposite=True)
+
+    # quick plot of numbers (dynamic vs stable)
+    
+    
     quit()
         
-    # TODO remove media influenced timepoints first
-
+    # Run trajectories using DP_GP clustering
+    if not os.path.isdir(args.folders['atac_dp-gp_dir']):
+        os.system('mkdir -p {}'.format(args.folders['atac_dp-gp_dir']))
+        cluster_dp_gp = ("DP_GP_cluster.py ",
+                         "-i {0} ",
+                         "-o {1}").format(args.atac['dynamic_mat'],
+                                          '{0}/{1}'.format(args.atac['atac_dp-gp_dir'], atac_prefix))
+        print cluster_dp_gp
+        os.system(cluster_dp_gp)
         
-    # use DESeq to run rlog normalization
-    atac_rlog_norm_file = '{0}/{1}.cuts.rlog.mat.txt.gz'.format(DATA_DIR, atac_prefix)
-    if not os.path.isfile(atac_rlog_norm_file):
-        run_rlog = 'normalize_count_mat.R {0} {1}'.format(atac_counts_mat_file, atac_rlog_norm_file)
-        os.system(run_rlog)
+        
+    # Make plotting functions to plot trajectories nicely
     
 
+
+    # Run homer on each group
+
+
+    # as well as GREAT
+
     
-    
+
+    # overlap with histone information
+    # TODO - actually use peak calls to determine overlaps and marks
     
     
 

@@ -3,6 +3,10 @@
     "data_dir":"data",
     "results_dir":"results",
     "atac_dir":"results/atac",
+    "atac_timeseries_dir":"results/atac/timeseries",
+    "atac_dynamic_dir":"results/atac/dynamic",
+    "atac_stable_dir":"results/atac/stable",
+    "atac_dp-gp_dir":"results/atac/dp_gp",
     "rna_dir":"results/rna",
     "histone_dir":"results/histones",
     "tf_dir":"results/tf"

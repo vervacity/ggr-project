@@ -16,4 +16,20 @@ def merge_regions(inputs_bed, out_bed):
 
     return None
 
+def id_to_bed(id_file, bed_file):
+    """Convert id of form chr:start-stop into BED
+    """
+    if os.path.splitext(idfile)[1] == '.gz':
+        pipe_in = 'zcat'
+    else:
+        pipe_in = 'cat'
+        
+    convert = ("{0} {1} | ",
+               "awk -F ':' '{{ print $1\"\t\"$2 }}' | ",
+               "awk -F '-' '{{ print $1\"\t\"$2 }}' | ",
+               "awk -F '(' '{{ print $1 }}' | ",
+               "gzip -c > {1}").format(pipe_in, id_file, bed_file)
+    print convert
+    os.system(convert)
 
+    return None

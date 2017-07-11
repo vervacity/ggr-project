@@ -26,12 +26,16 @@ args <- commandArgs(trailingOnly=TRUE)
 in_file <- args[1]
 prefix <- args[2]
 fdr_cutoff <- args[3]
+out_file <- args[4]
+
+
+mkdir <- paste("mkdir -p",
+               dirname(prefix),
+               sep=" ")
+system(mkdir)
 
 # make count matrix
 count_data <- as.matrix(read.table(gzfile(in_file), sep='\t', header=TRUE, row.names=1))
-
-# ignore certain columns for now (change and make option) for no media infl timepoints
-count_data <- count_data[, -c(15, 16, 17, 18, 23, 24)]
 
 # run pairwise comparisons for all
 for (idx1 in seq(1, ncol(count_data)-1, 2)) {
@@ -48,8 +52,15 @@ for (idx1 in seq(1, ncol(count_data)-1, 2)) {
 
         # make the condition table
         conditions <- sub("_b.", "", colnames(pairwise_count_data))
+        unique_conditions <- unique(conditions)
+        t_baseline <- unique_conditions[1]
+        t_compare <- unique_conditions[2]
         col_data <- data.frame(condition=conditions)
         rownames(col_data) <- colnames(pairwise_count_data)
+
+        # do not evaluate if files exist
+        sigresultsall_file <- paste(prefix, '.', t_compare, '_over_', t_baseline, '_sigResultsAll.txt', sep='')
+        if (file.exists(sigresultsall_file)) { next }
 
         # make DESeq dataset
         dds <- DESeqDataSetFromMatrix(countData=pairwise_count_data,
@@ -60,10 +71,6 @@ for (idx1 in seq(1, ncol(count_data)-1, 2)) {
         dds <- DESeq(dds)
 
         # get results and save out to tables
-        unique_conditions <- unique(conditions)
-        t_baseline <- unique_conditions[1]
-        t_compare <- unique_conditions[2]
-        
         res <- results(dds, contrast=c('condition', t_compare, t_baseline), alpha=fdr_cutoff)
 
         # remove NA and filter for cutoff
@@ -96,4 +103,14 @@ for (idx1 in seq(1, ncol(count_data)-1, 2)) {
 
 
 # now merge sigResults to get list of full regions that are significant
-
+merge_sigresults <- paste("cat ",
+                          dirname(prefix),
+                          "/*sigResultsAll.txt | ",
+                          "awk -F '\t' '{ print $1 }' | ",
+                          "grep -v baseMean | ",
+                          "sort | ",
+                          "uniq | ",
+                          "gzip -c > ",
+                          out_file,
+                          sep="")
+system(merge_sigresults)
