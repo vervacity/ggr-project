@@ -9,6 +9,10 @@ import pandas as pd
 def get_proteincoding_gene_list(gtf_file, out_file):
     """Using a gtf file of protein coding genes, extract ids
     Note that it leaves the decimals on there
+
+    Args:
+      gtf_file: gtf annotation file with protein coding annotations
+      out_file: output file of gene ids
     """
     extract_gene_ids = ("cat {0} | "
                         "grep 'protein_coding' | "
@@ -24,9 +28,8 @@ def get_proteincoding_gene_list(gtf_file, out_file):
 
 
 def build_ordered_tss_file(ordered_gene_list, gtf_file, out_bed):
-    '''
-    Using an ensembl list, build a TSS file
-    '''
+    """Using an ensembl list, build a TSS file
+    """
 
     # make a tmp gene only file
     work_dir = os.path.dirname(ordered_gene_list)
@@ -56,10 +59,9 @@ def build_ordered_tss_file(ordered_gene_list, gtf_file, out_bed):
     return None
 
 def build_grouped_tss_file(ordered_gene_list, gtf_file, out_bed):
-    '''
-    Using an ensembl list, build a TSS file. Requires the second column of the 
+    """Using an ensembl list, build a TSS file. Requires the second column of the 
     gene list to have clusters
-    '''
+    """
 
     # make a tmp gene only file
     work_dir = os.path.dirname(ordered_gene_list)

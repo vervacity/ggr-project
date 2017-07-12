@@ -11,6 +11,7 @@ from ggr.util.bed_utils import merge_regions
 from ggr.util.parallelize import *
 from ggr.util.filtering import remove_media_timepoints, filter_for_ids
 
+
 def make_ends_file(tagAlign_file, out_file):
     '''
     Just get cut sites instead of the whole read. Use for ATAC-seq
@@ -165,19 +166,27 @@ def run(args):
     # quick plot of numbers (dynamic vs stable)
     
     
-    quit()
-        
     # Run trajectories using DP_GP clustering
     if not os.path.isdir(args.folders['atac_dp-gp_dir']):
         os.system('mkdir -p {}'.format(args.folders['atac_dp-gp_dir']))
-        cluster_dp_gp = ("DP_GP_cluster.py ",
-                         "-i {0} ",
-                         "-o {1}").format(args.atac['dynamic_mat'],
-                                          '{0}/{1}'.format(args.atac['atac_dp-gp_dir'], atac_prefix))
+        # unzip into tmp file
+        tmp_unzipped_mat = '{0}/{1}.dp_gp.tmp.txt'.format(args.folders['atac_dp-gp_dir'], atac_prefix)
+        unzip_mat = ("zcat {0} > {1}").format(args.atac['dynamic_mat'], tmp_unzipped_mat)
+        print unzip_mat
+        os.system(unzip_mat)
+        # cluster
+        cluster_dp_gp = ("DP_GP_cluster.py "
+                         "-i {0} "
+                         "-o {1}").format(tmp_unzipped_mat,
+                                          '{0}/{1}'.format(args.folders['atac_dp-gp_dir'], atac_prefix))
         print cluster_dp_gp
         os.system(cluster_dp_gp)
+        # delete tmp file
+        os.system('rm {}'.format(tmp_unzipped_mat))
         
-        
+
+    quit()
+    
     # Make plotting functions to plot trajectories nicely
     
 

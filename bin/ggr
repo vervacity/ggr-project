@@ -61,11 +61,7 @@ def main():
     from ggr.atac_analysis import run
     args = run(args)
     
-    
-    # generate normalized matrices etc
-    
-    
-    # atac trajectories analysis
+
 
 
     # deep learning

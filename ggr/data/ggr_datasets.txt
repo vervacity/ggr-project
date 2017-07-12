@@ -1,0 +1,10 @@
+	day 0.0	day 0.5	day 1.0	day 1.5	day 2.0	day 2.5	day 3.0	day 3.5	day 4.0	day 4.5	day 5.0	day 5.5	day 6.0
+ATAC-seq	1	1	1	1	1	1	1	1	1	1	1	1	1
+H3K27ac ChIP-seq	1						1						1
+H3K4me1 ChIP-seq	1						1						1
+H3K27me3 ChIP-seq	1						1						1
+CTCF ChIP-seq	1						1						1
+RAMPAGE	1	1	1	1	1	1	1	1	1	1	1	1	1
+PAS-seq	1	1	1	1	1	1	1	1	1	1	1	1	1
+RNA-seq (polyA+)	1						1						1
+RNA-seq (Ribo-Zero)	1						1						1

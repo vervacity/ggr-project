@@ -13,6 +13,6 @@ if __name__== "__main__":
           install_requires=[],
           packages=find_packages(),
           #package_data={'ggr':'data/*.json'},
-          package_data={"":"data/*.json"},
+          package_data={"":["data/*.json", "data/*.txt"]},
           scripts=["bin/ggr"] + glob("R/*/*.R")
     )
