@@ -15,9 +15,11 @@ import json
 def parse_args():
     """Set up arguments
     """
-    parser = argparse.ArgumentParser(description='Run GGR analysis')
-    parser.add_argument("--out_dir", dest="out_dir", type=str, default='./',
-                        help = "If specified all output files will be written to that directory. Default: the current working directory")
+    parser = argparse.ArgumentParser(
+        description='Run GGR analysis')
+    parser.add_argument(
+        "-o", "--out_dir", dest="out_dir", type=str, default='./',
+        help = "Output directory (default: current dir)")
     load_data_files(parser)
     
     args = parser.parse_args()
@@ -28,30 +30,47 @@ def parse_args():
 def load_data_files(parser):
     """Load all json files in so that we have handles on all data
     """
-    json_files = glob.glob(pkg_resources.resource_filename('ggr', 'data/*.json'))
+    json_files = glob.glob(
+        pkg_resources.resource_filename('ggr', 'data/*.json'))
     data_files = {}
     
     for json_file in json_files:
         key_name = os.path.basename(json_file).split('.json')[0]
         with open(json_file, 'r') as fp:
-            parser.add_argument("--{}".format(key_name), type=dict, default=json.load(fp),
-                                help="Support data files")
-            
+            parser.add_argument(
+                "--{}".format(key_name),
+                type=dict, default=json.load(fp),
+                help="Support data files")
     return
 
 
-def track_commit():
-    """Keep track of which commit
+def track_runs(args):
+    """track command and github commit
     """
-    # TODO
+    logging_file = "{}/ggr-project.log".format(args.out_dir)
     
-    return
+    # track github commit
+    git_repo_path = os.path.dirname(os.path.realpath(__file__))
+    os.system('echo "commit:" > {0}'.format(logging_file))
+    os.system('git -C {0} rev-parse HEAD >> {1}'.format(
+        git_repo_path, logging_file))
+    os.system('echo "" >> {0}'.format(logging_file))
+    
+    # write out the command
+    with open(logging_file, 'a') as f:
+        f.write(' '.join(sys.argv)+'\n\n')
+        
+    return logging_file
 
 
 def main():
     """Run all code
     """
+    
+    # setup
     args = parse_args()
+    os.system("mkdir -p {}".format(args.out_dir))
+    logging_file = track_runs(args)
     
     # setup annotations
     from ggr.annotations import run
@@ -60,17 +79,8 @@ def main():
     # run atac analyses
     from ggr.atac_analysis import run
     args = run(args)
-    
 
-
-
-    # deep learning
-    
-    
-
-    # extract grammars
-
-
+    # deep learning: tronn
     
     
     

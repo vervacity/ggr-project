@@ -21,8 +21,12 @@ def make_ends_file(tagAlign_file, out_file):
     # awk is significantly faster than opening in python
     make_ends = ("zcat {0} | "
                  #"head -n 10000 | "
-                 "awk -F '\t' '{{ printf $1\"\t\"$2\"\t\"$2+1\"\tN\t1000\t\"$6\"\\n"
-                 "\"$1\"\t\"$3-1\"\t\"$3\"\tN\t1000\t\"$6\"\\n\" }}' | "
+                 "awk -F '\t' 'BEGIN {{ OFS=\"\t\" }} "
+                 "{{ if ($6==\"+\") {{$3=$2+1}} "
+                 "else if ($6==\"-\") {{$2=$3-1}} "
+                 "print $0 }}' | "
+                 #"awk -F '\t' '{{ printf $1\"\t\"$2\"\t\"$2+1\"\tN\t1000\t\"$6\"\\n"
+                 #"\"$1\"\t\"$3-1\"\t\"$3\"\tN\t1000\t\"$6\"\\n\" }}' | "
                  "sort -k1,1 -k2,2n | "
                  "gzip -c "
                  "> {1}").format(tagAlign_file, out_file)
@@ -188,6 +192,8 @@ def run(args):
     quit()
     
     # Make plotting functions to plot trajectories nicely
+    # TODO generate heatmap as well as inset trajectory patterns
+
     
 
 
