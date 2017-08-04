@@ -1,0 +1,31 @@
+{
+    "data_dir":"/mnt/lab_data/kundaje/projects/skin/data/bds/processed.chipseq.2017-01-23.histones",
+    "histones":{
+	"H3K27ac":{
+	    "bedpe_glob":"*H3K27ac*/*/rep*/*.bedpe.gz",
+	    "narrowPeak_glob":"*H3K27ac*/*/macs2/rep*/*filt.narrowPeak.gz",
+	    "pooled_bigwig_glob":"*H3K27ac*/signal/macs2/pooled_rep/*pval*bw",
+	    "bigwig_glob":"*H3K27ac*/signal/macs2/rep*/*pval*bw"
+	},
+	"H3K4me1":{
+	    "bedpe_glob":"*H3K4me1*/*/rep*/*.bedpe.gz",
+	    "narrowPeak_glob":"*H3K4me1*/*/macs2/rep*/*filt.narrowPeak.gz",
+	    "pooled_bigwig_glob":"*H3K4me1*/signal/macs2/pooled_rep/*pval*bw",
+	    "bigwig_glob":"*H3K4me1*/signal/macs2/rep*/*pval*bw"
+	},
+	"H3K27me3":{
+	    "bedpe_glob":"*H3K27me3*/*/rep*/*.bedpe.gz",
+	    "narrowPeak_glob":"*H3K27me3*/*/macs2/rep*/*filt.narrowPeak.gz",
+	    "pooled_bigwig_glob":"*H3K27me3*/signal/macs2/pooled_rep/*pval*bw",
+	    "bigwig_glob":"*H3K27me3*/signal/macs2/rep*/*pval*bw"
+	}
+    },
+    "tfs":{
+	"CTCF":{
+	    "bedpe_glob":"*CTCF*/*/rep*/*.bedpe.gz",
+	    "idr_peak_glob":"*CTCF*/*/idr/true_reps/*/*filt.narrowPeak.gz",
+	    "pooled_bigwig_glob":"*CTCF*/signal/macs2/pooled_rep/*pval*bw",
+	    "bigwig_glob":"*CTCF*/signal/macs2/rep*/*pval*bw"
+	}
+    }
+}

@@ -127,29 +127,49 @@ def run(args):
     # use DESeq to run rlog normalization (for visualization and timeseries)
     args.atac['counts_rlog_mat'] = '{0}/{1}.cuts.rlog.mat.txt.gz'.format(DATA_DIR, atac_prefix)
     if not os.path.isfile(args.atac['counts_rlog_mat']):
-        run_rlog = 'normalize_count_mat.R {0} {1}'.format(args.atac['counts_mat'], 
-        	                                          args.atac['counts_rlog_mat'])
+        run_rlog = 'normalize_count_mat.R {0} {1}'.format(
+            args.atac['counts_mat'], 
+            args.atac['counts_rlog_mat'])
         print run_rlog
         os.system(run_rlog)
         
     # Remove media influenced timepoints first (both counts and rlog norm matrices)
-    args.atac['counts_nomedia_mat'] = '{}.nomedia.mat.txt.gz'.format(args.atac['counts_mat'].split('.mat')[0])
+    args.atac['counts_nomedia_mat'] = '{}.nomedia.mat.txt.gz'.format(
+        args.atac['counts_mat'].split('.mat')[0])
     if not os.path.isfile(args.atac['counts_nomedia_mat']):
-	remove_media_timepoints(args.atac['counts_mat'], args, args.atac['counts_nomedia_mat'])
-    args.atac['counts_rlog_nomedia_mat'] = '{}.nomedia.mat.txt.gz'.format(args.atac['counts_rlog_mat'].split('.mat')[0])
+	remove_media_timepoints(
+            args.atac['counts_mat'],
+            args,
+            args.atac['counts_nomedia_mat'])
+    args.atac['counts_rlog_nomedia_mat'] = '{}.nomedia.mat.txt.gz'.format(
+        args.atac['counts_rlog_mat'].split('.mat')[0])
     if not os.path.isfile(args.atac['counts_rlog_nomedia_mat']):
-	remove_media_timepoints(args.atac['counts_rlog_mat'], args, args.atac['counts_rlog_nomedia_mat'])
+	remove_media_timepoints(
+            args.atac['counts_rlog_mat'],
+            args,
+            args.atac['counts_rlog_nomedia_mat'])
     
     # with read counts run DESeq2 as timeseries mode
-    args.atac['dynamic_region_ids'] = '{0}/{1}.dynamic.ids.txt.gz'.format(args.folders['atac_timeseries_dir'],
-                                                                       atac_prefix)
+    args.atac['dynamic_region_ids'] = '{0}/{1}.dynamic.ids.txt.gz'.format(
+        args.folders['atac_timeseries_dir'],
+        atac_prefix)
     if not os.path.isfile(args.atac['dynamic_region_ids']):
-	run_timeseries_deseq2 = "run_deseq2_timediff.R {0} {1} {2} {3}".format(args.atac['counts_nomedia_mat'],
-                                                                               '{0}/deseq2/{1}'.format(args.folders['atac_timeseries_dir'], atac_prefix),
-                                                                               args.params['deseq2_fdr'],
-                                                                               args.atac['dynamic_region_ids'])
+	run_timeseries_deseq2 = "run_deseq2_timediff.R {0} {1} {2} {3}".format(
+            args.atac['counts_nomedia_mat'],
+            '{0}/deseq2/{1}'.format(args.folders['atac_timeseries_dir'], atac_prefix),
+            args.params['deseq2_fdr'],
+            args.atac['dynamic_region_ids'])
         print run_timeseries_deseq2
         os.system(run_timeseries_deseq2)
+
+
+
+
+    quit()
+
+
+        
+
         
     # filter matrix for the dynamic and stable ones
     args.atac['dynamic_mat'] = '{0}/{1}.dynamic.mat.txt.gz'.format(args.folders['atac_dynamic_dir'], atac_prefix)
@@ -179,10 +199,13 @@ def run(args):
         print unzip_mat
         os.system(unzip_mat)
         # cluster
-        cluster_dp_gp = ("DP_GP_cluster.py "
-                         "-i {0} "
-                         "-o {1}").format(tmp_unzipped_mat,
-                                          '{0}/{1}'.format(args.folders['atac_dp-gp_dir'], atac_prefix))
+        cluster_dp_gp = (
+            "DP_GP_cluster.py "
+            "-i {0} "
+            "-o {1}"
+            "-p png --plot").format(
+                tmp_unzipped_mat,
+                '{0}/{1}'.format(args.folders['atac_dp-gp_dir'], atac_prefix))
         print cluster_dp_gp
         os.system(cluster_dp_gp)
         # delete tmp file

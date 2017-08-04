@@ -27,6 +27,7 @@ in_file <- args[1]
 prefix <- args[2]
 fdr_cutoff <- args[3]
 out_file <- args[4]
+is_sequential_only <- args[5]
 
 
 mkdir <- paste("mkdir -p",
@@ -43,6 +44,14 @@ for (idx1 in seq(1, ncol(count_data)-1, 2)) {
 
         # do not evaluate if same indices
         if (idx1 == idx2) { next }
+
+        # if only running sequential pairwise,
+        # only run if idx2 == idx1 + 2
+        # ie, if they are next to each other
+        if (is_sequential_only == "sequential") {
+            if (idx2 != idx1 + 2) { next }
+        }
+        
         print(paste(idx1, idx2))
         
         # make smaller count matrix
