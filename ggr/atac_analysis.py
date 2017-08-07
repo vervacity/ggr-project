@@ -8,105 +8,24 @@ import signal
 import pandas as pd
 
 from ggr.util.bed_utils import merge_regions
-from ggr.util.parallelize import *
+from ggr.util.parallelize import setup_multiprocessing_queue
+from ggr.util.parallelize import run_in_parallel
 from ggr.util.filtering import remove_media_timepoints, filter_for_ids
+from ggr.util.counting import make_count_matrix
 
-
-def make_ends_file(tagAlign_file, out_file):
-    '''
-    Just get cut sites instead of the whole read. Use for ATAC-seq
-    '''
-    signal.signal(signal.SIGPIPE, signal.SIG_DFL)
-    
-    # awk is significantly faster than opening in python
-    make_ends = ("zcat {0} | "
-                 #"head -n 10000 | "
-                 "awk -F '\t' 'BEGIN {{ OFS=\"\t\" }} "
-                 "{{ if ($6==\"+\") {{$3=$2+1}} "
-                 "else if ($6==\"-\") {{$2=$3-1}} "
-                 "print $0 }}' | "
-                 #"awk -F '\t' '{{ printf $1\"\t\"$2\"\t\"$2+1\"\tN\t1000\t\"$6\"\\n"
-                 #"\"$1\"\t\"$3-1\"\t\"$3\"\tN\t1000\t\"$6\"\\n\" }}' | "
-                 "sort -k1,1 -k2,2n | "
-                 "gzip -c "
-                 "> {1}").format(tagAlign_file, out_file)
-    print make_ends
-    os.system(make_ends)
-
-    return None
-
-
-def make_atac_count_matrix(master_regions_file, tagalign_file_list, out_mat_file, tmp_dir='.'):
-    '''
-    For the regions in the master region file, gets cut site counts (5' and 3' sites of PE ATAC)
-    and returns a matrix file with this information
-    '''
-
-    # Generate (sorted) cuts files from tagAlign files
-    cuts_dir = '{}/cuts'.format(tmp_dir)
-    os.system('mkdir -p {}'.format(cuts_dir))
-    ends_queue = setup_multiprocessing_queue()
-    for tagalign_file in tagalign_file_list:
-        cuts_file = '{0}/{1}.cuts.tagAlign.gz'.format('{}'.format(cuts_dir),
-                                                      os.path.basename(tagalign_file).split('.tagAlign')[0])
-        if not os.path.isfile(cuts_file):
-            print cuts_file
-            ends_queue.put([make_ends_file, 
-                [tagalign_file, cuts_file]])
-    run_in_parallel(ends_queue)
-
-    # Overlap with master regions and save into a master file
-    # and then run bedtools coverage
-    cuts_files = sorted(glob.glob('{}/cuts/*.tagAlign.gz'.format(tmp_dir)))
-    count_cuts_queue = setup_multiprocessing_queue()
-    counts_dir = '{}/counts'.format(tmp_dir)
-    os.system('mkdir -p {}'.format(counts_dir))
-    for cuts_file in cuts_files:
-        cuts_in_regions_file = '{0}/counts/{1}.counts.txt.gz'.format(tmp_dir, os.path.basename(cuts_file).split('.tagAlign')[0])
-        if not os.path.isfile(cuts_in_regions_file):
-            get_coverage = ("bedtools coverage "
-                            "-sorted "
-                            "-counts "
-                            "-a {0} -b {1} | "
-                            "gzip -c > {2}").format(master_regions_file,
-                                                    cuts_file,
-                                                    cuts_in_regions_file)
-            print get_coverage
-            count_cuts_queue.put([os.system, [get_coverage]])
-    run_in_parallel(count_cuts_queue)
-
-    # Now combine into cuts for all timepoints file
-    counts_files = sorted(glob.glob('{}/counts/*counts.txt.gz'.format(tmp_dir)))
-    coverage_df = pd.DataFrame()
-    if not os.path.isfile(out_mat_file):
-        for counts_file in counts_files:
-            filename_fields = os.path.basename(counts_file).split('.')
-            header = '{0}_{1}'.format(filename_fields[0].split('-')[1], filename_fields[4])
-
-            counts = pd.read_csv(counts_file, sep='\t', header=None)
-            counts.columns = ['chrom', 'start', 'stop', 'counts']
-
-            coverage_df[header] = counts['counts']
-        coverage_df = coverage_df.set_index(counts['chrom'] + ':' + counts['start'].map(str) + '-' + counts['stop'].map(str))
-        coverage_df.to_csv(out_mat_file, sep='\t', index_label=False, compression='gzip')
-
-    return None
-
+from ggr.util.bioinformatics import make_deeptools_heatmap
 
 
 def run(args):
     """Run everything
     """
-    # make folders
-    DATA_DIR = args.folders['data_dir']
-    ATAC_DIR = args.folders['atac_dir']
-    os.system('mkdir -p {0} {1}'.format(DATA_DIR, ATAC_DIR))
     atac_prefix = 'ggr.atac'
     
     # generate a master regions file
-    args.atac['master_bed'] = '{0}/{1}.idr.master.bed.gz'.format(DATA_DIR, atac_prefix)
-    atac_peak_files = glob.glob('{0}/{1}'.format(args.atac['data_dir'],
-                                                 args.atac['idr_peak_glob']))
+    args.atac['master_bed'] = '{0}/{1}.idr.master.bed.gz'.format(
+        args.folders["data_dir"], atac_prefix)
+    atac_peak_files = glob.glob('{0}/{1}'.format(
+        args.atac['data_dir'], args.atac['idr_peak_glob']))
     merge_regions(atac_peak_files, args.atac['master_bed'])
 
     # TODO any plots here?
@@ -115,17 +34,20 @@ def run(args):
     
     
     # get read counts in these regions
-    args.atac['counts_mat'] = '{0}/{1}.cuts.counts.mat.txt.gz'.format(DATA_DIR, atac_prefix)
+    adjustment = "ends"
+    args.atac['counts_mat'] = '{0}/{1}.cuts.counts.mat.txt.gz'.format(
+        args.folders['data_dir'], atac_prefix)
     atac_tagalign_files = glob.glob('{0}/{1}'.format(args.atac['data_dir'],
                                                      args.atac['tagalign_glob']))
     if not os.path.isfile(args.atac['counts_mat']):
-        make_atac_count_matrix(args.atac['master_bed'],
+        make_count_matrix(args.atac['master_bed'],
                                atac_tagalign_files,
                                args.atac['counts_mat'],
-                               tmp_dir=ATAC_DIR)
+                               adjustment="ends",
+                               tmp_dir=args.folders["atac_dir"])
 
     # use DESeq to run rlog normalization (for visualization and timeseries)
-    args.atac['counts_rlog_mat'] = '{0}/{1}.cuts.rlog.mat.txt.gz'.format(DATA_DIR, atac_prefix)
+    args.atac['counts_rlog_mat'] = '{0}/{1}.cuts.rlog.mat.txt.gz'.format(args.folders["data_dir"], atac_prefix)
     if not os.path.isfile(args.atac['counts_rlog_mat']):
         run_rlog = 'normalize_count_mat.R {0} {1}'.format(
             args.atac['counts_mat'], 
@@ -161,15 +83,6 @@ def run(args):
             args.atac['dynamic_region_ids'])
         print run_timeseries_deseq2
         os.system(run_timeseries_deseq2)
-
-
-
-
-    quit()
-
-
-        
-
         
     # filter matrix for the dynamic and stable ones
     args.atac['dynamic_mat'] = '{0}/{1}.dynamic.mat.txt.gz'.format(args.folders['atac_dynamic_dir'], atac_prefix)
@@ -187,10 +100,10 @@ def run(args):
                        args.atac['stable_mat'],
                        opposite=True)
 
-    # quick plot of numbers (dynamic vs stable)
+    # quick plot of numbers (dynamic vs stable)?
     
     
-    # Run trajectories using DP_GP clustering
+    # Run trajectories (on dynamic set) using DP_GP clustering
     if not os.path.isdir(args.folders['atac_dp-gp_dir']):
         os.system('mkdir -p {}'.format(args.folders['atac_dp-gp_dir']))
         # unzip into tmp file
@@ -210,16 +123,62 @@ def run(args):
         os.system(cluster_dp_gp)
         # delete tmp file
         os.system('rm {}'.format(tmp_unzipped_mat))
+
+    # save key file to args - the clustering
+    args.atac["dp-gp_clusters"] = "{0}/{1}_optimal_clustering.txt".format(
+        args.folders["atac_dp-gp_dir"], atac_prefix)
+
+    # split the clusters into bed files
+    if False:
+        data = pd.read_table(args.atac["dp-gp_clusters"])
+        print data.columns
+        for i in range(len(list(set(data["cluster"].tolist())))):
+            cluster_idx = i + 1
+            out_id_file = "{}/{}.dp-gp.cluster_{}.txt".format(
+                args.folders["atac_dp-gp_dir"], atac_prefix, cluster_idx)
+            print i
+            data_subset = data[data["cluster"] == cluster_idx]
+            data_subset["gene"].to_csv(out_id_file, sep='\t', header=False, index=False)
+
+            # make bed
+            out_bed_file = "{}/{}.dp-gp.cluster_{}.bed".format(
+                args.folders["atac_dp-gp_dir"], atac_prefix, cluster_idx)
+            make_bed = ("cat {} | "
+                        "awk -F ':' '{{ print $1\"\t\"$2 }}' | "
+                        "awk -F '-' '{{ print $1\"\t\"$2 }}' > "
+                        "{}").format(out_id_file, out_bed_file)
+            print make_bed
+            os.system(make_bed)
+
+            # run great
+            run_great = "run_rgreat.R {} {}/{}.dp-gp_cluster_{}".format(
+                out_bed_file,
+                args.folders["atac_dp-gp_dir"],
+                atac_prefix,
+                cluster_idx)
+            print run_great
+            os.system(run_great)
         
 
-    quit()
-    
+        
     # Make plotting functions to plot trajectories nicely
     # TODO generate heatmap as well as inset trajectory patterns
+    if True:
+        plot_trajectories = ("plot_trajectories.R {0} {1} {2}").format(
+            args.atac["counts_rlog_nomedia_mat"],
+            args.atac["dp-gp_clusters"],
+            "{0}/{1}.dp_gp".format(args.folders["atac_dp-gp_dir"], atac_prefix))
+        print plot_trajectories
+        os.system(plot_trajectories)
+
+    quit()
+
+    # save key file
+    args.atac["dp-gp_subsample"] = "{}/{}.dp_gp.subsampled.ordered.txt".format(
+        args.folders["atac_dp-gp_dir"], atac_prefix)
+
 
     
-
-
     # Run homer on each group
 
 
@@ -229,7 +188,38 @@ def run(args):
 
     # overlap with histone information
     # TODO - actually use peak calls to determine overlaps and marks
+    args.atac["dp-gp_subsample_bed"] = "{0}/{1}.dp_gp.subsampled.ordered.bed".format(
+        args.folders["atac_dp-gp_dir"], atac_prefix)
+    get_atac_midpoints = (
+        "cat {0} | "
+        "awk -F ':' '{{ print $1\"\t\"$2 }}' | "
+        "awk -F '-' '{{ print $1\"\t\"$2 }}' | "
+        "awk -F '\t' 'BEGIN {{ OFS=\"\t\" }} {{ $2=$2+int(($3-$2)/2); $3=$2+1; print }}' "
+        "> {1}").format(args.atac["dp-gp_subsample"],
+                        args.atac["dp-gp_subsample_bed"])
+
+    print get_atac_midpoints
+    os.system(get_atac_midpoints)
+
+    # and plot with the midpoint file (testing HJ3K27ac)
+    histones = ["H3K27ac", "H3K4me1", "H3K27me3"]
+
+    for histone in histones:
     
+        histone_bigwigs = sorted(
+            glob.glob("{}/{}".format(
+                args.chipseq["data_dir"],
+                args.chipseq["histones"][histone]["pooled_bigwig_glob"])))
+        make_deeptools_heatmap(
+            args.atac["dp-gp_subsample_bed"],
+            histone_bigwigs,
+            "{0}/{1}.{2}_profile".format(args.folders["atac_dp-gp_dir"],
+                                         atac_prefix,
+                                         histone),
+        sort=False)
+    
+    
+    quit()
     
 
     

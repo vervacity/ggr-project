@@ -32,3 +32,4 @@ def filter_for_ids(mat_file, keep_ids_file, gz_out_file, opposite=False, counts=
     keep_data.to_csv(gz_out_file, sep='\t', compression='gzip')
 
     return None
+

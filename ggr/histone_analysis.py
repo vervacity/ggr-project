@@ -15,6 +15,7 @@ from ggr.util.bed_utils import merge_regions
 from ggr.util.parallelize import setup_multiprocessing_queue
 from ggr.util.parallelize import run_in_parallel
 
+from ggr.util.diff import join_diff_region_lists_to_mat
 
 
 def run(args):
@@ -105,8 +106,19 @@ def run(args):
         
             
         # enumerate trajectories (9 groups) and keep trajectory numbers
+        sig_up_files = sorted(glob.glob("{}/*sigResultsUp.txt".format(histone_diff_dir)))
+        sig_down_files = sorted(glob.glob("{}/*sigResultsDown.txt".format(histone_diff_dir)))
+        sig_up_down_pairs = zip(sig_up_files, sig_down_files)
 
         
+        args.chipseq["histones"][histone]["sig_mat"] = "{}/{}.sig.mat.txt".format(
+            histone_diff_dir, histone_prefix)
+        join_diff_region_lists_to_mat(
+            args.chipseq["histones"][histone]["master_regions"],
+            sig_up_down_pairs,
+            args.chipseq["histones"][histone]["sig_mat"])
+
+
         # from here, move onto integration with ATAC info
     
 
