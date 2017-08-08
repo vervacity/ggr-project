@@ -281,6 +281,39 @@ def make_count_matrix(
     return None
 
 
+def split_count_matrix_by_replicate(
+        count_matrix_file,
+        rep1_file,
+        rep2_file,
+        pooled_file):
+    """Takes an input matrix and splits into replicates 
+    and a pooled file.
+    """
+    assert ".mat" in count_matrix_file
+    data = pd.read_table(count_matrix_file)
+    
+    # rep1
+    rep1_columns = [
+        colname for colname in data.columns
+        if "b1" in colname]
+    data_rep1 = data[rep1_columns]
+    data_rep1.to_csv(rep1_file, sep='\t', compression="gzip")
 
+    # rep2
+    rep2_columns = [
+        colname for colname in data.columns
+        if "b2" in colname]
+    data_rep2 = data[rep2_columns]
+    data_rep2.to_csv(rep2_file, sep='\t', compression="gzip")
 
+    # pooled
+    samples = sorted(
+        list(set([colname.split("_")[0]
+                  for colname in data.columns])))
+    for sample in samples:
+        data[sample] = data["{}_b1".format(sample)] + data["{}_b2".format(sample)]
+    data_pooled = data[samples]
+    data_pooled.to_csv(pooled_file, sep='\t', compression="gzip")
+
+    return None
 

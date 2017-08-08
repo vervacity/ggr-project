@@ -5,6 +5,7 @@
     
     "atac_dir":"results/atac",
     "atac_timeseries_dir":"results/atac/timeseries",
+    "atac_deseq2_dir":"results/atac/timeseries/deseq2",
     "atac_dynamic_dir":"results/atac/dynamic",
     "atac_stable_dir":"results/atac/stable",
     "atac_dp-gp_dir":"results/atac/dp_gp",

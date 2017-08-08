@@ -3,7 +3,11 @@
 
 import os
 
-def run_homer(positives_bed, background_bed, out_dir, parallel=12):
+def run_homer(
+        positives_bed,
+        background_bed,
+        out_dir,
+        parallel=12):
     """Generic wrapper to run homer on a set of regions (vs background)
     """
     run_homer = ("findMotifsGenome.pl {0} hg19 {1}"
@@ -19,7 +23,14 @@ def run_homer(positives_bed, background_bed, out_dir, parallel=12):
     return None
 
 
-def make_deeptools_heatmap(point_file, bigwig_files, prefix, sort=False, kval=4, referencepoint='TSS', extend_dist=1000):
+def make_deeptools_heatmap(
+        point_file,
+        bigwig_files,
+        prefix,
+        sort=False,
+        kval=4,
+        referencepoint='TSS',
+        extend_dist=1000):
     '''
     Uses deeptools to make a profile heatmap
     '''
@@ -78,3 +89,5 @@ def make_deeptools_heatmap(point_file, bigwig_files, prefix, sort=False, kval=4,
     
         
     return None
+
+

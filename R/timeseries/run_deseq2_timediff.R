@@ -36,7 +36,11 @@ mkdir <- paste("mkdir -p",
 system(mkdir)
 
 # make count matrix
-count_data <- as.matrix(read.table(gzfile(in_file), sep='\t', header=TRUE, row.names=1))
+count_data <- as.matrix(read.table(
+    gzfile(in_file),
+    sep='\t',
+    header=TRUE,
+    row.names=1))
 
 # run pairwise comparisons for all
 for (idx1 in seq(1, ncol(count_data)-1, 2)) {
@@ -68,7 +72,8 @@ for (idx1 in seq(1, ncol(count_data)-1, 2)) {
         rownames(col_data) <- colnames(pairwise_count_data)
 
         # do not evaluate if files exist
-        sigresultsall_file <- paste(prefix, '.', t_compare, '_over_', t_baseline, '_sigResultsAll.txt', sep='')
+        sigresultsall_file <- paste(
+            prefix, '.', t_compare, '_over_', t_baseline, '_sigResultsAll.txt', sep='')
         if (file.exists(sigresultsall_file)) { next }
 
         # make DESeq dataset
@@ -91,30 +96,36 @@ for (idx1 in seq(1, ncol(count_data)-1, 2)) {
         res_filt_down <- res_filt[res_filt$log2FoldChange < 0,]
 
         # write everything out
-        write.table(res_filt,
-                    file=paste(prefix, '.', t_compare, '_over_', t_baseline, '_sigResultsAll.txt', sep=''),
-                    quote=FALSE, sep='\t')
+        write.table(
+            res_filt,
+            file=gzfile(
+                paste(prefix, '.', t_compare, '_over_', t_baseline, '_sigResultsAll.txt.gz', sep='')),
+            quote=FALSE, sep='\t')
         
         up_names <- str_split_fixed(rownames(res_filt_up), '[.]', 2)[,1] # for ENSG genes
-        write.table(up_names,
-                    file=paste(prefix, '.', t_compare, '_over_', t_baseline, '_sigResultsUp.txt', sep=''),
-                    quote=FALSE, row.names=FALSE, col.names=FALSE,
-                    sep='\t')
+        write.table(
+            up_names,
+            file=gzfile(
+                paste(prefix, '.', t_compare, '_over_', t_baseline, '_sigResultsUp.txt.gz', sep='')),
+            quote=FALSE, row.names=FALSE, col.names=FALSE,
+            sep='\t')
         
         down_names <- str_split_fixed(rownames(res_filt_down), '[.]', 2)[,1] # for ENSG genes
-        write.table(down_names,
-                    file=paste(prefix, '.', t_compare, '_over_', t_baseline, '_sigResultsDown.txt', sep=''),
-                    quote=FALSE, row.names=FALSE, col.names=FALSE,
-                    sep='\t')
+        write.table(
+            down_names,
+            file=gzfile(
+                paste(prefix, '.', t_compare, '_over_', t_baseline, '_sigResultsDown.txt.gz', sep='')),
+            quote=FALSE, row.names=FALSE, col.names=FALSE,
+            sep='\t')
         
     }
 }
 
 
 # now merge sigResults to get list of full regions that are significant
-merge_sigresults <- paste("cat ",
+merge_sigresults <- paste("zcat ",
                           dirname(prefix),
-                          "/*sigResultsAll.txt | ",
+                          "/*sigResultsAll.txt.gz | ",
                           "awk -F '\t' '{ print $1 }' | ",
                           "grep -v baseMean | ",
                           "sort | ",

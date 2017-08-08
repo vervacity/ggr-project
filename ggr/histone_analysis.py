@@ -27,12 +27,13 @@ def run(args):
 
     for histone in histones:
 
-        logging.info("working on {}".format(histone))
+        logging.info("HISTONE: Working on {}".format(histone))
         histone_prefix = "ggr.{}".format(histone)
         histone_dir = args.folders["{}_dir".format(histone)]
         
         # first do an intersect of the raw BED files,
         # the current overlap (1/23/2017) was unstable
+        logging.info("HISTONE: {}: Intersecting replicates...".format(histone))
         days = ["d0", "d3", "d6"]
         intersect_dir = "{}/intersect".format(histone_dir)
         os.system("mkdir -p {}".format(intersect_dir))
@@ -62,6 +63,7 @@ def run(args):
                 os.system(bed_intersect)
         
         # generate master regions file
+        logging.info("HISTONE: {}: Generating master regions...".format(histone))
         args.chipseq["histones"][histone]["master_regions"] = "{0}/ggr.{1}.macs2.master.bed.gz".format(
             args.folders["data_dir"], histone)
         if not os.path.isfile(args.chipseq["histones"][histone]["master_regions"]):
@@ -77,6 +79,7 @@ def run(args):
         assert len(bedpe_file_list) == 6
 
         # make count matrix for histone mark
+        logging.info("HISTONE: {}: Making counts matrix...".format(histone))
         args.chipseq["histones"][histone]["counts"] = "{0}/ggr.{1}.midpoints.counts.mat.txt.gz".format(
             args.folders["data_dir"], histone)
         make_count_matrix(
@@ -87,6 +90,7 @@ def run(args):
             tmp_dir=histone_dir)
 
         # run DESeq on forward sequential pairs of timepoints
+        logging.info("HISTONE: {}: Running DESeq2 analysis...".format(histone))
         histone_diff_dir = args.folders["{}_diff_dir".format(histone)]
         args.chipseq["histones"][histone]["dynamic_ids"] = "{0}/ggr.{1}.dynamic.ids.txt.gz".format(
             histone_diff_dir, histone)
@@ -101,9 +105,7 @@ def run(args):
 
             
         # run rlog to have standardized matrix (to viz and do QC)
-        
-        
-        
+                
             
         # enumerate trajectories (9 groups) and keep trajectory numbers
         sig_up_files = sorted(glob.glob("{}/*sigResultsUp.txt".format(histone_diff_dir)))
