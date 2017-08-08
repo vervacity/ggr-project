@@ -92,7 +92,7 @@ def run(args):
             args.atac["counts_pooled"])
 
     logging.info("ATAC: normalizing count files...")
-    if not os.path.isfile("{}.rlog.mat.gz".format(
+    if not os.path.isfile("{}.rlog.mat.txt.gz".format(
             args.atac["counts_pooled"].split(".mat")[0])):
         run_rlogs = "normalize_count_mats.R {0} {1} {2} {3}".format(
             args.atac["counts"],
@@ -125,19 +125,19 @@ def run(args):
             stable_handle = "{}_stable".format(rlog_handle)
             args.atac[stable_handle] = "{}.stable.mat.txt.gz".format(
                 args.atac[rlog_handle].split('.mat')[0])
-            if not os.path.isfile(args.atac['stable_mat']):
+            if not os.path.isfile(args.atac[stable_handle]):
                 filter_for_ids(args.atac[rlog_handle],
                                args.atac["dynamic_ids"],
                                args.atac[stable_handle],
                                opposite=True)
 
-    quit()
-    
     # 7) Run trajectories (on dynamic set) using DP_GP clustering
     args.atac["consistent_clusters"] = get_consistent_dpgp_trajectories(
         args.atac["counts_rep1_rlog_dynamic"],
         args.atac["counts_rep2_rlog_dynamic"],
-        args.atac["counts_pooled_rlog_dynamic"])
+        args.atac["counts_pooled_rlog_dynamic"],
+        args.folders["atac_dp-gp_dir"],
+        atac_prefix)
 
 
     quit()
