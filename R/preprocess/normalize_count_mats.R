@@ -11,6 +11,7 @@ args <- commandArgs(trailingOnly=TRUE)
 master_count_file <- args[1]
 other_count_files <- args[2:length(args)]
 
+
 master_counts <- read.table(
     gzfile(master_count_file),
     header=TRUE,
@@ -38,8 +39,8 @@ data_rlog <- rlog(dds, blind=FALSE)
 for (count_file_idx in 1:length(other_count_files)) {
 
     count_file <- other_count_files[count_file_idx]
-    prefix <- unlist(strsplit(count_file, ".mat", fixed=TRUE))
-    out_file <- paste(prefix, ".rlog.mat.gz", sep="")
+    prefix <- unlist(strsplit(count_file, ".mat", fixed=TRUE))[1]
+    out_file <- paste(prefix, ".rlog.mat.txt.gz", sep="")
 
     counts <- read.table(
         gzfile(count_file),

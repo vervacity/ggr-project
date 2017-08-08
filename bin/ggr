@@ -100,7 +100,7 @@ def main():
     args = run(args)
 
     # run histone analyses
-    #from ggr.histone_analysis import run
+    from ggr.histone_analysis import run
     #args = run(args)
     
 

@@ -77,7 +77,7 @@ def run(args):
         print run_timeseries_deseq2
         os.system(run_timeseries_deseq2)
 
-    # 4) trajectories: make rep1, rep2, pooled files (for DP_GP analysis)
+    # 4) trajectories: make normalized rep1, rep2, pooled files (for DP_GP analysis)
     counts_prefix = args.atac["counts"].split(".mat")[0]
     args.atac["counts_rep1"] = "{}.rep1.mat.txt.gz".format(counts_prefix)
     args.atac["counts_rep2"] = "{}.rep2.mat.txt.gz".format(counts_prefix)
@@ -102,14 +102,11 @@ def run(args):
         print run_rlogs
         os.system(run_rlogs)
     
-    quit()
-    
     # for each of the counts files:
     logging.info("ATAC: filtering dynamic/stable...")
     counts_files_to_normalize = ["counts_rep1", "counts_rep2", "counts_pooled"]
     for counts_handle in counts_files_to_normalize:
 
-        # 5) use DESeq to run rlog normalization (for visualization and timeseries)
         rlog_handle = "{}_rlog".format(counts_handle)
         args.atac[rlog_handle] = "{}.rlog.mat.txt.gz".format(
             args.atac[counts_handle].split('.mat')[0])

@@ -312,7 +312,7 @@ def split_count_matrix_by_replicate(
                   for colname in data.columns])))
     for sample in samples:
         data[sample] = data["{}_b1".format(sample)] + data["{}_b2".format(sample)]
-    data_pooled = data[samples]
+    data_pooled = data[samples].astype(int)
     data_pooled.to_csv(pooled_file, sep='\t', compression="gzip")
 
     return None
