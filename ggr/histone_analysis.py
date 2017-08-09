@@ -127,21 +127,33 @@ def run(args):
             print run_rlogs
             os.system(run_rlogs)
             
-        # 6) enumerate trajectories (9 groups) and keep trajectory numbers
+        # 6) enumerate trajectories (9 groups)
         sig_up_files = sorted(glob.glob("{}/*sigResultsUp.txt.gz".format(histone_diff_dir)))
         sig_down_files = sorted(glob.glob("{}/*sigResultsDown.txt.gz".format(histone_diff_dir)))
         sig_up_down_pairs = zip(sig_up_files, sig_down_files)
-        args.chipseq["histones"][histone]["sig_mat"] = "{}/{}.sig.mat.txt".format(
+        args.chipseq["histones"][histone]["sig_mat"] = "{}/{}.deseq2.mat.txt.gz".format(
             histone_diff_dir, histone_prefix)
         if not os.path.isfile(args.chipseq["histones"][histone]["sig_mat"]):
             join_diff_region_lists_to_mat(
                 args.chipseq["histones"][histone]["master_regions"],
                 sig_up_down_pairs,
                 args.chipseq["histones"][histone]["sig_mat"])
-        # TODO convert to BED files too
-        
-
-        
+            
+        args.chipseq["histones"][histone]["clusters_bed"] = "{}/{}.deseq2.clusters.bed.gz".format(
+            histone_diff_dir, histone_prefix)
+        if not os.path.isfile(args.chipseq["histones"][histone]["clusters_bed"]):
+            make_bed = (
+                "zcat {0} | "
+                "awk -F '\t' '{{ print $1\"\t\"$4 }}' | "
+                "awk -F ':' '{{ print $1\"\t\"$2 }}' | "
+                "awk -F '-' '{{ print $1\"\t\"$2 }}' | "
+                "grep -v regions | "
+                "sort -k1,1 -k2,2n | "
+                "gzip -c > {1}").format(
+                    args.chipseq["histones"][histone]["sig_mat"],
+                    args.chipseq["histones"][histone]["clusters_bed"])
+            print make_bed
+            os.system(make_bed)
             
             
     return None

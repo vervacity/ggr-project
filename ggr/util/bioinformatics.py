@@ -34,20 +34,24 @@ def make_deeptools_heatmap(
     '''
     Uses deeptools to make a profile heatmap
     '''
+
+    # TODO(dk) try sorting using a BED with groups.
     
     # do the same with TSS
     point_matrix = '{}.point.mat.gz'.format(prefix)
-    deeptools_compute_matrix = ("computeMatrix reference-point "
-                                "--referencePoint {0} "
-                                "-b {1} -a {1} "
-                                "-R {2} "
-                                "-S {3} "
-                                #"--skipZeros "
-                                "-o {4} ").format(referencepoint,
-                                                  extend_dist,
-                                                  point_file,
-                                                  ' '.join(bigwig_files),
-                                                  point_matrix)
+    deeptools_compute_matrix = (
+        "computeMatrix reference-point "
+        "--referencePoint {0} "
+        "-b {1} -a {1} "
+        "-R {2} "
+        "-S {3} "
+        #"--skipZeros "
+        "-o {4} ").format(
+            referencepoint,
+            extend_dist,
+            point_file,
+            ' '.join(bigwig_files),
+            point_matrix)
     if not os.path.isfile(point_matrix):
         print deeptools_compute_matrix
         os.system(deeptools_compute_matrix)
@@ -69,20 +73,23 @@ def make_deeptools_heatmap(
         sorting = ''
     else:
         sorting = '--kmeans {0} --regionsLabel {1}'.format(kval, ' '.join([str(i) for i in range(kval)]))
-    deeptools_plot_heatmap = ("plotHeatmap -m {0} "
-                              "-out {1} "
-                              "--outFileSortedRegions {2} "
-                              "--colorMap Blues "
-                              "{3} "
-                              "--samplesLabel {4} "
-                              "--xAxisLabel '' "
-                              "--refPointLabel Summit "
-                              "--legendLocation none "
-                              "--heatmapHeight 50").format(point_matrix,
-                                                           point_plot,
-                                                           point_sorted_file,
-                                                           sorting,
-                                                           ' '.join(sample_labels))
+    deeptools_plot_heatmap = (
+        "plotHeatmap -m {0} "
+        "-out {1} "
+        "--outFileSortedRegions {2} "
+        "--colorMap Blues "
+        "{3} "
+        "--samplesLabel {4} "
+        "--xAxisLabel '' "
+        "--refPointLabel Summit "
+        "--legendLocation none "
+        "--heatmapHeight 50"
+        "--whatToShow 'heatmap and colorbar'").format(
+            point_matrix,
+            point_plot,
+            point_sorted_file,
+            sorting,
+            ' '.join(sample_labels))
     if not os.path.isfile(point_plot):
         print deeptools_plot_heatmap
         os.system(deeptools_plot_heatmap)

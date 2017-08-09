@@ -139,10 +139,40 @@ def run(args):
         args.folders["atac_dp-gp_dir"],
         atac_prefix)
 
+    quit()
+    
+    # 8) Take trajectories, run hclust to renumber clusters in order of hclust
+    reorder_clusters = ("reorder_clusters_w_hclust.R {0} {1} {2}").format()
+
+    
+
+    # and make into a BED file with renumbered clusters
+
+    
+    # make BED (to overlap with histones)
+    args.atac["clusters_bed_orig"] = "{}.bed.gz".format(
+        args.atac["consistent_clusters"].split('.txt')[0])
+    if not os.path.isfile(args.atac["clusters_bed_orig"]):
+        make_bed = (
+            "cat {0} | "
+            "awk -F '\t' '{{ print $1\"\t\"$4 }}' | "
+            "awk -F ':' '{{ print $1\"\t\"$2 }}' | "
+            "awk -F '-' '{{ print $1\"\t\"$2 }}' | "
+            "grep -v regions | "
+            "sort -k1,1 -k2,2n | "
+            "gzip -c > {1}").format(
+                args.atac["consistent_clusters"],
+                args.atac["clusters_bed"])
+        print make_bed
+        os.system(make_bed)
+
+
 
     quit()
 
+    # MOVE THIS TO INTEGRATIVE
     # 8) split the clusters into bed files and run GREAT/HOMER
+    # TODO convert this into a _from_dir method to make easy
     if False:
         data = pd.read_table(args.atac["dp-gp_clusters"])
         print data.columns

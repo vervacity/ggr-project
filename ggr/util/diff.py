@@ -12,6 +12,7 @@ def join_diff_region_lists_to_mat(master_list, sig_up_down_pairs, out_file):
     """Takes pairs of (sig up, sig down) files (zip them ordered together)
     and saves them out to out_file. includes non changed ids from master list
     """
+    assert ".gz" in out_file
 
     master = pd.read_table(master_list, header=None)
     master.columns = ["chrom", "start", "stop"]
@@ -59,6 +60,6 @@ def join_diff_region_lists_to_mat(master_list, sig_up_down_pairs, out_file):
     master["cluster"] = master["cluster"].astype(int)
 
     # save
-    master.to_csv(out_file, sep='\t')
+    master.to_csv(out_file, sep='\t', compression="gzip")
     
     return

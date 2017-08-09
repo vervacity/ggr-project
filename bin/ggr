@@ -97,11 +97,11 @@ def main():
 
     # run atac analyses
     from ggr.atac_analysis import run
-    args = run(args)
+    #args = run(args)
 
     # run histone analyses
     from ggr.histone_analysis import run
-    #args = run(args)
+    args = run(args)
     
 
     # run integrative analyses

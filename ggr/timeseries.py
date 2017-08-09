@@ -195,6 +195,8 @@ def get_consistent_dpgp_trajectories(
                     out.write(line)
                 else:
                     # inconsistent
-                    out.write("{}\t{}\t{}\t{}\n".format(region, rep1_cluster, rep2_cluster, "-1"))
+                    out.write("{}\t{}\t{}\t{}\n".format(region, rep1_cluster, rep2_cluster, "NA"))
     
     return cluster_repr_mat_file
+
+
