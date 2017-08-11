@@ -20,6 +20,12 @@
     
     "H3K27me3_dir":"results/histone/H3K27me3",
     "H3K27me3_diff_dir":"results/histone/H3K27me3/diff",
+
+    "epigenome_dir":"results/epigenome",
+    "epigenome_stable_dir":"results/epigenome/stable",
+    "epigenome_stable_great_dir":"results/epigenome/stable/great",
+    "epigenome_dynamic_dir":"results/epigenome/dynamic",
+    "epigenome_dynamic_great_dir":"results/epigenome/dynamic/great",
     
     "rna_dir":"results/rna",
     "tf_dir":"results/tf"

@@ -1,4 +1,5 @@
 {
+    "chromsizes":"/mnt/data/annotations/by_release/hg19.GRCh37/hg19.chrom.sizes",
     "gencode_all_gtf":"/mnt/data/annotations/by_release/hg19.GRCh37/GENCODE_ann/gencode.v19.annotation.gtf",
     "gencode_proteincoding_gtf":"/mnt/data/annotations/by_release/hg19.GRCh37/GENCODE_ann/gencode.v19.annotation.protein_coding.gtf",
     "fantom5_transcriptionfactor_csv":"/mnt/lab_data/kundaje/users/dskim89/annotations/fantom5_transcriptionfactors_hg19.csv"

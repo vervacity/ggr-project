@@ -51,94 +51,130 @@ for (i in 1:length(unique(clusters$cluster))) {
 
 colnames(cluster_means) <- colnames(cluster_subset)
 
-
 # calculate a dist matrix
 my_hclust <- function(d) {
     return(hclust(d, method="ward.D2"))
 
 }
 
-
-hclust_means <- hclust(dist(as.matrix(cluster_means)), method="ward.D2", members=cluster_sizes)
+hclust_means <- my_hclust(dist(as.matrix(cluster_means)))
 new_cluster_nums <- hclust_means$order
-dend <- as.dendrogram(hclust_means)
-
-png("test.dendro.1.png")
-plot(dend)
-dev.off()
-
-print(seq(1:14))
-print(new_cluster_nums)
 
 # ===================================
 # for dendrogram
 
 cluster_sizes <- cluster_sizes
+
 print(cluster_sizes)
+
 ratios <- as.integer(cluster_sizes / min(cluster_sizes))
-print(ratios)
 
 # set up repeated clusters
 cluster_means_rep <- data.frame()
-cluster_means_rep_members <- c()
 for (cluster_idx in 1:length(ratios)) {
-    print(ratios[cluster_idx])
     for (i in 1:ratios[cluster_idx]) {
-        #cluster_means_rep <- rbind(cluster_means_rep, cluster_means[cluster_idx,])
-        cluster_means_rep <- rbind(cluster_means_rep, jitter(as.numeric(cluster_means[cluster_idx,])))
-        cluster_means_rep_members <- c(cluster_means_rep_members, cluster_idx)
+        cluster_means_rep <- rbind(cluster_means_rep, cluster_means[cluster_idx,])
     }
-    # small perturb to center the dendro
-    #perturbed_cluster_means_lo <- cluster_means[cluster_idx,]
-    #perturbed_cluster_means_lo[1] <- perturbed_cluster_means_lo[1] + 0.2
-    #cluster_means_rep <- rbind(cluster_means_rep, perturbed_cluster_means_lo)
-    #cluster_means_rep_members <- c(cluster_means_rep_members, cluster_idx)
-    
-    #perturbed_cluster_means_hi <- cluster_means[cluster_idx,]
-    #perturbed_cluster_means_hi[1] <- perturbed_cluster_means_hi[1] -0.4
-    #cluster_means_rep <- rbind(cluster_means_rep, perturbed_cluster_means_hi)
-    #cluster_means_rep_members <- c(cluster_means_rep_members, cluster_idx)
-
-    
-    #perturbed_tot <- max(as.integer(ratios[cluster_idx] / 3.0), 1)
-    #for (i in 1:perturbed_tot) {
-    #    cluster_means_rep <- rbind(cluster_means_rep, perturbed_cluster_means)
-    #    cluster_means_rep_members <- c(cluster_means_rep_members, cluster_idx)
-    #}
-    
 }
 
-
-# also inject intermediates between clusters
-
-
-
 # hclust
-hclust_dendro <- hclust(dist(as.matrix(cluster_means_rep)), method="ward.D2")
+hclust_dendro <- my_hclust(dist(as.matrix(cluster_means_rep)))
 dend <- as.dendrogram(hclust_dendro)
-
-
-ordered_cluster_nums <- cluster_means_rep_members[hclust_dendro$order]
-new_cluster_nums <- ordered_cluster_nums[!duplicated(ordered_cluster_nums)]
-print(new_cluster_nums)
-
-
-print(cluster_means)
-print(cluster_means[hclust_means$order,])
-print(head(cluster_means_rep[hclust_dendro$order,]))
 
 png("test.dendro.0.png")
 plot(dend)
 dev.off()
 
+q()
+
+
+
+
+
+hclust_means_double <- my_hclust(dist(as.matrix(clsuter_means_double)))
+dend <- as.dendrogram(hclust_means_double)
+
+
+get_spacing <- function(dendro, cluster_sizes) {
+    
+    if (is.null(attr(dendro, "leaf"))) {
+        midpoint_val <- attr(dendro, "midpoint")
+    } else {
+        # it's a leaf
+        midpoint_val <- cluster_sizes[as.numeric(attr(dendro, "label"))] / 4.0
+    }
+    return(midpoint_val)
+    
+}
+
+
+adjust_midpoint_at_height <- function(dendro, cluster_sizes, height) {
+    
+    # TODO reorder
+    if (!is.null(attr(dendro, "leaf"))) {
+        # don't do anything
+    } else if ( attr(dendro, "height") == height ) {
+        # adjust the midpoint here
+        left_space <- get_spacing(dendro[[1]], cluster_sizes)
+        right_space <- get_spacing(dendro[[2]], cluster_sizes)
+        #print(attr(dendro, "midpoint"))
+        attr(dendro, "midpoint") <- (left_space + right_space) / 2.0
+        #print(attr(dendro, "midpoint"))
+    } else {
+        # not a leaf but not the right height, so keep doing down
+        dendro[[1]] <- adjust_midpoint_at_height(dendro[[1]], cluster_sizes, height)
+        dendro[[2]] <- adjust_midpoint_at_height(dendro[[2]], cluster_sizes, height)
+    }
+    return(dendro)
+}
+
+
+adjust_dendro <- function(dendro, cluster_sizes, node_heights) {
+
+    # for each height level, starting from lowest (minus leaves) going up, adjust midpoints
+    for (height_idx in 2:length(node_heights)) {
+        print(node_heights[height_idx])
+        dendro <- adjust_midpoint_at_height(
+            dendro, cluster_sizes, node_heights[height_idx])
+    }
+    
+    return(dendro)
+
+}
+
+
+unique_heights <- sort(unique(get_nodes_attr(dend, "height")))
+print(unique_heights)
+
+print(get_nodes_attr(dend, "midpoint"))
+
+dendro_new <- adjust_dendro(dend, cluster_sizes, unique_heights)
+
+print(get_nodes_attr(dendro_new, "midpoint"))
+
+png("test.dendro.1.png")
+plot(dend)
+dev.off()
+
+
+png("test.dendro.2.png")
+plot(dendro_new)
+dev.off()
+
+
+
+q()
+
+
+
 
 # END DENDRO
-# =================================
+
 
 print(new_cluster_nums)
 
 # change old numbers for new ones
-data_w_clusters$new_cluster <- match(data_w_clusters$cluster, new_cluster_nums)
+data_w_clusters$new_cluster <- match(data_w_clusters$cluster, hclust_means$order)
 data_w_clusters_sorted <- data_w_clusters[order(data_w_clusters$new_cluster),]
 
 

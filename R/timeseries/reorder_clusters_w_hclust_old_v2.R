@@ -51,7 +51,6 @@ for (i in 1:length(unique(clusters$cluster))) {
 
 colnames(cluster_means) <- colnames(cluster_subset)
 
-
 # calculate a dist matrix
 my_hclust <- function(d) {
     return(hclust(d, method="ward.D2"))
@@ -84,8 +83,7 @@ cluster_means_rep_members <- c()
 for (cluster_idx in 1:length(ratios)) {
     print(ratios[cluster_idx])
     for (i in 1:ratios[cluster_idx]) {
-        #cluster_means_rep <- rbind(cluster_means_rep, cluster_means[cluster_idx,])
-        cluster_means_rep <- rbind(cluster_means_rep, jitter(as.numeric(cluster_means[cluster_idx,])))
+        cluster_means_rep <- rbind(cluster_means_rep, cluster_means[cluster_idx,])
         cluster_means_rep_members <- c(cluster_means_rep_members, cluster_idx)
     }
     # small perturb to center the dendro
@@ -131,6 +129,7 @@ png("test.dendro.0.png")
 plot(dend)
 dev.off()
 
+q()
 
 # END DENDRO
 # =================================

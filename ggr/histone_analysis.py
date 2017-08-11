@@ -156,4 +156,4 @@ def run(args):
             os.system(make_bed)
             
             
-    return None
+    return args

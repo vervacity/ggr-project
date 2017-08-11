@@ -13,7 +13,7 @@ bed_file <- args[1]
 prefix <- args[2]
 
 # setup bed file
-bed <- read.table(bed_file, header=FALSE, row.names=NULL)
+bed <- read.table(gzfile(bed_file), header=FALSE, row.names=NULL)
 colnames(bed) <- c('chr', 'start', 'stop')
 
 # create GREAT job and get enrichments

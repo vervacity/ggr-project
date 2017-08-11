@@ -30,7 +30,8 @@ def make_deeptools_heatmap(
         sort=False,
         kval=4,
         referencepoint='TSS',
-        extend_dist=1000):
+        extend_dist=1000,
+        color="Blues"):
     '''
     Uses deeptools to make a profile heatmap
     '''
@@ -68,7 +69,7 @@ def make_deeptools_heatmap(
     point_plot = '{}.heatmap.profile.png'.format(prefix)
     point_sorted_file = '{}.point.sorted.bed'.format(prefix)
     if sort == False:
-        sorting = '--sortRegions=no'
+        sorting = '--sortRegions=descend' # changed here
     elif kval == 1:
         sorting = ''
     else:
@@ -77,17 +78,19 @@ def make_deeptools_heatmap(
         "plotHeatmap -m {0} "
         "-out {1} "
         "--outFileSortedRegions {2} "
-        "--colorMap Blues "
-        "{3} "
-        "--samplesLabel {4} "
+        "--colorMap {3} "
+        "{4} "
+        "--samplesLabel {5} "
         "--xAxisLabel '' "
         "--refPointLabel Summit "
         "--legendLocation none "
-        "--heatmapHeight 50"
+        "--heatmapHeight 50 "
+        "--boxAroundHeatmaps no "
         "--whatToShow 'heatmap and colorbar'").format(
             point_matrix,
             point_plot,
             point_sorted_file,
+            color,
             sorting,
             ' '.join(sample_labels))
     if not os.path.isfile(point_plot):

@@ -130,7 +130,30 @@ def run(args):
                                args.atac["dynamic_ids"],
                                args.atac[stable_handle],
                                opposite=True)
+                
+            # also make a BED file for downstream analyses
+            stable_bed_handle = "{}_bed".format(stable_handle)
+            args.atac[stable_bed_handle] = "{}.bed.gz".format(
+                args.atac[stable_handle].split(".mat")[0])
+            if not os.path.isfile(args.atac[stable_bed_handle]):
+                make_bed = (
+                    "zcat {} | "
+                    "awk -F '\t' '{{ print $1 }}' | "
+                    "awk -F ':' '{{ print $1\"\t\"$2 }}' | "
+                    "awk -F '-' '{{ print $1\"\t\"$2 }}' | "
+                    "grep -v d0 | "
+                    "awk 'NF' | "
+                    "gzip -c > {}").format(
+                        args.atac[stable_handle],
+                        args.atac[stable_bed_handle])
+                print make_bed
+                os.system(make_bed)
+            
 
+    # break for now
+    if True:
+        return args
+                
     # 7) Run trajectories (on dynamic set) using DP_GP clustering
     args.atac["consistent_clusters"] = get_consistent_dpgp_trajectories(
         args.atac["counts_rep1_rlog_dynamic"],
