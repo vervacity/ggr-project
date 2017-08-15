@@ -148,11 +148,6 @@ def run(args):
                         args.atac[stable_bed_handle])
                 print make_bed
                 os.system(make_bed)
-            
-
-    # break for now
-    if True:
-        return args
                 
     # 7) Run trajectories (on dynamic set) using DP_GP clustering
     args.atac["consistent_clusters"] = get_consistent_dpgp_trajectories(
