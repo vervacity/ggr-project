@@ -9,6 +9,7 @@
     "atac_dynamic_dir":"results/atac/dynamic",
     "atac_stable_dir":"results/atac/stable",
     "atac_dp-gp_dir":"results/atac/dp_gp",
+    "atac_dp-gp_final_dir":"results/atac/dp_gp/final",
     
     "histone_dir":"results/histone",
     

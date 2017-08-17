@@ -16,22 +16,37 @@ from ggr.util.parallelize import setup_multiprocessing_queue
 from ggr.util.parallelize import run_in_parallel
 
 
-def merge_cluster_files(cluster_files, out_file):
+def merge_cluster_files(cluster_files, out_file, cluster_name_pos=2):
     """Given a list of cluster files, merge
     """
-    clusters = pd.read_table(cluster_files[0], sep='\t')
-    col_name = os.path.basename(cluster_files[0]).split("_optimal")[0]
-    clusters.columns = [col_name, "region"]
-    clusters = clusters[["region", col_name]]
+    # merge all clusters
+    clusters = None
+    for cluster_file in cluster_files:
+        clusters_tmp = pd.read_table(cluster_file, sep='\t', index_col=0, header=None)
+        col_name = os.path.basename(cluster_file).split(".")[cluster_name_pos]
+        clusters_tmp[col_name] = [1 for i in range(clusters_tmp.shape[0])]
+        clusters_tmp["region"] = clusters_tmp.index
+        clusters_tmp = clusters_tmp[["region", col_name]]    
+        
+        if clusters is None:
+            clusters = clusters_tmp
+        else:
+            clusters = clusters.merge(clusters_tmp, how="outer", on="region")
+
+    clusters = clusters.fillna(0)
+    clusters.index = clusters["region"]
+    del clusters["region"]
     
-    for cluster_file in cluster_files[1:]:
-        clusters_tmp = pd.read_table(cluster_file, sep='\t')
-        col_name = os.path.basename(cluster_file).split("_optimal")[0]
-        clusters_tmp.columns = [col_name, "region"]
+    # and set up master cluster id (for sorting)
+    clusters["atac_cluster"] = [0 for i in range(clusters.shape[0])]
+    num_clusters = clusters.shape[1] - 1
+    for i in range(num_clusters):
+        clusters["atac_cluster"] = clusters["atac_cluster"] + (10**i) * (clusters.iloc[:,i])
+    clusters["atac_cluster"] = clusters["atac_cluster"].astype(int)
 
-        clusters = clusters.merge(clusters_tmp, on="region")
-
-    clusters.to_csv(out_file, sep='\t', index=False)
+    # and sort by ID column
+    clusters = clusters.sort_values("atac_cluster")
+    clusters.to_csv(out_file, sep='\t', compression="gzip")
 
     return
 
@@ -359,8 +374,7 @@ def get_consistent_dpgp_trajectories(
 
     # stage 2: soft clustering
     soft_cluster_dir = "{}/soft".format(out_dir)
-    #if not os.path.isdir(soft_cluster_dir):
-    if True:
+    if not os.path.isdir(soft_cluster_dir):
         os.system("mkdir -p {}".format(soft_cluster_dir))
     
         # for each cluster (from POOLED clusters), get the mean and covariance matrix (assuming multivariate normal)

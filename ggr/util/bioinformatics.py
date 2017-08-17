@@ -69,9 +69,9 @@ def make_deeptools_heatmap(
     point_plot = '{}.heatmap.profile.png'.format(prefix)
     point_sorted_file = '{}.point.sorted.bed'.format(prefix)
     if sort == False:
-        sorting = '--sortRegions=descend' # changed here
-    elif kval == 1:
-        sorting = ''
+        sorting = '--sortRegions=no'
+    elif kval == 0:
+        sorting = '--sortRegions=descend'
     else:
         sorting = '--kmeans {0} --regionsLabel {1}'.format(kval, ' '.join([str(i) for i in range(kval)]))
     deeptools_plot_heatmap = (

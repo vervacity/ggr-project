@@ -9,6 +9,7 @@ import logging
 import pandas as pd
 
 from ggr.timeseries import get_consistent_dpgp_trajectories
+from ggr.timeseries import merge_cluster_files
 
 from ggr.util.parallelize import setup_multiprocessing_queue
 from ggr.util.parallelize import run_in_parallel
@@ -131,7 +132,7 @@ def run(args):
                                args.atac[stable_handle],
                                opposite=True)
                 
-            # also make a BED file for downstream analyses
+            # also make a stable BED file for downstream analyses
             stable_bed_handle = "{}_bed".format(stable_handle)
             args.atac[stable_bed_handle] = "{}.bed.gz".format(
                 args.atac[stable_handle].split(".mat")[0])
@@ -148,6 +149,27 @@ def run(args):
                         args.atac[stable_bed_handle])
                 print make_bed
                 os.system(make_bed)
+
+            # also make a dynamic BED file for downstream analyses
+            dynamic_bed_handle = "{}_bed".format(dynamic_handle)
+            args.atac[dynamic_bed_handle] = "{}.bed.gz".format(
+                args.atac[dynamic_handle].split(".mat")[0])
+            if not os.path.isfile(args.atac[dynamic_bed_handle]):
+                make_bed = (
+                    "zcat {} | "
+                    "awk -F '\t' '{{ print $1 }}' | "
+                    "awk -F ':' '{{ print $1\"\t\"$2 }}' | "
+                    "awk -F '-' '{{ print $1\"\t\"$2 }}' | "
+                    "grep -v d0 | "
+                    "awk 'NF' | "
+                    "gzip -c > {}").format(
+                        args.atac[dynamic_handle],
+                        args.atac[dynamic_bed_handle])
+                print make_bed
+                os.system(make_bed)
+
+                
+                
                 
     # 7) Run trajectories (on dynamic set) using DP_GP clustering
     args.atac["consistent_clusters"] = get_consistent_dpgp_trajectories(
@@ -157,7 +179,43 @@ def run(args):
         args.folders["atac_dp-gp_dir"],
         atac_prefix)
 
-    quit()
+    # 8) reorder (ie renumber) the clusters (numerically) by order of hclust
+    final_atac_clusters = sorted(glob.glob("{}/*.gz".format(args.folders["atac_dp-gp_final_dir"])))
+    if len(final_atac_clusters) == 0:
+        reorder_clusters = "reorder_soft_clusters_w_hclust.R {0} {1}/soft/*soft*gz".format(
+            args.folders["atac_dp-gp_final_dir"],
+            args.folders["atac_dp-gp_dir"])
+        print reorder_clusters
+        os.system(reorder_clusters)
+
+    # 9) make an integrated file with soft clusters
+    final_atac_clusters = sorted(glob.glob("{}/*.gz".format(args.folders["atac_dp-gp_final_dir"])))
+    args.atac["soft_cluster_mat"] = "{}/{}.clusters.soft.mat.txt.gz".format(
+        args.folders["atac_dp-gp_final_dir"],
+        atac_prefix)
+    if not os.path.isfile(args.atac["soft_cluster_mat"]):
+        merge_cluster_files(
+            final_atac_clusters,
+            args.atac["soft_cluster_mat"])
+    
+        
+    if True:
+        return args
+
+
+
+    # below is old code
+
+
+
+
+
+
+
+
+
+
+
     
     # 8) Take trajectories, run hclust to renumber clusters in order of hclust
     reorder_clusters = ("reorder_clusters_w_hclust.R {0} {1} {2}").format()
@@ -237,23 +295,6 @@ def run(args):
     # save key file
     args.atac["dp-gp_subsample"] = "{}/{}.dp_gp.subsampled.ordered.txt".format(
         args.folders["atac_dp-gp_dir"], atac_prefix)
-
-
-    
-    # Run homer on each group
-
-
-    # as well as GREAT
-
-    
-
-    # overlap with histone information
-
-    # TODO have a BED file for each histone mark with clusters
-
-
-    # for each histone mark, do an intersect with the ATAC peaks.
-    # to reconcile multiple hits for a peak, take nearest peak to midpoint of ATAC peak.
 
 
     
