@@ -167,9 +167,6 @@ def run(args):
                         args.atac[dynamic_bed_handle])
                 print make_bed
                 os.system(make_bed)
-
-                
-                
                 
     # 7) Run trajectories (on dynamic set) using DP_GP clustering
     args.atac["consistent_clusters"] = get_consistent_dpgp_trajectories(
@@ -179,15 +176,21 @@ def run(args):
         args.folders["atac_dp-gp_dir"],
         atac_prefix)
 
-    # 8) reorder (ie renumber) the clusters (numerically) by order of hclust
+    # 8) reorder (ie renumber) the SOFT clusters (numerically) by order of hclust and make sure to propagate to hard clusters
     final_atac_clusters = sorted(glob.glob("{}/*.gz".format(args.folders["atac_dp-gp_final_dir"])))
     if len(final_atac_clusters) == 0:
-        reorder_clusters = "reorder_soft_clusters_w_hclust.R {0} {1}/soft/*soft*gz".format(
+        reorder_clusters = "reorder_soft_clusters_w_hclust.R {0} {1}/soft/*hard*gz {1}/soft/*soft*gz".format(
             args.folders["atac_dp-gp_final_dir"],
             args.folders["atac_dp-gp_dir"])
         print reorder_clusters
         os.system(reorder_clusters)
 
+    quit()
+        
+
+    if True:
+        return args
+        
     # 9) make an integrated file with soft clusters
     final_atac_clusters = sorted(glob.glob("{}/*.gz".format(args.folders["atac_dp-gp_final_dir"])))
     args.atac["soft_cluster_mat"] = "{}/{}.clusters.soft.mat.txt.gz".format(

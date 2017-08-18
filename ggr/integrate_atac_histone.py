@@ -41,7 +41,13 @@ def get_nearest_mark(intersect_bed_file, out_file):
                     else:
                         distance = (int(fields[5]) - int(fields[4])) - (int(fields[2]) - int(fields[1]))
                         current_region_info = [region, {distance: fields[6]}]
-    
+
+            # don't forget to output the last region
+            closest_dist = min(current_region_info[1].keys())
+            out.write("{}\t{}\n".format(
+                current_region_info[0],
+                current_region_info[1][closest_dist]))
+
     return
 
 
@@ -131,34 +137,22 @@ def make_deeptools_bed(bed_file, out_bed_file, cluster_col=3, midpoint=False):
     return
 
 
-
-
-def run(args):
-    """Pipeline for integrating epigenome datasets
-    Assumes that ATAC analysis and ChIP analysis has
-    already been run before this
+def order_and_viz_dynamic_epigenome_v1(
+        args,
+        out_dir,
+        prefix,
+        histones,
+        histone_files):
+    """Order clusters by hclust and histones
     """
-    args.integrative = {}
-
-    histones = ["H3K27ac", "H3K4me1", "H3K27me3"] # keep ordered
-    histone_files = [
-        (histone, args.chipseq["histones"][histone]["clusters_bed"])
-        for histone in histones]
-
-    # dynamic ATAC
-    logging.info("EPIGENOME: DYNAMIC: integrate dynamic ATAC w histones")
-    dynamic_epigenome_prefix = "ggr.atac_dynamic.histone_diff"
-
     # get overlap with histones
-    dynamic_histone_overlap_dir = "{}/histone_overlap".format(
-        args.folders["epigenome_dynamic_dir"])
+    dynamic_histone_overlap_dir = "{}/histone_overlap".format(out_dir)
     os.system("mkdir -p {}".format(dynamic_histone_overlap_dir))
 
     args.integrative["atac_dynamic_w_histones_mat"] = (
         "{0}/{1}.overlaps.mat.txt.gz").format(
             dynamic_histone_overlap_dir,
-            dynamic_epigenome_prefix)
-
+            prefix)
     if not os.path.isfile(args.integrative["atac_dynamic_w_histones_mat"]):
         get_histone_overlaps(
             args.atac["counts_pooled_rlog_dynamic_bed"],
@@ -166,19 +160,15 @@ def run(args):
             dynamic_histone_overlap_dir,
             args.integrative["atac_dynamic_w_histones_mat"],
             args.annot["chromsizes"])
-
-    # here, run hclust on enumerated soft clusters to get initial ATAC ordering
-    # then also link in the histone data to subcluster. KEEP the fully enumerated
-    # epigenome clusters
-    dynamic_ordering_dir = "{}/ordering".format(
-        args.folders["epigenome_dynamic_dir"])
+     
+    # run hclust on enumerated soft clusters to get initial ATAC ordering
+    dynamic_ordering_dir = "{}/ordering".format(out_dir)
     os.system("mkdir -p {}".format(dynamic_ordering_dir))
     
     args.integrative["atac_dynamic_init_ordered"] = (
         "{0}/{1}.ordered.mat.txt.gz").format(
             dynamic_ordering_dir,
-            dynamic_epigenome_prefix)
-
+            prefix)
     if not os.path.isfile(args.integrative["atac_dynamic_init_ordered"]):
         plot_ordered_atac = ("init_order_dynamic_atac.R {0} {1} {2} {3}").format(
             args.atac["counts_pooled_rlog_dynamic"],
@@ -186,7 +176,7 @@ def run(args):
             args.integrative["atac_dynamic_w_histones_mat"],
             "{0}/{1}".format(
                 dynamic_ordering_dir,
-                dynamic_epigenome_prefix))
+                prefix))
         print plot_ordered_atac
         os.system(plot_ordered_atac)
 
@@ -194,8 +184,7 @@ def run(args):
     args.integrative["atac_dynamic_init_ordered_bed"] = (
         "{0}/{1}.ordered.init.bed.gz").format(
             dynamic_ordering_dir,
-            dynamic_epigenome_prefix)
-
+            prefix)
     if not os.path.isfile(args.integrative["atac_dynamic_init_ordered_bed"]):
         make_bed = (
             "zcat {0} | "
@@ -210,8 +199,7 @@ def run(args):
         os.system(make_bed)
     
     # here, generate a deeptools bed file to run deeptools
-    deeptools_dynamic_dir = "{}/deeptools".format(
-        args.folders["epigenome_dynamic_dir"])
+    deeptools_dynamic_dir = "{}/deeptools".format(out_dir)
     os.system("mkdir -p {}".format(deeptools_dynamic_dir))
     
     args.integrative["atac_dynamic_init_ordered_deeptools_bed"] = (
@@ -224,7 +212,7 @@ def run(args):
             args.integrative["atac_dynamic_init_ordered_bed"],
             args.integrative["atac_dynamic_init_ordered_deeptools_bed"],
             cluster_col=3)
-
+        
     # run deeptools with ALL histones first to get a final ordering
     all_histone_bigwigs = []
     for histone in histones:
@@ -235,11 +223,11 @@ def run(args):
 
     args.integrative["atac_dynamic_final_ordered_bed"] = (
         "{0}/{1}.ordered.final.bed.gz").format(
-            args.folders["epigenome_dynamic_dir"],
-            dynamic_epigenome_prefix)
+            out_dir,
+            prefix)
     point_mat_file = "{0}/{1}.deeptools.point.mat.tmp.gz".format(
         deeptools_dynamic_dir,
-        dynamic_epigenome_prefix)
+        prefix)
     if not os.path.isfile(args.integrative["atac_dynamic_final_ordered_bed"]):
         deeptools_compute_matrix = (
             "computeMatrix reference-point "
@@ -252,23 +240,23 @@ def run(args):
             "-o {3} ").format(
                 args.integrative["atac_dynamic_init_ordered_deeptools_bed"],
                 " ".join(all_histone_bigwigs),
-                args.integrative["atac_dynamic_final_ordered_bed"],
+                args.integrative["atac_dynamic_final_ordered_bed"].split(".gz")[0],
                 point_mat_file)
         print deeptools_compute_matrix
-        #os.system(deeptools_compute_matrix)
+        os.system(deeptools_compute_matrix)
         os.system("gzip {}".format(
             args.integrative["atac_dynamic_final_ordered_bed"].split(".gz")[0]))
 
     # NOW can go back to ATAC and plot out with histogram
     dynamic_plotting_dir = "{}/plots".format(
-        args.folders["epigenome_dynamic_dir"])
+        out_dir)
     os.system("mkdir -p {}".format(dynamic_plotting_dir))
     dynamic_atac_plot = "{}/{}.ordered.atac_plot.png".format(
         dynamic_plotting_dir,
-        dynamic_epigenome_prefix)
+        prefix)
     dynamic_atac_subsample_file = "{}/{}.ordered.subsample.txt.gz".format(
         dynamic_plotting_dir,
-        dynamic_epigenome_prefix)
+        prefix)
     if not os.path.isfile(dynamic_atac_plot):
         plot_dynamic_atac = (
             "plot_dynamic_atac.R {0} {1} {2} {3}").format(
@@ -292,7 +280,7 @@ def run(args):
                 dynamic_atac_subsample_bed)
         print make_bed
         os.system(make_bed)
-    
+
     # and then run through deeptools for histone marks
     histone_colors = ["Reds", "Blues", "Greens"]
     for histone_idx in range(len(histones)):
@@ -307,7 +295,7 @@ def run(args):
 
         out_prefix = "{}/{}.{}_overlap".format(
             dynamic_plotting_dir,
-            dynamic_epigenome_prefix,
+            prefix,
             histone)
         out_file = "{}.heatmap.profile.png".format(out_prefix)
 
@@ -319,7 +307,218 @@ def run(args):
                 sort=False,
                 referencepoint="center",
                 color=histone_color)
+
+    return
+
+def order_and_viz_dynamic_epigenome_v2(
+        args,
+        out_dir,
+        prefix,
+        histones,
+        histone_files):
+    """Order clusters by hclust and histones more simple
+    """
+    # get overlap with histones
+    dynamic_histone_overlap_dir = "{}/histone_overlap".format(out_dir)
+    os.system("mkdir -p {}".format(dynamic_histone_overlap_dir))
+
+    args.integrative["atac_dynamic_w_histones_mat"] = (
+        "{0}/{1}.overlaps.mat.txt.gz").format(
+            dynamic_histone_overlap_dir,
+            prefix)
+    if not os.path.isfile(args.integrative["atac_dynamic_w_histones_mat"]):
+        get_histone_overlaps(
+            args.atac["counts_pooled_rlog_dynamic_bed"],
+            histone_files,
+            dynamic_histone_overlap_dir,
+            args.integrative["atac_dynamic_w_histones_mat"],
+            args.annot["chromsizes"])
+
+    # TODO: get atac clusters and sort by (hard) cluster
+        
+    # run hclust on enumerated soft clusters to get initial ATAC ordering
+    dynamic_ordering_dir = "{}/ordering".format(out_dir)
+    os.system("mkdir -p {}".format(dynamic_ordering_dir))
     
+    args.integrative["atac_dynamic_init_ordered"] = (
+        "{0}/{1}.ordered.mat.txt.gz").format(
+            dynamic_ordering_dir,
+            prefix)
+    if not os.path.isfile(args.integrative["atac_dynamic_init_ordered"]):
+        plot_ordered_atac = ("init_order_dynamic_atac.R {0} {1} {2} {3}").format(
+            args.atac["counts_pooled_rlog_dynamic"],
+            args.atac["soft_cluster_mat"],
+            args.integrative["atac_dynamic_w_histones_mat"],
+            "{0}/{1}".format(
+                dynamic_ordering_dir,
+                prefix))
+        print plot_ordered_atac
+        os.system(plot_ordered_atac)
+
+    # make a bed file, keeping epigenome cluster
+    args.integrative["atac_dynamic_init_ordered_bed"] = (
+        "{0}/{1}.ordered.init.bed.gz").format(
+            dynamic_ordering_dir,
+            prefix)
+    if not os.path.isfile(args.integrative["atac_dynamic_init_ordered_bed"]):
+        make_bed = (
+            "zcat {0} | "
+            "grep -v d00 | "
+            "awk -F '\t' '{{ print $1\"\t\"$14}}' | "
+            "awk -F '-' '{{ print $1\"\t\"$2 }}' | "
+            "awk -F ':' '{{ print $1\"\t\"$2 }}' | "
+            "gzip -c > {1}").format(
+                args.integrative["atac_dynamic_init_ordered"],
+                args.integrative["atac_dynamic_init_ordered_bed"])
+        print make_bed
+        os.system(make_bed)
+    
+    # here, generate a deeptools bed file to run deeptools
+    deeptools_dynamic_dir = "{}/deeptools".format(out_dir)
+    os.system("mkdir -p {}".format(deeptools_dynamic_dir))
+    
+    args.integrative["atac_dynamic_init_ordered_deeptools_bed"] = (
+        "{0}/{1}.deeptools.bed.gz").format(
+            deeptools_dynamic_dir,
+            os.path.basename(
+                args.integrative["atac_dynamic_init_ordered_bed"]).split(".bed")[0])
+    if not os.path.isfile(args.integrative["atac_dynamic_init_ordered_deeptools_bed"]):
+        make_deeptools_bed(
+            args.integrative["atac_dynamic_init_ordered_bed"],
+            args.integrative["atac_dynamic_init_ordered_deeptools_bed"],
+            cluster_col=3)
+        
+    # run deeptools with ALL histones first to get a final ordering
+    all_histone_bigwigs = []
+    for histone in histones:
+        all_histone_bigwigs = all_histone_bigwigs + sorted(
+            glob.glob("{}/{}".format(
+                args.chipseq["data_dir"],
+                args.chipseq["histones"][histone]["pooled_bigwig_glob"])))
+
+    args.integrative["atac_dynamic_final_ordered_bed"] = (
+        "{0}/{1}.ordered.final.bed.gz").format(
+            out_dir,
+            prefix)
+    point_mat_file = "{0}/{1}.deeptools.point.mat.tmp.gz".format(
+        deeptools_dynamic_dir,
+        prefix)
+    if not os.path.isfile(args.integrative["atac_dynamic_final_ordered_bed"]):
+        deeptools_compute_matrix = (
+            "computeMatrix reference-point "
+            "--referencePoint center "
+            "-b 1000 -a 1000 "
+            "-R {0} "
+            "-S {1} "
+            "--sortRegions=descend "
+            "--outFileSortedRegions {2} "
+            "-o {3} ").format(
+                args.integrative["atac_dynamic_init_ordered_deeptools_bed"],
+                " ".join(all_histone_bigwigs),
+                args.integrative["atac_dynamic_final_ordered_bed"].split(".gz")[0],
+                point_mat_file)
+        print deeptools_compute_matrix
+        os.system(deeptools_compute_matrix)
+        os.system("gzip {}".format(
+            args.integrative["atac_dynamic_final_ordered_bed"].split(".gz")[0]))
+
+    # NOW can go back to ATAC and plot out with histogram
+    dynamic_plotting_dir = "{}/plots".format(
+        out_dir)
+    os.system("mkdir -p {}".format(dynamic_plotting_dir))
+    dynamic_atac_plot = "{}/{}.ordered.atac_plot.png".format(
+        dynamic_plotting_dir,
+        prefix)
+    dynamic_atac_subsample_file = "{}/{}.ordered.subsample.txt.gz".format(
+        dynamic_plotting_dir,
+        prefix)
+    if not os.path.isfile(dynamic_atac_plot):
+        plot_dynamic_atac = (
+            "plot_dynamic_atac.R {0} {1} {2} {3}").format(
+                args.atac["counts_pooled_rlog_dynamic"],
+                args.integrative["atac_dynamic_final_ordered_bed"],
+                dynamic_atac_plot,
+                dynamic_atac_subsample_file)
+        print plot_dynamic_atac
+        os.system(plot_dynamic_atac)
+
+    # take subsample file and make BED
+    dynamic_atac_subsample_bed = "{}.bed.gz".format(
+        dynamic_atac_subsample_file.split(".txt")[0])
+    if not os.path.isfile(dynamic_atac_subsample_bed):
+        make_bed = (
+            "zcat {0} | "
+            "awk -F ':' '{{ print $1\"\t\"$2 }}' | "
+            "awk -F '-' '{{ print $1\"\t\"$2 }}' | "
+            "gzip -c > {1}").format(
+                dynamic_atac_subsample_file,
+                dynamic_atac_subsample_bed)
+        print make_bed
+        os.system(make_bed)
+
+    quit()
+        
+    # and then run through deeptools for histone marks
+    histone_colors = ["Reds", "Blues", "Greens"]
+    for histone_idx in range(len(histones)):
+
+        histone = histones[histone_idx]
+        histone_color = histone_colors[histone_idx]
+        
+        histone_bigwigs = sorted(
+            glob.glob("{}/{}".format(
+                args.chipseq["data_dir"],
+                args.chipseq["histones"][histone]["pooled_bigwig_glob"])))
+
+        out_prefix = "{}/{}.{}_overlap".format(
+            dynamic_plotting_dir,
+            prefix,
+            histone)
+        out_file = "{}.heatmap.profile.png".format(out_prefix)
+
+        if not os.path.isfile(out_file):
+            make_deeptools_heatmap(
+                dynamic_atac_subsample_bed,
+                histone_bigwigs,
+                out_prefix,
+                sort=False,
+                referencepoint="center",
+                color=histone_color)
+
+    return
+
+
+
+def run(args):
+    """Pipeline for integrating epigenome datasets
+    Assumes that ATAC analysis and ChIP analysis has
+    already been run before this
+    """
+    args.integrative = {}
+
+    histones = ["H3K27ac", "H3K4me1", "H3K27me3"] # keep ordered
+    histone_files = [
+        (histone, args.chipseq["histones"][histone]["clusters_bed"])
+        for histone in histones]
+
+    # TODO: different version
+    # overlap with ONLY H3K27ac and H3K4me1
+    # and do NOT sort descending
+
+    
+    # dynamic ATAC
+    logging.info("EPIGENOME: DYNAMIC: integrate dynamic ATAC w histones")
+    dynamic_epigenome_prefix = "ggr.atac_dynamic.histone_diff"
+
+
+    # TODO different version
+    order_and_viz_dynamic_epigenome_v2(
+        args,
+        args.folders["epigenome_dynamic_dir_v1"],
+        dynamic_epigenome_prefix,
+        histones,
+        histone_files)
+
     quit()
 
     

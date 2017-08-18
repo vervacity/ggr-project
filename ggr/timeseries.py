@@ -191,7 +191,6 @@ def get_consistent_soft_clusters_by_region(
         cluster_set = []
         
         for cluster_idx in range(len(cluster_means)):
-            cluster_num = cluster_names[cluster_idx]
 
             # determine if in confidence interval
             pdf_val = multivariate_normal.pdf(
@@ -218,18 +217,31 @@ def get_consistent_soft_clusters_by_region(
                 continue
 
             # if all conditions are met, add to cluster set
-            cluster_set.append(cluster_num)
+            cluster_set.append(cluster_idx)
 
         # append set to all cluster sets
         soft_cluster_sets.append(set(cluster_set))
         
     # intersect
-    consistent_clusters = list(set.intersection(*soft_cluster_sets))
-
-    #import ipdb
-    #ipdb.set_trace()
+    consistent_cluster_indices = list(set.intersection(*soft_cluster_sets))
+    consistent_clusters = [cluster_names[cluster_idx]
+                           for cluster_idx in consistent_cluster_indices]
     
-    return consistent_clusters
+    # TODO(dk) with the consistent clusters, figure out best fit (to have a hard cluster assignment)
+    best_pdf_val = 0
+    hard_cluster = None
+    for cluster_idx in consistent_cluster_indices:
+        # get pdf val
+        pdf_val = multivariate_normal.pdf(
+            timepoint_vectors[2],
+            mean=cluster_means[cluster_idx],
+            cov=cluster_covariances[cluster_idx],
+            allow_singular=True)
+        if pdf_val > best_pdf_val:
+            best_pdf_val = pdf_val
+            hard_cluster = cluster_names[cluster_idx]
+    
+    return consistent_clusters, hard_cluster
 
 
 def get_consistent_soft_clusters(
@@ -286,8 +298,8 @@ def get_consistent_soft_clusters(
                     assert rep1_region == pooled_region
                     assert rep2_region == pooled_region
 
-                    # now for each cluster, check consistency
-                    consistent_clusters = get_consistent_soft_clusters_by_region(
+                    # now for each cluster, check consistency and get soft/hard clusters
+                    consistent_clusters, hard_cluster = get_consistent_soft_clusters_by_region(
                         cluster_means,
                         cluster_covariances,
                         cluster_names,
@@ -303,7 +315,16 @@ def get_consistent_soft_clusters(
                             out.write("{}\t{}\n".format(
                                 pooled_region,
                                 "\t".join(map(str, pooled_timepoints.tolist()))))
-
+                            
+                    # save out hard cluster
+                    if hard_cluster is not None:
+                        hard_cluster_file = "{}/soft/{}.clusters.hard.txt.gz".format(out_dir, prefix)
+                        with gzip.open(hard_cluster_file, "a") as out:
+                            out.write("{}\t{}\t{}\n".format(
+                                pooled_region,
+                                "\t".join(map(str, pooled_timepoints.tolist())),
+                                hard_cluster))
+                            
                     region_idx += 1
                     if region_idx % 1000 == 0:
                         print region_idx
@@ -410,11 +431,10 @@ def get_consistent_dpgp_trajectories(
         
         # use R to plot 
         plot_soft_clusters = ("plot_soft_trajectories.R {0}/soft/plot {0}/soft/{1}").format(
-            out_dir, "*.gz")
+            out_dir, "*soft*.gz")
         print plot_soft_clusters
         os.system(plot_soft_clusters)
 
     # TODO convert into BED files with cluster numbers?
-        
-
+    
     return

@@ -27,6 +27,8 @@
     "epigenome_stable_great_dir":"results/epigenome/stable/great",
     "epigenome_dynamic_dir":"results/epigenome/dynamic",
     "epigenome_dynamic_great_dir":"results/epigenome/dynamic/great",
+
+    "epigenome_dynamic_dir_v1":"results/epigenome/dynamic_v1",
     
     "rna_dir":"results/rna",
     "tf_dir":"results/tf"
