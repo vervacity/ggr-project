@@ -5,7 +5,7 @@ library(gplots)
 library(RColorBrewer)
 library(dendextend)
 
-# testing
+# for DIANA
 library(cluster)
 
 set.seed(1337)
@@ -171,20 +171,26 @@ dev.off()
 
 
 # dendrogram
-ratios <- as.integer(cluster_sizes / min(cluster_sizes))
+ratios <- as.integer(50 * cluster_sizes / min(cluster_sizes)) # increase by factor of 10 to even out better
 
-                                        # set up repeated clusters
+# set up repeated clusters
 cluster_means_rep <- data.frame()
+cluster_means_group <- c()
 for (cluster_idx in 1:length(ratios)) {
     for (i in 1:ratios[cluster_idx]) {
-        cluster_means_rep <- rbind(cluster_means_rep, cluster_means[cluster_idx,])
+        cluster_means_rep <- rbind(cluster_means_rep, jitter(as.numeric(cluster_means[cluster_idx,])))
+        #cluster_means_group <- c(cluster_means_group, cluster_order[cluster_idx])
+        cluster_means_group <- c(cluster_means_group, cluster_idx)
     }
+    #print(cluster_order[cluster_idx])
 }
 
-                                        # hclust
+# hclust
 hclust_dendro <- hclust(dist(as.matrix(cluster_means_rep)), method=agglom_method)
 #hclust_dendro <- my_hclust(dist(as.matrix(cluster_means_rep)))
 dend <- as.dendrogram(hclust_dendro)
+
+dend_old <- dend
 
 # TRICK flip the top half of the dendrogram
 flip_dend <- function(dend) {
@@ -231,21 +237,65 @@ if (tweak_diana) {
 
     dend[[1]] <- rev(dend[[1]])
     dend[[1]][[1]] <- rev(dend[[1]][[1]])
-    
-    #tmp <- dend[[1]][[1]]
-    #dend[[1]][[1]] <- dend[[1]][[2]]
-    #dend[[1]][[2]] <- tmp
 
-    dend[[1]][[2]][[1]] <- rev(dend[[1]][[2]][[1]])
+    #dend[[1]][[2]][[1]] <- rev(dend[[1]][[2]][[1]])
+    dend[[2]][[1]][[2]] <- rev(dend[[2]][[1]][[2]])
     
 }
 
 
+# for color bar
+my_palette <- colorRampPalette(brewer.pal(11, "Spectral"))(nrow(cluster_means))
+cluster_means_group_ordered <- match(cluster_means_group, cluster_order) # get the cluster order right
+colors <- my_palette[cluster_means_group_ordered]
+
+#print(my_palette)
+#print(my_palette[c(4, 8, 9)])
+#print(head(cluster_means_group_ordered))
+#print(head(colors))
+
 plot_file <- paste(out_dir, "/", prefix, ".hard.dendro.png", sep="")
 png(plot_file)
-plot(dend)
+par(mar = c(4,1,1,12))
+plot(dend, horiz=TRUE, xlab="", ylab="", sub="")
+colored_bars(colors, dend, rowLabels="ATAC", horiz = TRUE)
 dev.off()
 
 
 
+
+
+# plotting
+plot_file <- paste(out_dir, "/", prefix, ".hard.dendro_sanity_check.heatmap.png", sep="")
+my_palette <- rev(colorRampPalette(brewer.pal(11, "RdBu"))(49))
+
+mylmat = rbind(c(0,3,0),c(2,1,0),c(0,4,0))
+mylwid = c(2,6,2)
+mylhei = c(0.5,12,1.5)
+
+png(plot_file, height=18, width=6, units="in", res=200)
+heatmap.2(
+    as.matrix(cluster_means_rep),
+    Rowv=dend,
+    Colv=FALSE,
+    dendrogram="none",
+    trace='none',
+    density.info="none",
+    keysize=0.1,
+    key.title=NA,
+    key.xlab=NA,
+    key.par=list(pin=c(4,0.1),
+        mar=c(6.1,0,5.1,0),
+        mgp=c(3,2,0),
+        cex.axis=2.0,
+        font.axis=2),
+    srtCol=45,
+    cexCol=3.0,
+    labRow="",
+    margins=c(3,0),
+    col=my_palette,
+    lmat=mylmat,
+    lwid=mylwid,
+    lhei=mylhei)
+dev.off()
 

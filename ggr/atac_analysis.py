@@ -188,4 +188,6 @@ def run(args):
         print reorder_clusters
         os.system(reorder_clusters)
 
+    quit()
+
     return args
