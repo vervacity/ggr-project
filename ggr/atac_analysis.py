@@ -178,12 +178,14 @@ def run(args):
 
     # 8) reorder (ie renumber) the SOFT clusters (numerically) by order of hclust and make sure to propagate to hard clusters
     final_atac_clusters = sorted(glob.glob("{}/*.gz".format(args.folders["atac_dp-gp_final_dir"])))
-    if len(final_atac_clusters) == 0:
+    args.atac["final_hard_clusters"] = "{}/{}.clusters.hard.renumbered.txt.gz".format(
+        args.folders["atac_dp-gp_final_dir"],
+        atac_prefix)
+    if not os.path.isfile(args.atac["final_hard_clusters"]):
         reorder_clusters = "reorder_soft_clusters_w_hclust.R {0} {1}/soft/*hard*gz {1}/soft/*soft*gz".format(
             args.folders["atac_dp-gp_final_dir"],
             args.folders["atac_dp-gp_dir"])
         print reorder_clusters
         os.system(reorder_clusters)
-
 
     return args

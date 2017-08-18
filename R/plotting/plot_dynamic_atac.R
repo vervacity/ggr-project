@@ -13,32 +13,40 @@ library(RColorBrewer)
 library(fastcluster)
 
 args <- commandArgs(trailingOnly=TRUE)
-atac_timepoints_file <- args[1]
-deeptools_ordered_bed <- args[2]
+atac_timepoints_w_clusters_file <- args[1]
+histone_clusters_file <- args[2]
 out_plot_file <- args[3]
 out_subsample_file <- args[4]
 
-atac_timepoints <- read.table(gzfile(atac_timepoints_file), header=TRUE, row.names=1, stringsAsFactors=FALSE)
-deeptools_ordering <- read.table(gzfile(deeptools_ordered_bed), header=FALSE, skip=1)
-
+atac_timepoints_w_clusters <- read.table(
+    gzfile(atac_timepoints_w_clusters_file),
+    header=FALSE,
+    row.names=1,
+    stringsAsFactors=FALSE)
+histone_clusters <- read.table(gzfile(histone_clusters_file), header=TRUE)
 
 # adjust files
-atac_timepoints <- data.frame(t(scale(t(atac_timepoints))))
-atac_timepoints$region <- rownames(atac_timepoints)
-deeptools_ordering <- data.frame(region=deeptools_ordering$V4, order=rownames(deeptools_ordering))
+colnames(atac_timepoints_w_clusters)[ncol(atac_timepoints_w_clusters)] <- "atac_cluster"
+atac_timepoints_w_clusters$region <- rownames(atac_timepoints_w_clusters)
+histone_clusters <- histone_clusters[, c("region", "histone_cluster")]
 
-# merge and order by deeptools ordering
-atac_timepoints_ordered <- merge(deeptools_ordering, atac_timepoints, by="region", all.x=TRUE, all.y=FALSE, sort=FALSE)
+# merge 
+epigenome_data <- merge(atac_timepoints_w_clusters, histone_clusters, by="region")
+rownames(epigenome_data) <- epigenome_data$region
+epigenome_data$region <- NULL
+
+# and sort with atac cluster followed by histone cluster
+epigenome_data_sorted <- epigenome_data[with(epigenome_data, order(atac_cluster, histone_cluster)), ]
+
+# save out the subsample to be used for deeptools
+evenly_spaced_subsample <- epigenome_data_sorted[seq(1, nrow(epigenome_data_sorted), 20), ]
+write.table(rownames(evenly_spaced_subsample),
+            file=gzfile(out_subsample_file),
+            quote=FALSE, row.names=FALSE, col.names=FALSE)
 
 # and now plot out
-rownames(atac_timepoints_ordered) <- atac_timepoints_ordered$region
-atac_timepoints_ordered$region <- NULL
-atac_timepoints_ordered$order <- NULL
-
-evenly_spaced_subsample <- atac_timepoints_ordered[seq(1, nrow(atac_timepoints_ordered), 20), ]
-
-# TODO save out subsample for histone plotting
-write.table(rownames(evenly_spaced_subsample), file=gzfile(out_subsample_file), quote=FALSE, row.names=FALSE, col.names=FALSE)
+evenly_spaced_subsample$atac_cluster <- NULL
+evenly_spaced_subsample$histone_cluster <- NULL
 
 # plotting
 my_palette <- rev(colorRampPalette(brewer.pal(11, "RdBu"))(49))
