@@ -362,6 +362,7 @@ def order_and_viz_dynamic_epigenome_v2(
     if not os.path.isfile(dynamic_atac_subsample_bed):
         make_bed = (
             "zcat {0} | "
+            "grep -v region | "
             "awk -F ':' '{{ print $1\"\t\"$2 }}' | "
             "awk -F '-' '{{ print $1\"\t\"$2 }}' | "
             "gzip -c > {1}").format(
@@ -400,6 +401,130 @@ def order_and_viz_dynamic_epigenome_v2(
     return args
 
 
+def order_and_viz_stable_epigenome(
+        args,
+        out_dir,
+        prefix,
+        histones,
+        histone_files):
+    """Analyze stable epigenome
+    """
+    # get histone overlap with stable ATAC
+    stable_histone_overlap_dir = "{}/histone_overlap".format(out_dir)
+    os.system("mkdir -p {}".format(stable_histone_overlap_dir))
+    
+    args.integrative["atac_stable_w_histones_mat"] = (
+        "{0}/{1}.overlaps.mat.txt.gz").format(
+            stable_histone_overlap_dir,
+            prefix)
+
+    if not os.path.isfile(args.integrative["atac_stable_w_histones_mat"]):
+        get_histone_overlaps(
+            args.atac["counts_pooled_rlog_stable_bed"],
+            histone_files,
+            stable_histone_overlap_dir,
+            args.integrative["atac_stable_w_histones_mat"],
+            args.annot["chromsizes"])
+
+    # make the BED file
+    args.integrative["atac_stable_histone_ordered_bed"] = "{}.bed.gz".format(
+        args.integrative["atac_stable_w_histones_mat"].split(".mat")[0])
+    if not os.path.isfile(args.integrative["atac_stable_histone_ordered_bed"]):
+        make_bed = (
+            "zcat {0} | "
+            "grep -v region | "
+            "awk -F '\t' '{{ print $1\"\t\"$5 }}' | "
+            "awk -F ':' '{{ print $1\"\t\"$2 }}' | "
+            "awk -F '-' '{{ print $1\"\t\"$2 }}' | "
+            "gzip -c > {1}").format(
+                args.integrative["atac_stable_w_histones_mat"],
+                args.integrative["atac_stable_histone_ordered_bed"])
+        print make_bed
+        os.system(make_bed)
+
+    # make the deeptools bed
+    args.integrative["atac_stable_histone_deeptools_bed"] = "{}.deeptools.bed.gz".format(
+        args.integrative["atac_stable_w_histones_mat"].split(".mat")[0])
+    if not os.path.isfile(args.integrative["atac_stable_histone_deeptools_bed"]):
+        make_deeptools_bed(
+            args.integrative["atac_stable_histone_ordered_bed"],
+            args.integrative["atac_stable_histone_deeptools_bed"],
+            cluster_col=3)
+
+    stable_plots_dir = "{}/plots".format(out_dir)
+    os.system("mkdir -p {}".format(stable_plots_dir))
+    
+    # And plot
+    histone_colors = ["Reds", "Blues", "Greens"]
+    for histone_idx in range(len(histones)):
+
+        histone = histones[histone_idx]
+        histone_color = histone_colors[histone_idx]
+        
+        histone_bigwigs = sorted(
+            glob.glob("{}/{}".format(
+                args.chipseq["data_dir"],
+                args.chipseq["histones"][histone]["pooled_bigwig_glob"])))
+
+        out_prefix = "{}/{}.{}_overlap".format(
+            stable_plots_dir, prefix, histone)
+        out_file = "{}.heatmap.profile.png".format(out_prefix)
+
+        if not os.path.isfile(out_file):
+            make_deeptools_heatmap(
+                args.integrative["atac_stable_histone_deeptools_bed"],
+                histone_bigwigs,
+                out_prefix,
+                sort=False,
+                kval=0,
+                color=histone_color)
+
+    quit()
+
+    # and generate group BED files
+    stable_clusters = pd.read_table(
+        args.integrative["atac_stable_histone_ordered_bed"], header=None)
+    stable_clusters.columns = ["chrom", "start", "stop", "cluster"]
+    cluster_ids = list(set(stable_clusters["cluster"].tolist()))
+
+    for cluster_id in cluster_ids:
+        cluster_subset = stable_clusters[stable_clusters["cluster"] == cluster_id]
+        
+        if cluster_subset.shape[0] > 1000: # manually chosen
+            cluster_prefix = "ggr.atac_stable.cluster_{0}".format(cluster_id)
+            
+            cluster_file = "{0}/{1}.bed.gz".format(
+                args.folders["epigenome_stable_dir"],
+                cluster_prefix)
+
+            if not os.path.isfile(cluster_file):
+                cluster_subset.to_csv(
+                    cluster_file,
+                    sep='\t', header=False, index=False,
+                    compression="gzip")
+    
+            # run GREAT
+            great_files = glob.glob("{}/{}*".format(
+                args.folders["epigenome_stable_great_dir"],
+                cluster_prefix))
+            if len(great_files) == 0:
+                run_great = "run_rgreat.R {0} {1}/{2}".format(
+                    cluster_file,
+                    args.folders["epigenome_stable_great_dir"],
+                    cluster_prefix)
+                print run_great
+                os.system(run_great)
+
+            # run HOMER
+            
+
+    
+    
+
+
+    
+    return args
+
 
 def run(args):
     """Pipeline for integrating epigenome datasets
@@ -426,6 +551,19 @@ def run(args):
         dynamic_epigenome_prefix,
         activating_marks,
         activating_mark_files)
+
+    # now for dynamic sets use soft clusters, split, and only keep "large enough" clusters
+    
+    
+    # stable ATAC
+    logging.info("EPIGENOME: STABLE: integrate dynamic ATAC w histones")
+    stable_epigenome_prefix = "ggr.epigenome.stable"
+    args = order_and_viz_stable_epigenome(
+        args,
+        args.folders["epigenome_stable_dir"],
+        stable_epigenome_prefix,
+        histones,
+        histone_files)
 
     quit()
 

@@ -30,7 +30,7 @@ def make_deeptools_heatmap(
         sort=False,
         kval=4,
         referencepoint='TSS',
-        extend_dist=1000,
+        extend_dist=2000, # 1000
         color="Blues"):
     '''
     Uses deeptools to make a profile heatmap
