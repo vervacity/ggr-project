@@ -9,6 +9,7 @@ import logging
 import pandas as pd
 
 from ggr.util.bioinformatics import make_deeptools_heatmap
+from ggr.util.bed_utils import id_to_bed
 
 
 def get_nearest_mark(intersect_bed_file, out_file):
@@ -400,6 +401,7 @@ def order_and_viz_dynamic_epigenome_v2(
             
     return args
 
+
 def cluster_by_chromatin_state(
         soft_cluster_files,
         histone_overlap_mat_file,
@@ -412,10 +414,8 @@ def cluster_by_chromatin_state(
     # set up directories for each type of split
     mark_dir = "{}/by_mark".format(out_dir)
     state_dir = "{}/by_state".format(out_dir)
-    dynamic_mark_dir = "{}/by_dynamic_mark".format(out_dir)
-    dynamic_state_dir = "{}/by_dynamic_state".format(out_dir)
-    os.system("mkdir -p {} {} {} {}".format(
-        mark_dir, state_dir, dynamic_mark_dir, dynamic_state_dir))
+    os.system("mkdir -p {0} {0}/ids {0}/bed {1} {1}/ids {1}/bed".format(
+        mark_dir, state_dir))
 
     for soft_cluster_file in soft_cluster_files:
 
@@ -434,74 +434,10 @@ def cluster_by_chromatin_state(
 
         # set up a min region num to remove really small sets
         min_region_num = int(min_region_fraction * cluster_w_histones.shape[0])
+        min_region_num = 100
         
-        # perform several overlap types:
-        # each histone mark alone (presence)
-        # TODO - dont take absence, its the exact opposite (negative set)
-        for histone in histone_names:
-            subset = cluster_w_histones[cluster_w_histones[histone] != 9]
-            if subset.shape[0] > min_region_num:
-                overlap_file = "{}/{}.{}-present.txt.gz".format(
-                    mark_dir, soft_prefix, histone)
-                pd.DataFrame(subset["region"]).to_csv(
-                    overlap_file, sep='\t', header=False, index=False, compression="gzip")
-
-            #subset = cluster_w_histones[cluster_w_histones[histone] == 9]
-            #if subset.shape[0] > min_region_num:
-            #    overlap_file = "{}/{}.{}-absent.txt.gz".format(
-            #        mark_dir, soft_prefix, histone)
-            #    pd.DataFrame(subset["region"]).to_csv(
-            #        overlap_file, sep='\t', header=False, index=False, compression="gzip")
-            
-        
-        # histone marks in combination (just presence)
-        histone_a = "H3K27ac"
-        histone_b = "H3K4me1"
-
-        # both present
-        subset = cluster_w_histones[
-            (cluster_w_histones[histone_a] != 9) &
-            (cluster_w_histones[histone_b] != 9)]
-        if subset.shape[0] > min_region_num:
-            overlap_file = "{}/{}.{}-present_{}-present.txt.gz".format(
-                state_dir, soft_prefix, histone_a, histone_b)
-            pd.DataFrame(subset["region"]).to_csv(
-                overlap_file, sep='\t', header=False, index=False, compression="gzip")
-
-        # a present, b missing
-        subset = cluster_w_histones[
-            (cluster_w_histones[histone_a] != 9) &
-            (cluster_w_histones[histone_b] == 9)]
-        if subset.shape[0] > min_region_num:
-            overlap_file = "{}/{}.{}-present_{}-absent.txt.gz".format(
-                state_dir, soft_prefix, histone_a, histone_b)
-            pd.DataFrame(subset["region"]).to_csv(
-                overlap_file, sep='\t', header=False, index=False, compression="gzip")
-
-        # a missing, b present
-        subset = cluster_w_histones[
-            (cluster_w_histones[histone_a] == 9) &
-            (cluster_w_histones[histone_b] != 9)]
-        if subset.shape[0] > min_region_num:
-            overlap_file = "{}/{}.{}-absent_{}-present.txt.gz".format(
-                state_dir, soft_prefix, histone_a, histone_b)
-            pd.DataFrame(subset["region"]).to_csv(
-                overlap_file, sep='\t', header=False, index=False, compression="gzip")
-
-        # a missing, b missing
-        # TODO don't take these, these are negatives (for function)
-        #subset = cluster_w_histones[
-        #    (cluster_w_histones[histone_a] == 9) &
-        #    (cluster_w_histones[histone_b] == 9)]
-        #if subset.shape[0] > min_region_num:
-        #    overlap_file = "{}/{}.{}-absent_{}-absent.txt.gz".format(
-        #        state_dir, soft_prefix, histone_a, histone_b)
-        #    pd.DataFrame(subset["region"]).to_csv(
-        #        overlap_file, sep='\t', header=False, index=False, compression="gzip")
-
         # histone marks alone (dynamics)
         # TODO don't take 9s.
-        # NOTE: as currently defined, not useful
         for histone in histone_names:
             mark_states = list(set(cluster_w_histones[histone].tolist()))
 
@@ -510,36 +446,37 @@ def cluster_by_chromatin_state(
                     continue
                 
                 subset = cluster_w_histones[cluster_w_histones[histone] == mark_state]
-                #if subset.shape[0] > min_region_num:
-                if subset.shape[0] > 100:
+                if subset.shape[0] > min_region_num:
                     overlap_file = "{}/{}.{}-{}.txt.gz".format(
-                        dynamic_mark_dir, soft_prefix, histone, mark_state)
+                        "{}/ids".format(mark_dir), soft_prefix, histone, mark_state)
                     pd.DataFrame(subset["region"]).to_csv(
                         overlap_file, sep='\t', header=False, index=False, compression="gzip")
             
         # chromatin state dynamics
         # don't take 99s
-        # TODO: ignore 4s, and 9s? these are subsets of presence/absence?
-        # NOTE: as currently defined, not useful
         dynamic_states = list(set(cluster_w_histones["histone_cluster"].tolist()))
         for dynamic_state in dynamic_states:
             if dynamic_state == 99:
                 continue
             
             subset = cluster_w_histones[cluster_w_histones["histone_cluster"] == dynamic_state]
-            #if subset.shape[0] > min_region_num:
-            if subset.shape[0] > 100:
+            if subset.shape[0] > min_region_num:
                 overlap_file = "{}/{}.dynamic-state-{}.txt.gz".format(
-                    dynamic_state_dir, soft_prefix, dynamic_state)
+                    "{}/ids".format(state_dir), soft_prefix, dynamic_state)
                 pd.DataFrame(subset["region"]).to_csv(
                     overlap_file, sep='\t', header=False, index=False, compression="gzip")
 
-        # TODO consider taking the dynamic marks (even if tiny sets) and super downweight their tasks?
-        # this will cover for the issues above.
-        # make sure that these groups are at least 100?
-        
-        
-        
+    # and convert all to BED
+    mark_files = glob.glob("{}/ids/*.txt.gz".format(mark_dir))
+    for mark_file in mark_files:
+        mark_bed_file = "{0}/bed/{1}.bed.gz".format(mark_dir, os.path.basename(mark_file).split('.txt')[0])
+        id_to_bed(mark_file, mark_bed_file)
+
+    state_files = glob.glob("{}/ids/*.txt.gz".format(state_dir))
+    for state_file in state_files:
+        state_bed_file = "{0}/bed/{1}.bed.gz".format(state_dir, os.path.basename(state_file).split('.txt')[0])
+        id_to_bed(state_file, state_bed_file)
+    
     return None
 
 
@@ -568,6 +505,9 @@ def order_and_viz_stable_epigenome(
             args.integrative["atac_stable_w_histones_mat"],
             args.annot["chromsizes"])
 
+    # TODO go into R, make fake heatmap to get color bars for histone marks
+
+        
     # make the BED file
     args.integrative["atac_stable_histone_ordered_bed"] = "{}.bed.gz".format(
         args.integrative["atac_stable_w_histones_mat"].split(".mat")[0])
@@ -584,19 +524,11 @@ def order_and_viz_stable_epigenome(
         print make_bed
         os.system(make_bed)
 
-    # make the deeptools bed
-    args.integrative["atac_stable_histone_deeptools_bed"] = "{}.deeptools.bed.gz".format(
-        args.integrative["atac_stable_w_histones_mat"].split(".mat")[0])
-    if not os.path.isfile(args.integrative["atac_stable_histone_deeptools_bed"]):
-        make_deeptools_bed(
-            args.integrative["atac_stable_histone_ordered_bed"],
-            args.integrative["atac_stable_histone_deeptools_bed"],
-            cluster_col=3)
-
+    # plot histone marks
     stable_plots_dir = "{}/plots".format(out_dir)
     os.system("mkdir -p {}".format(stable_plots_dir))
-    
-    # And plot
+
+    # TODO need to generate colorbar file
     histone_colors = ["Reds", "Blues", "Greens"]
     for histone_idx in range(len(histones)):
 
@@ -614,57 +546,13 @@ def order_and_viz_stable_epigenome(
 
         if not os.path.isfile(out_file):
             make_deeptools_heatmap(
-                args.integrative["atac_stable_histone_deeptools_bed"],
+                args.integrative["atac_stable_histone_ordered_bed"],
                 histone_bigwigs,
                 out_prefix,
-                sort=False,
                 kval=0,
+                referencepoint="center",
                 color=histone_color)
 
-    quit()
-
-    # and generate group BED files
-    stable_clusters = pd.read_table(
-        args.integrative["atac_stable_histone_ordered_bed"], header=None)
-    stable_clusters.columns = ["chrom", "start", "stop", "cluster"]
-    cluster_ids = list(set(stable_clusters["cluster"].tolist()))
-
-    for cluster_id in cluster_ids:
-        cluster_subset = stable_clusters[stable_clusters["cluster"] == cluster_id]
-        
-        if cluster_subset.shape[0] > 1000: # manually chosen
-            cluster_prefix = "ggr.atac_stable.cluster_{0}".format(cluster_id)
-            
-            cluster_file = "{0}/{1}.bed.gz".format(
-                args.folders["epigenome_stable_dir"],
-                cluster_prefix)
-
-            if not os.path.isfile(cluster_file):
-                cluster_subset.to_csv(
-                    cluster_file,
-                    sep='\t', header=False, index=False,
-                    compression="gzip")
-    
-            # run GREAT
-            great_files = glob.glob("{}/{}*".format(
-                args.folders["epigenome_stable_great_dir"],
-                cluster_prefix))
-            if len(great_files) == 0:
-                run_great = "run_rgreat.R {0} {1}/{2}".format(
-                    cluster_file,
-                    args.folders["epigenome_stable_great_dir"],
-                    cluster_prefix)
-                print run_great
-                os.system(run_great)
-
-            # run HOMER
-            
-
-    
-    
-
-
-    
     return args
 
 
@@ -689,31 +577,20 @@ def run(args):
 
     args = order_and_viz_dynamic_epigenome_v2(
         args,
-        args.folders["epigenome_dynamic_dir_v2"],
+        args.folders["epigenome_dynamic_dir"],
         dynamic_epigenome_prefix,
         activating_marks,
         activating_mark_files)
 
-
-    print args.atac["final_soft_clusters"]
-    print len(args.atac["final_soft_clusters"])
-    cluster_by_chromatin_state(
-        args.atac["final_soft_clusters"],
-        args.integrative["atac_dynamic_w_histones_mat"],
-        activating_marks,
-        args.folders["epigenome_dynamic_clusters_dir"],
-        dynamic_epigenome_prefix)
-    
-    quit()
-
-    # TODO(dk) now for dynamic sets use soft clusters, split, and only keep "large enough" clusters
-    # few levels: 1) just is_marked (5 possibilities for two histone marks)
-    # then granular chromatin state. for granular level, remove things that are not at least some cutoff val (empirical)
-    
-
-    
-
-    
+    dynamic_state_beds = glob.glob("{}/*bed.gz".format(
+        args.folders["epigenome_dynamic_state_bed_dir"]))
+    if len(dynamic_state_beds) == 0:
+        cluster_by_chromatin_state(
+            args.atac["final_soft_clusters"],
+            args.integrative["atac_dynamic_w_histones_mat"],
+            activating_marks,
+            args.folders["epigenome_dynamic_clusters_dir"],
+            dynamic_epigenome_prefix)
     
     # stable ATAC
     logging.info("EPIGENOME: STABLE: integrate dynamic ATAC w histones")
@@ -726,72 +603,23 @@ def run(args):
         histone_files)
 
     quit()
+    
+    # tODO cluster_by_chromatin_state
+    stable_state_beds = glob.glob("{}/*bed.gz".format(
+        args.folders["epigenome_stable_state_bed_dir"]))
+    if len(stable_state_beds) == 0:
+        cluster_by_chromatin_state(
+            [args.atac["counts_pooled_rlog_stable"]],
+            args.integrative["atac_stable_w_histones_mat"],
+            histones,
+            args.folders["epigenome_stable_clusters_dir"],
+            stable_epigenome_prefix)
+    quit()
+    
+
+    # TODO now go through all folders and run GREAT and HOMER
 
     
-    # get overlap with stable ATAC
-    logging.info("EPIGENOME: STABLE: integrate dynamic ATAC w histones")
-    args.integrative["atac_stable_w_histones_mat"] = (
-        "{}/ggr.atac_stable.histone_diff.overlaps.mat.txt.gz").format(
-            args.folders["epigenome_dir"])
-
-    if not os.path.isfile(args.integrative["atac_stable_w_histones_mat"]):
-        get_histone_overlaps(
-            args.atac["counts_pooled_rlog_stable_bed"],
-            histone_files,
-            args.folders["epigenome_dir"],
-            args.integrative["atac_stable_w_histones_mat"],
-            args.annot["chromsizes"])
-
-    # make the BED file
-    args.integrative["atac_stable_histone_ordered_bed"] = "{}.bed.gz".format(
-        args.integrative["atac_stable_w_histones_mat"].split(".mat")[0])
-    if not os.path.isfile(args.integrative["atac_stable_histone_ordered_bed"]):
-        make_bed = (
-            "zcat {0} | "
-            "grep -v regions | "
-            "awk -F '\t' '{{ print $1\"\t\"$5 }}' | "
-            "awk -F ':' '{{ print $1\"\t\"$2 }}' | "
-            "awk -F '-' '{{ print $1\"\t\"$2 }}' | "
-            "gzip -c > {1}").format(
-                args.integrative["atac_stable_w_histones_mat"],
-                args.integrative["atac_stable_histone_ordered_bed"])
-        print make_bed
-        os.system(make_bed)
-
-    # make the deeptools bed
-    args.integrative["atac_stable_histone_deeptools_bed"] = "{}.deeptools.bed.gz".format(
-        args.integrative["atac_stable_w_histones_mat"].split(".mat")[0])
-    if not os.path.isfile(args.integrative["atac_stable_histone_deeptools_bed"]):
-        make_deeptools_bed(
-            args.integrative["atac_stable_histone_ordered_bed"],
-            args.integrative["atac_stable_histone_deeptools_bed"],
-            cluster_col=3)
-        
-    # And plot
-    histone_colors = ["Reds", "Blues", "Greens"]
-    for histone_idx in range(len(histones)):
-
-        histone = histones[histone_idx]
-        histone_color = histone_colors[histone_idx]
-        
-        histone_bigwigs = sorted(
-            glob.glob("{}/{}".format(
-                args.chipseq["data_dir"],
-                args.chipseq["histones"][histone]["pooled_bigwig_glob"])))
-
-        out_prefix = "{}/ggr.atac_stable.{}_overlap".format(
-            args.folders["epigenome_dir"], histone)
-        out_file = "{}.heatmap.profile.png".format(out_prefix)
-
-        if not os.path.isfile(out_file):
-            make_deeptools_heatmap(
-                args.integrative["atac_stable_histone_deeptools_bed"],
-                histone_bigwigs,
-                out_prefix,
-                sort=True,
-                kval=0,
-                color=histone_color)
-
     # and generate group BED files
     stable_clusters = pd.read_table(
         args.integrative["atac_stable_histone_ordered_bed"], header=None)

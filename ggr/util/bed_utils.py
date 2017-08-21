@@ -29,16 +29,17 @@ def id_to_bed(id_file, bed_file):
         can include other data
       bed_file: output BED file
     """
-    if os.path.splitext(idfile)[1] == '.gz':
+    if os.path.splitext(id_file)[1] == '.gz':
         pipe_in = 'zcat'
     else:
         pipe_in = 'cat'
         
-    convert = ("{0} {1} | ",
-               "awk -F ':' '{{ print $1\"\t\"$2 }}' | ",
-               "awk -F '-' '{{ print $1\"\t\"$2 }}' | ",
-               "awk -F '(' '{{ print $1 }}' | ",
-               "gzip -c > {1}").format(pipe_in, id_file, bed_file)
+    convert = ("{0} {1} | "
+               "awk -F ':' '{{ print $1\"\t\"$2 }}' | "
+               "awk -F '-' '{{ print $1\"\t\"$2 }}' | "
+               "awk -F '(' '{{ print $1 }}' | "
+               "sort -k1,1 -k2,2n | "
+               "gzip -c > {2}").format(pipe_in, id_file, bed_file)
     print convert
     os.system(convert)
 
