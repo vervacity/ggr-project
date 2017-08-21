@@ -21,7 +21,7 @@ def merge_regions(bed_files, out_bed):
     return None
 
 
-def id_to_bed(id_file, bed_file):
+def id_to_bed(id_file, bed_file, sort=False, remove_extra_columns=True):
     """Convert id of form chr:start-stop into BED
     
     Args:
@@ -33,13 +33,27 @@ def id_to_bed(id_file, bed_file):
         pipe_in = 'zcat'
     else:
         pipe_in = 'cat'
+
+    if sort:
+        sort_file = "sort -k1,1 -k2,2n | "
+    else:
+        sort_file = ""
+
+    if remove_extra_columns:
+        remove = "awk -F '\t' '{{ print $1 }}' | "
+    else:
+        remove = ""
         
-    convert = ("{0} {1} | "
-               "awk -F ':' '{{ print $1\"\t\"$2 }}' | "
-               "awk -F '-' '{{ print $1\"\t\"$2 }}' | "
-               "awk -F '(' '{{ print $1 }}' | "
-               "sort -k1,1 -k2,2n | "
-               "gzip -c > {2}").format(pipe_in, id_file, bed_file)
+    convert = (
+        "{0} {1} | "
+        "grep -v region | "
+        "{2}"
+        "awk -F ':' '{{ print $1\"\t\"$2 }}' | "
+        "awk -F '-' '{{ print $1\"\t\"$2 }}' | "
+        "awk -F '(' '{{ print $1 }}' | "
+        "{3}"
+        "gzip -c > {4}").format(
+            pipe_in, id_file, remove, sort_file, bed_file)
     print convert
     os.system(convert)
 
