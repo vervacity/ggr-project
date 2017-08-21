@@ -127,12 +127,27 @@ print(new_filename)
 write.table(hard_clusters, file=gzfile(new_filename), sep='\t', row.names=FALSE, col.names=FALSE, quote=FALSE)
 
 # and plot out for sanity check
-hard_clusters$new_clusters <- NULL
 rownames(hard_clusters) <- hard_clusters$V1
 hard_clusters$V1 <- NULL
 
 
 evenly_spaced_subsample <- hard_clusters[seq(1, nrow(hard_clusters), 20), ]
+
+# TODO determine row sep points
+rowsep <- c()
+cluster <- 1
+new_clusters <- evenly_spaced_subsample$new_clusters
+evenly_spaced_subsample$new_clusters <- NULL
+for (i in 1:nrow(evenly_spaced_subsample)) {
+    
+    if (new_clusters[i] != cluster) {
+        rowsep <- c(rowsep, i)
+        cluster <- new_clusters[i]
+    }
+
+}
+
+print(rowsep)
 
 
 # plotting
@@ -166,7 +181,9 @@ heatmap.2(
     col=my_palette,
     lmat=mylmat,
     lwid=mylwid,
-    lhei=mylhei)
+    lhei=mylhei,
+    rowsep=rowsep,
+    sepcolor="black")
 dev.off()
 
 

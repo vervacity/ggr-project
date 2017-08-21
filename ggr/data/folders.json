@@ -30,6 +30,7 @@
 
     "epigenome_dynamic_dir_v1":"results/epigenome/dynamic_v1",
     "epigenome_dynamic_dir_v2":"results/epigenome/dynamic_v2",
+    "epigenome_dynamic_clusters_dir":"results/epigenome/dynamic_v2/clusters",
     
     "rna_dir":"results/rna",
     "tf_dir":"results/tf"

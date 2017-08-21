@@ -340,22 +340,22 @@ def order_and_viz_dynamic_epigenome_v2(
     # this ordering is the FINAL ordering
     dynamic_plots_dir = "{}/plots".format(out_dir)
     os.system("mkdir -p {}".format(dynamic_plots_dir))
-    dynamic_atac_plot = "{}/{}.atac.heatmap.ordered.png".format(
+    dynamic_atac_plot_prefix = "{}/{}.atac.epigenome_ordered".format(
         dynamic_plots_dir, prefix)
     dynamic_atac_subsample_file = "{}/{}.atac.ordered.subsample.txt.gz".format(
         dynamic_plots_dir, prefix)
 
-    if not os.path.isfile(dynamic_atac_plot):
+    if not os.path.isfile(dynamic_atac_subsample_file):
     
         order_and_plot_atac = (
             "plot_dynamic_atac.R {0} {1} {2} {3}").format(
                 args.atac["final_hard_clusters"],
                 args.integrative["atac_dynamic_w_histones_mat"],
-                dynamic_atac_plot,
+                dynamic_atac_plot_prefix,
                 dynamic_atac_subsample_file)
         print order_and_plot_atac
         os.system(order_and_plot_atac)
-
+        
     # take subsample file and make BED
     dynamic_atac_subsample_bed = "{}.bed.gz".format(
         dynamic_atac_subsample_file.split(".txt")[0])
@@ -397,8 +397,150 @@ def order_and_viz_dynamic_epigenome_v2(
                 sort=False,
                 referencepoint="center",
                 color=histone_color)
-
+            
     return args
+
+def cluster_by_chromatin_state(
+        soft_cluster_files,
+        histone_overlap_mat_file,
+        histone_names,
+        out_dir,
+        prefix,
+        min_region_fraction=0.2):
+    """Take in a list of cluster files and sort by histone marks
+    """
+    # set up directories for each type of split
+    mark_dir = "{}/by_mark".format(out_dir)
+    state_dir = "{}/by_state".format(out_dir)
+    dynamic_mark_dir = "{}/by_dynamic_mark".format(out_dir)
+    dynamic_state_dir = "{}/by_dynamic_state".format(out_dir)
+    os.system("mkdir -p {} {} {} {}".format(
+        mark_dir, state_dir, dynamic_mark_dir, dynamic_state_dir))
+
+    for soft_cluster_file in soft_cluster_files:
+
+        soft_prefix = "{}.{}".format(
+            prefix,
+            os.path.basename(soft_cluster_file).split('.')[2])
+        
+        # overlap files
+        soft_cluster_data = pd.read_table(soft_cluster_file, header=None)
+        soft_cluster_data = pd.DataFrame(soft_cluster_data[0])
+        soft_cluster_data.columns = ["region"]
+        histone_overlap_data = pd.read_table(histone_overlap_mat_file)
+
+        cluster_w_histones = soft_cluster_data.merge(
+            histone_overlap_data, how="left", on="region")
+
+        # set up a min region num to remove really small sets
+        min_region_num = int(min_region_fraction * cluster_w_histones.shape[0])
+        
+        # perform several overlap types:
+        # each histone mark alone (presence)
+        # TODO - dont take absence, its the exact opposite (negative set)
+        for histone in histone_names:
+            subset = cluster_w_histones[cluster_w_histones[histone] != 9]
+            if subset.shape[0] > min_region_num:
+                overlap_file = "{}/{}.{}-present.txt.gz".format(
+                    mark_dir, soft_prefix, histone)
+                pd.DataFrame(subset["region"]).to_csv(
+                    overlap_file, sep='\t', header=False, index=False, compression="gzip")
+
+            #subset = cluster_w_histones[cluster_w_histones[histone] == 9]
+            #if subset.shape[0] > min_region_num:
+            #    overlap_file = "{}/{}.{}-absent.txt.gz".format(
+            #        mark_dir, soft_prefix, histone)
+            #    pd.DataFrame(subset["region"]).to_csv(
+            #        overlap_file, sep='\t', header=False, index=False, compression="gzip")
+            
+        
+        # histone marks in combination (just presence)
+        histone_a = "H3K27ac"
+        histone_b = "H3K4me1"
+
+        # both present
+        subset = cluster_w_histones[
+            (cluster_w_histones[histone_a] != 9) &
+            (cluster_w_histones[histone_b] != 9)]
+        if subset.shape[0] > min_region_num:
+            overlap_file = "{}/{}.{}-present_{}-present.txt.gz".format(
+                state_dir, soft_prefix, histone_a, histone_b)
+            pd.DataFrame(subset["region"]).to_csv(
+                overlap_file, sep='\t', header=False, index=False, compression="gzip")
+
+        # a present, b missing
+        subset = cluster_w_histones[
+            (cluster_w_histones[histone_a] != 9) &
+            (cluster_w_histones[histone_b] == 9)]
+        if subset.shape[0] > min_region_num:
+            overlap_file = "{}/{}.{}-present_{}-absent.txt.gz".format(
+                state_dir, soft_prefix, histone_a, histone_b)
+            pd.DataFrame(subset["region"]).to_csv(
+                overlap_file, sep='\t', header=False, index=False, compression="gzip")
+
+        # a missing, b present
+        subset = cluster_w_histones[
+            (cluster_w_histones[histone_a] == 9) &
+            (cluster_w_histones[histone_b] != 9)]
+        if subset.shape[0] > min_region_num:
+            overlap_file = "{}/{}.{}-absent_{}-present.txt.gz".format(
+                state_dir, soft_prefix, histone_a, histone_b)
+            pd.DataFrame(subset["region"]).to_csv(
+                overlap_file, sep='\t', header=False, index=False, compression="gzip")
+
+        # a missing, b missing
+        # TODO don't take these, these are negatives (for function)
+        #subset = cluster_w_histones[
+        #    (cluster_w_histones[histone_a] == 9) &
+        #    (cluster_w_histones[histone_b] == 9)]
+        #if subset.shape[0] > min_region_num:
+        #    overlap_file = "{}/{}.{}-absent_{}-absent.txt.gz".format(
+        #        state_dir, soft_prefix, histone_a, histone_b)
+        #    pd.DataFrame(subset["region"]).to_csv(
+        #        overlap_file, sep='\t', header=False, index=False, compression="gzip")
+
+        # histone marks alone (dynamics)
+        # TODO don't take 9s.
+        # NOTE: as currently defined, not useful
+        for histone in histone_names:
+            mark_states = list(set(cluster_w_histones[histone].tolist()))
+
+            for mark_state in mark_states:
+                if mark_state == 9:
+                    continue
+                
+                subset = cluster_w_histones[cluster_w_histones[histone] == mark_state]
+                #if subset.shape[0] > min_region_num:
+                if subset.shape[0] > 100:
+                    overlap_file = "{}/{}.{}-{}.txt.gz".format(
+                        dynamic_mark_dir, soft_prefix, histone, mark_state)
+                    pd.DataFrame(subset["region"]).to_csv(
+                        overlap_file, sep='\t', header=False, index=False, compression="gzip")
+            
+        # chromatin state dynamics
+        # don't take 99s
+        # TODO: ignore 4s, and 9s? these are subsets of presence/absence?
+        # NOTE: as currently defined, not useful
+        dynamic_states = list(set(cluster_w_histones["histone_cluster"].tolist()))
+        for dynamic_state in dynamic_states:
+            if dynamic_state == 99:
+                continue
+            
+            subset = cluster_w_histones[cluster_w_histones["histone_cluster"] == dynamic_state]
+            #if subset.shape[0] > min_region_num:
+            if subset.shape[0] > 100:
+                overlap_file = "{}/{}.dynamic-state-{}.txt.gz".format(
+                    dynamic_state_dir, soft_prefix, dynamic_state)
+                pd.DataFrame(subset["region"]).to_csv(
+                    overlap_file, sep='\t', header=False, index=False, compression="gzip")
+
+        # TODO consider taking the dynamic marks (even if tiny sets) and super downweight their tasks?
+        # this will cover for the issues above.
+        # make sure that these groups are at least 100?
+        
+        
+        
+    return None
 
 
 def order_and_viz_stable_epigenome(
@@ -552,7 +694,25 @@ def run(args):
         activating_marks,
         activating_mark_files)
 
-    # now for dynamic sets use soft clusters, split, and only keep "large enough" clusters
+
+    print args.atac["final_soft_clusters"]
+    print len(args.atac["final_soft_clusters"])
+    cluster_by_chromatin_state(
+        args.atac["final_soft_clusters"],
+        args.integrative["atac_dynamic_w_histones_mat"],
+        activating_marks,
+        args.folders["epigenome_dynamic_clusters_dir"],
+        dynamic_epigenome_prefix)
+    
+    quit()
+
+    # TODO(dk) now for dynamic sets use soft clusters, split, and only keep "large enough" clusters
+    # few levels: 1) just is_marked (5 possibilities for two histone marks)
+    # then granular chromatin state. for granular level, remove things that are not at least some cutoff val (empirical)
+    
+
+    
+
     
     
     # stable ATAC
