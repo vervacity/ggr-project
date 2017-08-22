@@ -81,6 +81,7 @@ def make_deeptools_heatmap(
         "--colorMap {3} "
         "{4} "
         "--samplesLabel {5} "
+        "--zMax 450 " # TESTING
         "--xAxisLabel '' "
         "--refPointLabel Summit "
         "--legendLocation none "

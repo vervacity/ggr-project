@@ -7,12 +7,13 @@ import gzip
 import logging
 
 import pandas as pd
+import numpy as np
 
 from ggr.util.bioinformatics import make_deeptools_heatmap
 from ggr.util.bed_utils import id_to_bed
 
 
-def get_nearest_mark(intersect_bed_file, out_file):
+def get_nearest_mark(intersect_bed_file, out_file, histone_assignment):
     """Assumes that you did an intersect 
     where you have two regions on a line
     """
@@ -23,25 +24,38 @@ def get_nearest_mark(intersect_bed_file, out_file):
                 
                 fields = line.strip().split('\t')
                 region = "{}:{}-{}".format(fields[0], fields[1], fields[2])
+                cluster = fields[6]
 
                 if current_region_info[0] == region:
                     # same region, save in the following info
                     distance = (int(fields[5]) - int(fields[4])) - (int(fields[2]) - int(fields[1]))
-                    current_region_info[1][distance] = fields[6]
+                    current_region_info[1][distance] = cluster
+                    current_region_info[2].append(int(cluster))
                 else:
                     # new region: save out old region, and replace with new
                     if current_region_info[0] != "":
-                        closest_dist = min(current_region_info[1].keys())
-                        out.write("{}\t{}\n".format(
-                            current_region_info[0],
-                            current_region_info[1][closest_dist]))
-                        
+                        if histone_assignment == "most_diff":
+                            most_diff = np.abs(np.array(current_region_info[2]) - 4.)
+                            most_diff[most_diff > 4] = 0 # ignore 9s
+                            most_diff_idx = np.argmax(most_diff)
+                            out.write("{}\t{}\n".format(
+                                current_region_info[0],
+                                current_region_info[2][most_diff_idx]))
+                        elif histone_assignment == "nearest":
+                            closest_dist = min(current_region_info[1].keys())
+                            out.write("{}\t{}\n".format(
+                                current_region_info[0],
+                                current_region_info[1][closest_dist]))
+                        else:
+                            print "unrecognized method for histone assignment!"
+                            quit()
+                            
                     # replace with new
                     if fields[6] == ".":
-                        current_region_info = [region, {0: "9"}]
+                        current_region_info = [region, {0: "9"}, [9]]
                     else:
                         distance = (int(fields[5]) - int(fields[4])) - (int(fields[2]) - int(fields[1]))
-                        current_region_info = [region, {distance: fields[6]}]
+                        current_region_info = [region, {distance: cluster}, [int(cluster)]]
 
             # don't forget to output the last region
             closest_dist = min(current_region_info[1].keys())
@@ -57,7 +71,9 @@ def get_histone_overlaps(
         overlap_bed_files,
         out_dir,
         out_file,
-        chromsizes_file):
+        chromsizes_file,
+        search_dist=1000,
+        histone_assignment="nearest"):
     """Given a master bed file and a list of histone files,
     get the overlaps and merge back into a file with all clusters
     """
@@ -73,7 +89,7 @@ def get_histone_overlaps(
             "gzip -c > {4}").format(
                 overlap_bed_file,
                 chromsizes_file,
-                1000,
+                search_dist,
                 master_bed_file,
                 out_tmp_file)
         print intersect_bed
@@ -82,7 +98,10 @@ def get_histone_overlaps(
         # and then adjust to get nearest histone
         out_nearest_tmp = "{}/{}.overlap.{}.nearest.tmp.txt.gz".format(
             out_dir, prefix, histone)
-        get_nearest_mark(out_tmp_file, out_nearest_tmp)
+        get_nearest_mark(
+            out_tmp_file,
+            out_nearest_tmp,
+            histone_assignment)
     
         # and take these and overlap with each other to get out file
         mark_clusters = pd.read_table(out_nearest_tmp, header=None, sep='\t')
@@ -144,7 +163,9 @@ def order_and_viz_dynamic_epigenome(
         prefix,
         activating_histones,
         activating_histone_files,
-        all_histones):
+        all_histones,
+        search_dist=1000,
+        histone_assignment="nearest"):
     """Order clusters by hclust and histones more simple
     """
     # get overlap with histones
@@ -161,7 +182,9 @@ def order_and_viz_dynamic_epigenome(
             activating_histone_files,
             dynamic_histone_overlap_dir,
             args.integrative["atac_dynamic_w_histones_mat"],
-            args.annot["chromsizes"])
+            args.annot["chromsizes"],
+            search_dist=search_dist,
+            histone_assignment=histone_assignment)
         
     # TODO: get atac clusters and sort by (hard) cluster
     # Now merge in histone clusters, and sort by ATAC + histone
@@ -344,7 +367,9 @@ def order_and_viz_stable_epigenome(
         out_dir,
         prefix,
         histones,
-        histone_files):
+        histone_files,
+        search_dist=1000,
+        histone_assignment="nearest"):
     """Analyze stable epigenome
     """
     # get histone overlap with stable ATAC
@@ -362,7 +387,9 @@ def order_and_viz_stable_epigenome(
             histone_files,
             stable_histone_overlap_dir,
             args.integrative["atac_stable_w_histones_mat"],
-            args.annot["chromsizes"])
+            args.annot["chromsizes"],
+            search_dist=search_dist,
+            histone_assignment=histone_assignment)
 
     # first separate out dynamic and non dynamic chromatin mark data
     args.integrative["atac_stable_w_histones_dynamic_mat"] = (
@@ -448,6 +475,19 @@ def run(args):
         (histone, args.chipseq["histones"][histone]["clusters_bed"])
         for histone in histones]
 
+
+    # TODO: take ATAC master regions file and extend {extend_len} bp out either direction
+    # then get histone fragments that fall in these regions
+    # run DESeq2 on these and use for analysis
+
+    # then do histone overlap (method above) to get the marking (nearest)
+    # note: need to first use peak calls to distinguish not marked vs marked
+
+
+    quit()
+    
+
+    
     # dynamic ATAC
     logging.info("EPIGENOME: DYNAMIC: integrate dynamic ATAC w histones")
     dynamic_epigenome_prefix = "ggr.epigenome.dynamic"
@@ -461,7 +501,9 @@ def run(args):
         dynamic_epigenome_prefix,
         activating_marks,
         activating_mark_files,
-        histones)
+        histones,
+        search_dist=500,
+        histone_assignment="most_diff") #1000, nearest
 
     quit()
 
@@ -483,7 +525,9 @@ def run(args):
         args.folders["epigenome_stable_dir"],
         stable_epigenome_prefix,
         histones,
-        histone_files)
+        histone_files,
+        search_dist=1000,
+        histone_assignment="most_diff")
 
     quit()
     

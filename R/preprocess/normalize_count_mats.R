@@ -24,9 +24,16 @@ col_data <- data.frame(condition=conditions)
 rownames(col_data) <- colnames(master_counts)
 
 # Set up DESeq object
-dds <- DESeqDataSetFromMatrix(countData=master_counts,
-                              colData=col_data,
-                              design = ~ condition)
+if (length(unique(conditions)) != 1) {
+    dds <- DESeqDataSetFromMatrix(countData=master_counts,
+                                  colData=col_data,
+                                  design = ~ condition)
+} else {
+    # if normalizing a set in total, set design to 1
+    dds <- DESeqDataSetFromMatrix(countData=master_counts,
+                                  colData=col_data,
+                                  design = ~ 1)
+}
 
 # Estimate size factors and dispersion
 dds <- estimateSizeFactors(dds)

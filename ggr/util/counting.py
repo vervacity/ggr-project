@@ -66,8 +66,8 @@ def make_midpoints_file(bedpe_file, out_file):
     make_midpoints = (
         "zcat {0} | "
         "awk -F '\t' 'BEGIN {{ OFS=\"\t\" }} "
-        "{{ if ($9==\"+\") {{ $2=$2+int(($6-$2)/2); $3=$2+int(($6-$2)/2)+1 }} "
-        "else if ($9==\"-\") {{ $2=$5+int(($3-$5)/2); $3=$5+int(($3-$5)/2)+1 }} "
+        "{{ if ($9==\"+\") {{ midpoint=$2+int(($6-$2)/2); $2=midpoint; $3=midpoint+1 }} "
+        "else if ($9==\"-\") {{ midpoint=$5+int(($3-$5)/2); $2=midpoint; $3=midpoint+1 }} "
         "print $1\"\t\"$2\"\t\"$3\"\tN\t1000\t\"$9 }}' | "
         "sort -k1,1 -k2,2n | "
         "gzip -c "
@@ -141,6 +141,7 @@ def get_counts_from_tagalign(
     assert os.path.splitext(out_counts_file)[1] == ".gz"
 
     # run bedtools coverage
+    # TODO allow read extension?
     get_coverage = (
         "bedtools coverage "
         "-sorted "

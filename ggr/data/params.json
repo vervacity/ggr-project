@@ -1,4 +1,5 @@
 {
     "deseq2_fdr":0.0005,
-    "timeseries_fdr":0.05
+    "timeseries_fdr":0.05,
+    "histone_fdr":0.15
 }

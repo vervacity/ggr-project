@@ -12,15 +12,20 @@
     "histone_dir":"results/histone",
     
     "H3K27ac_dir":"results/histone/H3K27ac",
+    "H3K27ac_idr_dir":"results/histone/H3K27ac/idr",
     "H3K27ac_diff_dir":"results/histone/H3K27ac/diff",
     
+
     "H3K4me1_dir":"results/histone/H3K4me1",
+    "H3K4me1_idr_dir":"results/histone/H3K4me1/idr",
     "H3K4me1_diff_dir":"results/histone/H3K4me1/diff",
     
     "H3K27me3_dir":"results/histone/H3K27me3",
+    "H3K27me3_idr_dir":"results/histone/H3K27me3/idr",
     "H3K27me3_diff_dir":"results/histone/H3K27me3/diff",
 
     "epigenome_dir":"results/epigenome",
+    "epigenome_histone_dir":"results/epigenome/histone_overlap",
     
     "epigenome_stable_dir":"results/epigenome/stable",
     "epigenome_stable_clusters_dir":"results/epigenome/stable/clusters",

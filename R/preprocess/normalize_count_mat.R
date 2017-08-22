@@ -17,9 +17,15 @@ col_data <- data.frame(condition=conditions)
 rownames(col_data) <- colnames(data)
 
 # Set up DESeq object
-dds <- DESeqDataSetFromMatrix(countData=data,
-                              colData=col_data,
-                              design = ~ condition)
+if (length(unique(conditions)) != 1) {
+    dds <- DESeqDataSetFromMatrix(countData=data,
+                                  colData=col_data,
+                                  design = ~ condition)
+} else {
+    dds <- DESeqDataSetFromMatrix(countData=data,
+                                  colData=col_data,
+                                  design = ~ 1)
+}
 
 # Estimate size factors and dispersion
 dds <- estimateSizeFactors(dds)
