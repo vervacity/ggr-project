@@ -1,5 +1,16 @@
 {
     "deseq2_fdr":0.0005,
     "timeseries_fdr":0.05,
-    "histone_fdr":0.15
+    "histones":{
+	"H3K27ac":{
+	    "atac_extend_len":1000
+	},
+	"H3K4me1":{
+	    "atac_extend_len":1000
+	},
+	"H3K27me3":{
+	    "atac_extend_len":1000
+	}
+    },
+    "histone_fdr":0.10
 }

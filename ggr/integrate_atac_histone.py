@@ -475,19 +475,6 @@ def run(args):
         (histone, args.chipseq["histones"][histone]["clusters_bed"])
         for histone in histones]
 
-
-    # TODO: take ATAC master regions file and extend {extend_len} bp out either direction
-    # then get histone fragments that fall in these regions
-    # run DESeq2 on these and use for analysis
-
-    # then do histone overlap (method above) to get the marking (nearest)
-    # note: need to first use peak calls to distinguish not marked vs marked
-
-
-    quit()
-    
-
-    
     # dynamic ATAC
     logging.info("EPIGENOME: DYNAMIC: integrate dynamic ATAC w histones")
     dynamic_epigenome_prefix = "ggr.epigenome.dynamic"
@@ -503,7 +490,7 @@ def run(args):
         activating_mark_files,
         histones,
         search_dist=500,
-        histone_assignment="most_diff") #1000, nearest
+        histone_assignment="nearest")
 
     quit()
 

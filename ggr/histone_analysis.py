@@ -108,6 +108,8 @@ def run_histone_idr(
 def run(args):
     """Pipeline for histone analyses
     """
+        
+    # set up histones
     histones = args.chipseq["histones"].keys()
     days = ["d0", "d3", "d6"]
     
@@ -126,32 +128,24 @@ def run(args):
             args.chipseq["histones"][histone]["bedpe_glob"])))
         assert len(bedpe_file_list) == 6
 
-        # first run histone IDR to clean up files
-        for day in days:
 
-            histone_day_dir = "{}/{}".format(args.folders["{}_idr_dir".format(histone)], day)
-            os.system("mkdir -p {}".format(histone_day_dir))
-            
-            histone_overlap_day_file = [
-                histone_overlap for histone_overlap in histone_overlap_files
-                if day in histone_overlap]
-            histone_bedpe_day_files = [
-                histone_bedpe for histone_bedpe in bedpe_file_list
-                if day in histone_bedpe]
-
-            run_histone_idr(
-                args,
-                histone,
-                histone_overlap_day_file[0],
-                histone_bedpe_day_files,
-                histone_day_dir,
-                "{}.{}".format(histone_prefix, day))
-
-
-        print "Make sure to run IDR before continuing"
-        # TODO gzip here
-        continue
-        quit()
+        # make the extended ATAC master regions as key regions for histones
+        # TODO go from midpoint outward
+        args.atac["master_slop_bed"] = "{}.slop_{}bp.bed.gz".format(
+            args.atac["master_bed"].split(".bed")[0],
+            args.params["histones"][histone]["atac_extend_len"])
+        if not os.path.isfile(args.atac["master_slop_bed"]):
+            slop_bed = (
+                "zcat {0} | "
+                "awk -F '\t' 'BEGIN{{OFS=\"\t\"}} {{ midpoint=$2+int(($3-$2)/2); $2=midpoint; $3=midpoint+1; print }}' | "
+                "bedtools slop -i stdin -g {1} -b {2} | "
+                "gzip -c > {3}").format(
+                    args.atac["master_bed"],
+                    args.annot["chromsizes"],
+                    args.params["histones"][histone]["atac_extend_len"],
+                    args.atac["master_slop_bed"])
+            print slop_bed
+            os.system(slop_bed)
 
         # TODO instead of IDR, use ATAC regions as master list.
         # first, only mark a region if it overlaps a naive overlap peak (master regions file)
@@ -159,7 +153,6 @@ def run(args):
         # and continue on as before
         # make sure to switch the nearest histone to look for nearest
         
-
         # 1) generate master regions file
         logging.info("HISTONE: {}: Generating master regions...".format(histone))
         args.chipseq["histones"][histone]["master_regions"] = "{0}/ggr.{1}.overlap.master.bed.gz".format(
@@ -170,20 +163,30 @@ def run(args):
                     args.chipseq["data_dir"], args.chipseq["histones"][histone]["overlap_glob"])))
             logging.info("Master regions using: {}".format(" ".join(histone_overlap_files)))
             merge_regions(histone_overlap_files, args.chipseq["histones"][histone]["master_regions"])
-            
+
+        # now intersect ATAC with the naive overlap files and only keep region if has an overlap
+        args.chipseq["histones"][histone]["master_slop_marked_bed"] = "{}.{}-marked.bed.gz".format(
+            args.atac["master_slop_bed"].split(".bed")[0],
+            histone)
+        if not os.path.isfile(args.chipseq["histones"][histone]["master_slop_marked_bed"]):
+            keep_marked = (
+                "bedtools intersect -u -a {0} -b {1} | "
+                "gzip -c > {2}").format(
+                    args.atac["master_slop_bed"],
+                    args.chipseq["histones"][histone]["master_regions"],
+                    args.chipseq["histones"][histone]["master_slop_marked_bed"])
+            print keep_marked
+            os.system(keep_marked)
+
         # 2) get counts of midpoint of fragments in these regions
         logging.info("HISTONE: {}: Making counts matrix...".format(histone))
-        args.chipseq["histones"][histone]["counts"] = "{0}/ggr.{1}.midpoints.counts.mat.txt.gz".format(
-            args.folders["data_dir"], histone)
+        args.chipseq["histones"][histone]["counts"] = "{0}/{1}.midpoints.counts.mat.txt.gz".format(
+            args.folders["data_dir"], histone_prefix)
         if not os.path.isfile(args.chipseq["histones"][histone]["counts"]):
-            # glob bedpe files
-            bedpe_file_list = sorted(glob.glob("{}/{}".format(
-                args.chipseq["data_dir"],
-                args.chipseq["histones"][histone]["bedpe_glob"])))
-            assert len(bedpe_file_list) == 6
             # Make count matrix
             make_count_matrix(
-                args.chipseq["histones"][histone]["master_regions"],
+                args.chipseq["histones"][histone]["master_slop_marked_bed"],
+                #args.atac["master_slop_bed"], # NOTE CHANGED HERE
                 bedpe_file_list,
                 args.chipseq["histones"][histone]["counts"],
                 histone,
@@ -237,7 +240,8 @@ def run(args):
             histone_diff_dir, histone_prefix)
         if not os.path.isfile(args.chipseq["histones"][histone]["sig_mat"]):
             join_diff_region_lists_to_mat(
-                args.chipseq["histones"][histone]["master_regions"],
+                args.chipseq["histones"][histone]["master_slop_marked_bed"],
+                #args.chipseq["histones"][histone]["master_regions"],# fix this
                 sig_up_down_pairs,
                 args.chipseq["histones"][histone]["sig_mat"])
             
@@ -257,5 +261,4 @@ def run(args):
             print make_bed
             os.system(make_bed)
             
-    quit()
     return args
