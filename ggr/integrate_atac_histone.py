@@ -492,8 +492,6 @@ def run(args):
         search_dist=500,
         histone_assignment="nearest")
 
-    quit()
-
     dynamic_state_beds = glob.glob("{}/*bed.gz".format(
         args.folders["epigenome_dynamic_state_bed_dir"]))
     if len(dynamic_state_beds) == 0:
@@ -515,8 +513,6 @@ def run(args):
         histone_files,
         search_dist=1000,
         histone_assignment="most_diff")
-
-    quit()
     
     # cluster_by_chromatin_state
     stable_state_beds = glob.glob("{}/*bed.gz".format(
@@ -532,7 +528,7 @@ def run(args):
     
 
     # TODO now go through all folders and run GREAT and HOMER
-
+    
     
     # and generate group BED files
     stable_clusters = pd.read_table(

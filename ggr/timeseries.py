@@ -180,7 +180,7 @@ def get_consistent_soft_clusters_by_region(
         cluster_names,
         timepoint_vectors,
         pdf_cutoff,
-        corr_cutoff=0.05):
+        corr_cutoff):
     """Given a list of timepoint vectors, compare to all clusters
     then perform an intersect to get consistent clusters
     utilizing a multivariate normal distribution
@@ -305,7 +305,7 @@ def get_consistent_soft_clusters(
                         cluster_names,
                         [rep1_timepoints, rep2_timepoints, pooled_timepoints],
                         pdf_cutoff,
-                        corr_cutoff=corr_cutoff)
+                        corr_cutoff)
                     
                     for cluster in consistent_clusters:
                         
@@ -351,7 +351,11 @@ def get_consistent_dpgp_trajectories(
         rep2_timeseries_file,
         pooled_timeseries_file,
         out_dir,
-        prefix):
+        prefix,
+        raw_cluster_min_size=1000,
+        raw_cluster_reject_null_ci_interval=0.999,
+        rep_to_cluster_ci_interval=0.95,        
+        rep_to_cluster_corr_cutoff=0.05):
     """Given count matrices for replicates, gets 
     consistent trajectories
 
@@ -367,20 +371,22 @@ def get_consistent_dpgp_trajectories(
     assert ".gz" in rep2_timeseries_file
     assert ".gz" in pooled_timeseries_file
 
-    # unzip files as needed
-    pooled_unzipped_file = "{}/{}.tmp".format(
-        out_dir,
-        os.path.basename(pooled_timeseries_file).split(".mat")[0])
-    unzip_mat = ("zcat {0} > {1}").format(
-        pooled_timeseries_file, pooled_unzipped_file)
-    print unzip_mat
-    os.system(unzip_mat)
-
     # run DP GP on pooled data
     pooled_dir = "{}/pooled".format(out_dir)
     pooled_cluster_file = "{0}/{1}.pooled_optimal_clustering.txt".format(
         pooled_dir, prefix)
     if not os.path.isdir(pooled_dir):
+
+        # unzip files as needed
+        pooled_unzipped_file = "{}/{}.tmp".format(
+            out_dir,
+            os.path.basename(pooled_timeseries_file).split(".mat")[0])
+        unzip_mat = ("zcat {0} > {1}").format(
+            pooled_timeseries_file, pooled_unzipped_file)
+        print unzip_mat
+        os.system(unzip_mat)
+
+        # cluster
         os.system("mkdir -p {}".format(pooled_dir))
         cluster = (
             "DP_GP_cluster.py -i {} -o {} -p png --plot").format(
@@ -390,8 +396,8 @@ def get_consistent_dpgp_trajectories(
         print cluster
         os.system(cluster)
 
-    # delete the unzipped tmp files
-    os.system("rm {}/*.tmp".format(out_dir))
+        # delete the unzipped tmp files
+        os.system("rm {}/*.tmp".format(out_dir))
 
     # stage 2: soft clustering
     soft_cluster_dir = "{}/soft".format(out_dir)
@@ -405,15 +411,19 @@ def get_consistent_dpgp_trajectories(
         # filter clusters: remove low membership (<1k) clusters and those that don't reject the null
         # note that "low membership" was empirical - strong split between <500 and >1400.
         # rejecting null - confidence interval of .999 (this is stronger as an FDR correction)
+        # TODO(dk) pull out params here
         cluster_means, cluster_covariances, cluster_sizes, cluster_names = filter_null_and_small_clusters(
             cluster_means,
             cluster_covariances,
             cluster_sizes,
-            cluster_names)
+            cluster_names,
+            ci=raw_cluster_reject_null_ci_interval,
+            size_cutoff=raw_cluster_min_size)
         
         # now extract consistent soft clusters
         # ie, for each region, check each cluster to see if it belongs after checking
         # confidence interval (multivariate normal), pearson and spearmans.
+        # TODO(dk) pull out params here
         get_consistent_soft_clusters(
             rep1_timeseries_file,
             rep2_timeseries_file,
@@ -422,7 +432,9 @@ def get_consistent_dpgp_trajectories(
             prefix,
             cluster_means,
             cluster_covariances,
-            cluster_names)
+            cluster_names,
+            ci=rep_to_cluster_ci_interval,
+            corr_cutoff=rep_to_cluster_corr_cutoff)
                             
     # sanity check - replot the soft clusters
     plot_dir = "{}/soft/plot".format(out_dir)
@@ -434,7 +446,5 @@ def get_consistent_dpgp_trajectories(
             out_dir, "*soft*.gz")
         print plot_soft_clusters
         os.system(plot_soft_clusters)
-
-    # TODO convert into BED files with cluster numbers?
     
     return

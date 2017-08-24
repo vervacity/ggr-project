@@ -73,7 +73,7 @@ def run(args):
             '{0}/{1}'.format(
                 args.folders['atac_deseq2_dir'],
                 atac_prefix),
-            args.params['deseq2_fdr'],
+            args.params['atac_deseq2_fdr'],
             args.atac['dynamic_ids'])
         print run_timeseries_deseq2
         os.system(run_timeseries_deseq2)
@@ -174,7 +174,11 @@ def run(args):
         args.atac["counts_rep2_rlog_dynamic"],
         args.atac["counts_pooled_rlog_dynamic"],
         args.folders["atac_dp-gp_dir"],
-        atac_prefix)
+        atac_prefix,
+        raw_cluster_min_size=args.params["raw_cluster_min_size"],
+        raw_cluster_reject_null_ci_interval=args.params["raw_cluster_reject_null_ci_interval"],
+        rep_to_cluster_ci_interval=args.params["rep_to_cluster_ci_interval"],
+        rep_to_cluster_corr_cutoff=args.params["rep_to_cluster_corr_cutoff"])
 
     # 8) reorder (ie renumber) the SOFT clusters (numerically) by order of hclust and make sure to propagate to hard clusters
     args.atac["final_hard_clusters"] = "{}/{}.clusters.hard.renumbered.txt.gz".format(

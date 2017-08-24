@@ -19,92 +19,6 @@ from ggr.util.parallelize import run_in_parallel
 from ggr.util.diff import join_diff_region_lists_to_mat
 
 
-
-def run_histone_idr(
-        args,
-        histone,
-        master_file,
-        bedpe_file_list,
-        out_dir,
-        prefix,
-        fdr=0.10):
-    """Do a version of IDR on histone files
-    NOTES: do on naive overlap file
-    """
-    # sort master file
-    master_ordered_file = "{}/{}.master.bed.gz".format(out_dir, prefix)
-    if not os.path.isfile(master_ordered_file):
-        order_bed = (
-            "zcat {0} | "
-            "awk -F '\t' '{{ print $1\"\t\"$2\"\t\"$3 }}' | "
-            "sort -k1,1 -k2,2n | "
-            "gzip -c > {1}").format(master_file, master_ordered_file)
-        print order_bed
-        os.system(order_bed)
-    
-    # get counts of midpoint of fragments in these regions
-    counts_file = "{}/{}.midpoints.counts.mat.txt.gz".format(out_dir, prefix)
-    if not os.path.isfile(counts_file):
-        make_count_matrix(
-            master_ordered_file,
-            bedpe_file_list,
-            counts_file,
-            histone,
-            tmp_dir=out_dir)
-
-    # run rlog to normalize
-    counts_rlog_file = "{}.rlog.mat.txt.gz".format(counts_file.split(".mat")[0])
-    if not os.path.isfile(counts_rlog_file):
-        run_rlogs = "normalize_count_mat.R {0} {1}".format(
-            counts_file,
-            counts_rlog_file)
-        print run_rlogs
-        os.system(run_rlogs)
-
-    # separate into 2 replicate files
-    rep1_out_file = "{}.rep1.bed.gz".format(counts_rlog_file.split('.mat')[0])
-    rep2_out_file = "{}.rep2.bed.gz".format(counts_rlog_file.split('.mat')[0])
-    if not os.path.isfile(rep2_out_file):
-        with gzip.open(counts_rlog_file, 'r') as fp:
-            with gzip.open(rep1_out_file, 'w') as out1:
-                with gzip.open(rep2_out_file, 'w') as out2:
-
-                    for line in fp:
-                        
-                        if "b1" in line:
-                            continue
-
-                        fields = line.strip().split('\t')
-                        chrom = fields[0].split(':')[0]
-                        start = fields[0].split(':')[1].split('-')[0]
-                        stop = fields[0].split('-')[1]
-
-                        out1.write("{0}\t{1}\t{2}\t{0}:{1}-{2}\t{3}\t.\t{1}\t{2}\t0\n".format(chrom, start, stop, fields[1]))
-                        out2.write("{0}\t{1}\t{2}\t{0}:{1}-{2}\t{3}\t.\t{1}\t{2}\t0\n".format(chrom, start, stop, fields[2]))
-
-    # call IDR on these rep files
-    # NOTE since idr is python3, need to step out of code to run
-    # command is kept here for reference
-    args.chipseq["histones"][histone]["idr_bed"] = "{}/{}.idr.bed.gz".format(out_dir, prefix)
-    idr_out_log_file = "{}/{}.idr.log".format(out_dir, prefix)
-
-    if not os.path.isfile(args.chipseq["histones"][histone]["idr_bed"]):
-        idr = (
-            "idr --samples {0} {1} --input-file-type bed "
-            "--rank score "
-            "--soft-idr-threshold {2} "
-            "--output-file {3} "
-            "--log-output-file {4} "
-            "--plot").format(
-                rep1_out_file, rep2_out_file,
-                0.05,
-                args.chipseq["histones"][histone]["idr_bed"].split(".gz")[0],
-                idr_out_log_file)
-        print idr
-
-    return args
-
-
 def run(args):
     """Pipeline for histone analyses
     """
@@ -128,9 +42,12 @@ def run(args):
             args.chipseq["histones"][histone]["bedpe_glob"])))
         assert len(bedpe_file_list) == 6
 
+        # TODO(dk) check histone options: 1) atac-centric (out from midpoint), 2) histone-centric (naive overlap)
+        # 3) atac-centric at flanks (ie, ignore center)
+        # but naive overlap will likely be fine, check and switch to that
 
+        # TODO(dk) convert this into a function with choices
         # make the extended ATAC master regions as key regions for histones
-        # TODO go from midpoint outward
         args.atac["master_slop_bed"] = "{}.slop_{}bp.bed.gz".format(
             args.atac["master_bed"].split(".bed")[0],
             args.params["histones"][histone]["atac_extend_len"])
@@ -147,12 +64,6 @@ def run(args):
             print slop_bed
             os.system(slop_bed)
 
-        # TODO instead of IDR, use ATAC regions as master list.
-        # first, only mark a region if it overlaps a naive overlap peak (master regions file)
-        # then, with those regions, normalize to {extendlen} size and count fragments
-        # and continue on as before
-        # make sure to switch the nearest histone to look for nearest
-        
         # 1) generate master regions file
         logging.info("HISTONE: {}: Generating master regions...".format(histone))
         args.chipseq["histones"][histone]["master_regions"] = "{0}/ggr.{1}.overlap.master.bed.gz".format(
@@ -164,6 +75,7 @@ def run(args):
             logging.info("Master regions using: {}".format(" ".join(histone_overlap_files)))
             merge_regions(histone_overlap_files, args.chipseq["histones"][histone]["master_regions"])
 
+            
         # now intersect ATAC with the naive overlap files and only keep region if has an overlap
         args.chipseq["histones"][histone]["master_slop_marked_bed"] = "{}.{}-marked.bed.gz".format(
             args.atac["master_slop_bed"].split(".bed")[0],
@@ -178,6 +90,13 @@ def run(args):
             print keep_marked
             os.system(keep_marked)
 
+            
+        # control master region set for histone overlap here
+        #master_regions = args.chipseq["histones"][histone]["master_regions"]
+        #master_regions = args.atac["master_slop_bed"]
+        master_regions = args.chipseq["histones"][histone]["master_slop_marked_bed"]
+
+
         # 2) get counts of midpoint of fragments in these regions
         logging.info("HISTONE: {}: Making counts matrix...".format(histone))
         args.chipseq["histones"][histone]["counts"] = "{0}/{1}.midpoints.counts.mat.txt.gz".format(
@@ -185,8 +104,7 @@ def run(args):
         if not os.path.isfile(args.chipseq["histones"][histone]["counts"]):
             # Make count matrix
             make_count_matrix(
-                args.chipseq["histones"][histone]["master_slop_marked_bed"],
-                #args.atac["master_slop_bed"], # NOTE CHANGED HERE
+                master_regions,
                 bedpe_file_list,
                 args.chipseq["histones"][histone]["counts"],
                 histone,
@@ -240,8 +158,7 @@ def run(args):
             histone_diff_dir, histone_prefix)
         if not os.path.isfile(args.chipseq["histones"][histone]["sig_mat"]):
             join_diff_region_lists_to_mat(
-                args.chipseq["histones"][histone]["master_slop_marked_bed"],
-                #args.chipseq["histones"][histone]["master_regions"],# fix this
+                master_regions,
                 sig_up_down_pairs,
                 args.chipseq["histones"][histone]["sig_mat"])
             

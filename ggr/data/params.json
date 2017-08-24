@@ -1,6 +1,9 @@
 {
-    "deseq2_fdr":0.0005,
-    "timeseries_fdr":0.05,
+    "atac_deseq2_fdr":0.0005,
+    "raw_cluster_min_size":1000,
+    "raw_cluster_reject_null_ci_interval":0.999,
+    "rep_to_cluster_ci_interval":0.95,
+    "rep_to_cluster_corr_cutoff":0.05,
     "histones":{
 	"H3K27ac":{
 	    "atac_extend_len":1000
