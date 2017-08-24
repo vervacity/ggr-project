@@ -1,6 +1,8 @@
 {
     "data_dir":"/mnt/lab_data/kundaje/projects/skin/data/bds/processed.chipseq.2017-01-23.histones",
     "histones":{
+	"ordered_names":["H3K27ac", "H3K4me1", "H3K27me3"],
+	"ordered_deeptools_colors":["Reds", "Blues", "Greens"],
 	"H3K27ac":{
 	    "bedpe_glob":"*H3K27ac*/*/rep*/*.bedpe.gz",
 	    "overlap_glob":"*H3K27ac*/*/macs2/overlap/*filt.narrowPeak.gz",

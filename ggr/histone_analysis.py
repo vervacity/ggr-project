@@ -22,10 +22,8 @@ from ggr.util.diff import join_diff_region_lists_to_mat
 def run(args):
     """Pipeline for histone analyses
     """
-        
     # set up histones
     histones = args.chipseq["histones"].keys()
-    days = ["d0", "d3", "d6"]
     
     for histone in histones:
 
@@ -50,7 +48,7 @@ def run(args):
         # make the extended ATAC master regions as key regions for histones
         args.atac["master_slop_bed"] = "{}.slop_{}bp.bed.gz".format(
             args.atac["master_bed"].split(".bed")[0],
-            args.params["histones"][histone]["atac_extend_len"])
+            args.params["histones"][histone]["overlap_extend_len"])
         if not os.path.isfile(args.atac["master_slop_bed"]):
             slop_bed = (
                 "zcat {0} | "
@@ -59,7 +57,7 @@ def run(args):
                 "gzip -c > {3}").format(
                     args.atac["master_bed"],
                     args.annot["chromsizes"],
-                    args.params["histones"][histone]["atac_extend_len"],
+                    args.params["histones"][histone]["overlap_extend_len"],
                     args.atac["master_slop_bed"])
             print slop_bed
             os.system(slop_bed)

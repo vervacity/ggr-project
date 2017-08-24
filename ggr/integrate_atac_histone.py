@@ -68,19 +68,18 @@ def get_nearest_mark(intersect_bed_file, out_file, histone_assignment):
 
 def get_histone_overlaps(
         master_bed_file,
-        overlap_bed_files,
+        overlap_params,
         out_dir,
         out_file,
         chromsizes_file,
-        search_dist=1000,
         histone_assignment="nearest"):
     """Given a master bed file and a list of histone files,
     get the overlaps and merge back into a file with all clusters
     """
     prefix = os.path.basename(master_bed_file).split(".bed")[0]
     
-    for i in range(len(overlap_bed_files)):
-        histone, overlap_bed_file = overlap_bed_files[i]
+    for i in range(len(overlap_params)):
+        histone, overlap_bed_file, search_dist = overlap_params[i]
         out_tmp_file = "{}/{}.overlap.{}.tmp.bed.gz".format(
             out_dir, prefix, histone)
         intersect_bed = (
@@ -164,7 +163,6 @@ def order_and_viz_dynamic_epigenome(
         activating_histones,
         activating_histone_files,
         all_histones,
-        search_dist=1000,
         histone_assignment="nearest"):
     """Order clusters by hclust and histones more simple
     """
@@ -183,7 +181,6 @@ def order_and_viz_dynamic_epigenome(
             dynamic_histone_overlap_dir,
             args.integrative["atac_dynamic_w_histones_mat"],
             args.annot["chromsizes"],
-            search_dist=search_dist,
             histone_assignment=histone_assignment)
         
     # TODO: get atac clusters and sort by (hard) cluster
@@ -223,7 +220,7 @@ def order_and_viz_dynamic_epigenome(
         os.system(make_bed)
 
     # and then run through deeptools for histone marks
-    histone_colors = ["Reds", "Blues", "Greens"]
+    histone_colors = args.chipseq["histones"]["ordered_deeptools_colors"]
     for histone_idx in range(len(all_histones)):
         histone = all_histones[histone_idx]
         histone_color = histone_colors[histone_idx]
@@ -256,7 +253,7 @@ def cluster_by_chromatin_state(
         histone_names,
         out_dir,
         prefix,
-        min_region_fraction=0.2):
+        min_region_num=100):
     """Take in a list of cluster files and sort by histone marks
     """
     # set up directories for each type of split
@@ -280,10 +277,6 @@ def cluster_by_chromatin_state(
         cluster_w_histones = soft_cluster_data.merge(
             histone_overlap_data, how="left", on="region")
 
-        # set up a min region num to remove really small sets
-        min_region_num = int(min_region_fraction * cluster_w_histones.shape[0])
-        min_region_num = 100
-        
         # histone marks alone (dynamics)
         # TODO don't take 9s.
         for histone in histone_names:
@@ -368,7 +361,6 @@ def order_and_viz_stable_epigenome(
         prefix,
         histones,
         histone_files,
-        search_dist=1000,
         histone_assignment="nearest"):
     """Analyze stable epigenome
     """
@@ -388,7 +380,6 @@ def order_and_viz_stable_epigenome(
             stable_histone_overlap_dir,
             args.integrative["atac_stable_w_histones_mat"],
             args.annot["chromsizes"],
-            search_dist=search_dist,
             histone_assignment=histone_assignment)
 
     # first separate out dynamic and non dynamic chromatin mark data
@@ -470,9 +461,12 @@ def run(args):
     """
     args.integrative = {}
 
-    histones = ["H3K27ac", "H3K4me1", "H3K27me3"] # keep ordered
+    # set up histones
+    histones = args.chipseq["histones"]["ordered_names"]
     histone_files = [
-        (histone, args.chipseq["histones"][histone]["clusters_bed"])
+        (histone,
+         args.chipseq["histones"][histone]["clusters_bed"],
+         args.params["histones"][histone]["overlap_extend_len"])
         for histone in histones]
 
     # dynamic ATAC
@@ -489,8 +483,7 @@ def run(args):
         activating_marks,
         activating_mark_files,
         histones,
-        search_dist=500,
-        histone_assignment="nearest")
+        histone_assignment=args.params["histone_overlap_assignment"])
 
     dynamic_state_beds = glob.glob("{}/*bed.gz".format(
         args.folders["epigenome_dynamic_state_bed_dir"]))
@@ -500,7 +493,8 @@ def run(args):
             args.integrative["atac_dynamic_w_histones_mat"],
             activating_marks,
             args.folders["epigenome_dynamic_clusters_dir"],
-            dynamic_epigenome_prefix)
+            dynamic_epigenome_prefix,
+            min_region_num=args.params["chrom_state_cluster_min_size"])
     
     # stable ATAC
     logging.info("EPIGENOME: STABLE: integrate dynamic ATAC w histones")
@@ -511,8 +505,7 @@ def run(args):
         stable_epigenome_prefix,
         histones,
         histone_files,
-        search_dist=1000,
-        histone_assignment="most_diff")
+        histone_assignment=args.params["histone_overlap_assignment"])
     
     # cluster_by_chromatin_state
     stable_state_beds = glob.glob("{}/*bed.gz".format(
@@ -523,7 +516,8 @@ def run(args):
             args.integrative["atac_stable_w_histones_mat"],
             histones,
             args.folders["epigenome_stable_clusters_dir"],
-            stable_epigenome_prefix)
+            stable_epigenome_prefix,
+            min_region_num=args.params["chrom_state_cluster_min_size"])
     quit()
     
 
