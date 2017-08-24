@@ -47,8 +47,7 @@ def get_nearest_mark(intersect_bed_file, out_file, histone_assignment):
                                 current_region_info[0],
                                 current_region_info[1][closest_dist]))
                         else:
-                            print "unrecognized method for histone assignment!"
-                            quit()
+                            raise Exception("unrecognized method for histone assignment!")
                             
                     # replace with new
                     if fields[6] == ".":
@@ -525,22 +524,44 @@ def run(args):
             args.folders["epigenome_stable_clusters_dir"],
             stable_epigenome_prefix,
             min_region_num=args.params["chrom_state_cluster_min_size"])
-    quit()
-    
 
     # TODO now go through all folders and run GREAT and HOMER
     # key groups: ATAC final trajectorie (no histone info), dynamic atac (mark/state), stable atac (mark/state)
     # 5 folders
-    for label_dir_handle in args.folders["label_dirs"]:
 
-
-        # run HOMER
-
-
-        # run GREAT
-
-        pass
+    label_dir_handles = [
+        "atac_dp-gp_final_bed_dir",
+        "epigenome_dynamic_mark_bed_dir",
+        "epigenome_dynamic_state_bed_dir",
+        "epigenome_stable_mark_bed_dir",
+        "epigenome_stable_state_bed_dir"
+    ]
     
+    for label_dir_handle in label_dir_handles:
+        label_bed_files = glob.glob("{}/*bed.gz".format(args.folders[label_dir_handle]))
+        great_dir = "{}/great".format(args.folders[label_dir_handle].split("/bed")[0])
+        os.system("mkdir -p {}".format(great_dir))
+        
+        for label_bed_file in label_bed_files:
+            label_bed_prefix = os.path.basename(label_bed_file).split(".bed")[0]
+            
+            # run GREAT
+            great_files = glob.glob("{0}/{1}*".format(great_dir, label_bed_prefix))
+            run_great = "run_rgreat.R {0} {1}/{2}".format(
+                label_bed_file,
+                great_dir,
+                label_bed_prefix)
+            print run_great
+            os.system(run_great)
+        
+        # run HOMER
+        
+        
+
+
+
+
+    quit()
     
     # and generate group BED files
     stable_clusters = pd.read_table(
