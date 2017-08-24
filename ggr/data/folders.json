@@ -8,6 +8,7 @@
     "atac_deseq2_dir":"results/atac/timeseries/deseq2",
     "atac_dp-gp_dir":"results/atac/dp_gp",
     "atac_dp-gp_final_dir":"results/atac/dp_gp/final",
+    "atac_dp-gp_final_bed_dir":"results/atac/dp_gp/final/bed",
     
     "histone_dir":"results/histone",
     
@@ -39,6 +40,14 @@
     "epigenome_dynamic_mark_ids_dir":"results/epigenome/dynamic/clusters/by_mark/ids",
     "epigenome_dynamic_state_bed_dir":"results/epigenome/dynamic/clusters/by_state/bed",
     "epigenome_dynamic_state_ids_dir":"results/epigenome/dynamic/clusters/by_state/ids",
+
+    "label_dirs":[
+	"atac_dp-gp_final_bed_dir",
+	"epigenome_dynamic_mark_bed_dir",
+	"epigenome_dynamic_state_bed_dir",
+	"epigenome_stable_mark_bed_dir",
+	"epigenome_stable_state_bed_dir"
+    ],
     
     "rna_dir":"results/rna",
     "tf_dir":"results/tf"

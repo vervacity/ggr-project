@@ -88,7 +88,7 @@ def run(args):
     """Pipeline for histone analyses
     """
     # set up histones
-    histones = args.chipseq["histones"].keys()
+    histones = args.chipseq["histones"]["ordered_names"]
     
     for histone in histones:
 

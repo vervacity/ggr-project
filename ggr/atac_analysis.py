@@ -15,6 +15,7 @@ from ggr.util.parallelize import setup_multiprocessing_queue
 from ggr.util.parallelize import run_in_parallel
 
 from ggr.util.bed_utils import merge_regions
+from ggr.util.bed_utils import id_to_bed
 from ggr.util.filtering import filter_for_ids
 from ggr.util.counting import make_count_matrix
 from ggr.util.counting import split_count_matrix_by_replicate
@@ -192,5 +193,15 @@ def run(args):
         os.system(reorder_clusters)
     args.atac["final_soft_clusters"] = sorted(
         glob.glob("{}/*soft*.gz".format(args.folders["atac_dp-gp_final_dir"])))
+
+    # 9) make BED files from soft cluster files
+    atac_cluster_beds = glob.glob("{}/*bed.gz".format(args.folders["atac_dp-gp_final_bed_dir"]))
+    if len(atac_cluster_beds) == 0:
+        atac_cluster_id_files = glob.glob("{}/*soft.txt.gz".format(args.folders["atac_dp-gp_final_dir"]))
+        for atac_cluster_id_file in atac_cluster_id_files:
+            atac_cluster_bed_file = "{}/{}.bed.gz".format(
+                args.folders["atac_dp-gp_final_bed_dir"],
+                os.path.basename(atac_cluster_id_file).split('.txt')[0])
+            id_to_bed(atac_cluster_id_file, atac_cluster_bed_file, sort=True)
 
     return args

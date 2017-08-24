@@ -264,22 +264,26 @@ def cluster_by_chromatin_state(
 
     for soft_cluster_file in soft_cluster_files:
 
-        soft_prefix = "{}.{}".format(
-            prefix,
-            os.path.basename(soft_cluster_file).split('.')[2])
-        
+        if "cluster" in soft_cluster_file:
+            soft_prefix = "{}.{}".format(
+                prefix,
+                os.path.basename(soft_cluster_file).split('.')[2])
+        else:
+            soft_prefix = prefix
+            
         # overlap files
-        soft_cluster_data = pd.read_table(soft_cluster_file, header=None)
-        soft_cluster_data = pd.DataFrame(soft_cluster_data[0])
+        soft_cluster_data = pd.read_table(soft_cluster_file)
+        soft_cluster_data = pd.DataFrame(soft_cluster_data.iloc[:,0])
         soft_cluster_data.columns = ["region"]
         histone_overlap_data = pd.read_table(histone_overlap_mat_file)
 
         cluster_w_histones = soft_cluster_data.merge(
             histone_overlap_data, how="left", on="region")
-
+        
         # histone marks alone (dynamics)
         # TODO don't take 9s.
         for histone in histone_names:
+            cluster_w_histones[histone] = cluster_w_histones[histone].astype(int)
             mark_states = list(set(cluster_w_histones[histone].tolist()))
 
             for mark_state in mark_states:
@@ -299,10 +303,13 @@ def cluster_by_chromatin_state(
         for dynamic_state in dynamic_states:
             if dynamic_state == 99:
                 continue
+
+            if dynamic_state == 999:
+                continue
             
             subset = cluster_w_histones[cluster_w_histones["histone_cluster"] == dynamic_state]
             if subset.shape[0] > min_region_num:
-                overlap_file = "{}/{}.dynamic-state-{}.txt.gz".format(
+                overlap_file = "{}/{}.state-{}.txt.gz".format(
                     "{}/ids".format(state_dir), soft_prefix, dynamic_state)
                 pd.DataFrame(subset["region"]).to_csv(
                     overlap_file, sep='\t', header=False, index=False, compression="gzip")
@@ -522,6 +529,17 @@ def run(args):
     
 
     # TODO now go through all folders and run GREAT and HOMER
+    # key groups: ATAC final trajectorie (no histone info), dynamic atac (mark/state), stable atac (mark/state)
+    # 5 folders
+    for label_dir_handle in args.folders["label_dirs"]:
+
+
+        # run HOMER
+
+
+        # run GREAT
+
+        pass
     
     
     # and generate group BED files
