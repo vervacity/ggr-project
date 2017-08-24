@@ -25,7 +25,6 @@
     "H3K27me3_diff_dir":"results/histone/H3K27me3/diff",
 
     "epigenome_dir":"results/epigenome",
-    "epigenome_histone_dir":"results/epigenome/histone_overlap",
     
     "epigenome_stable_dir":"results/epigenome/stable",
     "epigenome_stable_clusters_dir":"results/epigenome/stable/clusters",

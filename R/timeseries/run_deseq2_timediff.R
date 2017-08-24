@@ -25,7 +25,7 @@ print('running DESeq2...')
 args <- commandArgs(trailingOnly=TRUE)
 in_file <- args[1]
 prefix <- args[2]
-fdr_cutoff <- args[3]
+fdr_cutoff <- as.numeric(args[3])
 out_file <- args[4]
 is_sequential_only <- args[5]
 
@@ -96,6 +96,12 @@ for (idx1 in seq(1, ncol(count_data)-1, 2)) {
         res_filt_down <- res_filt[res_filt$log2FoldChange < 0,]
 
         # write everything out
+        write.table(
+            res_noNA,
+            file=gzfile(
+                paste(prefix, '.', t_compare, '_over_', t_baseline, '_resultsAll.txt.gz', sep='')),
+            quote=FALSE, sep='\t')
+
         write.table(
             res_filt,
             file=gzfile(

@@ -39,6 +39,8 @@ epigenome_data$region <- NULL
 
 # and sort with atac cluster followed by histone cluster
 epigenome_data_sorted <- epigenome_data[with(epigenome_data, order(ATAC, H3K27ac, H3K4me1)), ]
+write.table(epigenome_data_sorted, file="test.txt", quote=FALSE, sep='\t')
+
 
 # save out the subsample to be used for deeptools
 evenly_spaced_subsample <- epigenome_data_sorted[seq(1, nrow(epigenome_data_sorted), 20), ]
