@@ -539,71 +539,30 @@ def run(args):
     
     for label_dir_handle in label_dir_handles:
         label_bed_files = glob.glob("{}/*bed.gz".format(args.folders[label_dir_handle]))
+
+        # run GREAT
         great_dir = "{}/great".format(args.folders[label_dir_handle].split("/bed")[0])
         os.system("mkdir -p {}".format(great_dir))
-        
         for label_bed_file in label_bed_files:
             label_bed_prefix = os.path.basename(label_bed_file).split(".bed")[0]
-            
-            # run GREAT
             great_files = glob.glob("{0}/{1}*".format(great_dir, label_bed_prefix))
-            run_great = "run_rgreat.R {0} {1}/{2}".format(
-                label_bed_file,
-                great_dir,
-                label_bed_prefix)
-            print run_great
-            os.system(run_great)
-        
-        # run HOMER
-        
-        
-
-
-
-
-    quit()
-    
-    # and generate group BED files
-    stable_clusters = pd.read_table(
-        args.integrative["atac_stable_histone_ordered_bed"], header=None)
-    stable_clusters.columns = ["chrom", "start", "stop", "cluster"]
-    cluster_ids = list(set(stable_clusters["cluster"].tolist()))
-
-    for cluster_id in cluster_ids:
-        cluster_subset = stable_clusters[stable_clusters["cluster"] == cluster_id]
-        
-        if cluster_subset.shape[0] > 1000: # manually chosen
-            cluster_prefix = "ggr.atac_stable.cluster_{0}".format(cluster_id)
-            
-            cluster_file = "{0}/{1}.bed.gz".format(
-                args.folders["epigenome_stable_dir"],
-                cluster_prefix)
-
-            if not os.path.isfile(cluster_file):
-                cluster_subset.to_csv(
-                    cluster_file,
-                    sep='\t', header=False, index=False,
-                    compression="gzip")
-    
-            # run GREAT
-            great_files = glob.glob("{}/{}*".format(
-                args.folders["epigenome_stable_great_dir"],
-                cluster_prefix))
             if len(great_files) == 0:
                 run_great = "run_rgreat.R {0} {1}/{2}".format(
-                    cluster_file,
-                    args.folders["epigenome_stable_great_dir"],
-                    cluster_prefix)
+                    label_bed_file,
+                    great_dir,
+                    label_bed_prefix)
                 print run_great
                 os.system(run_great)
-
-            # run HOMER
-            
-
-    
-
-
-            
-    
+        
+        # run HOMER
+        homer_dir = "{}/homer".format(args.folders[label_dir_handle].split("/bed")[0])
+        os.system("mkdir -p {}".format(homer_dir))
+        for label_bed_file in label_bed_files:
+            label_bed_prefix = os.path.basename(label_bed_file).split(".bed")[0]
+            homer_files = glob.glob("{0}/{1}*".format(great_dir, label_bed_prefix))
+            if len(homer_files) == 0:
+                run_homer(label_bed_file,
+                          args.atac["master_bed"],
+                          homer_dir)
 
     return args
