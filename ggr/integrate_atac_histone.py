@@ -539,6 +539,9 @@ def run(args):
 
     # now go through all folders and run GREAT and HOMER
     for label_dir_handle in args.params["label_dir_handles"]:
+        if "timepoints" in label_dir_handle:
+            continue
+        
         label_bed_files = glob.glob("{}/*bed.gz".format(args.folders[label_dir_handle]))
         
         # run GREAT
@@ -554,6 +557,8 @@ def run(args):
                     label_bed_prefix)
                 print run_great
                 os.system(run_great)
+
+        continue
 
         # run HOMER
         homer_dir = "{}/homer".format(args.folders[label_dir_handle].split("/bed")[0])

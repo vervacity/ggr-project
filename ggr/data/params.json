@@ -24,6 +24,7 @@
     "chrom_state_cluster_min_size":500,
 
     "label_dir_handles":[
+	"atac_timepoints_bed_dir",
 	"atac_dp-gp_final_bed_dir",
 	"epigenome_dynamic_mark_bed_dir",
 	"epigenome_dynamic_state_bed_dir",

@@ -27,6 +27,21 @@ def run(args):
     """Run all ATAC analyses
     """
     atac_prefix = 'ggr.atac'
+
+    # 0) download peak files into a folder (timepoint labels)
+    timepoints_files = glob.glob("{}/*.narrowPeak.gz".format(
+        args.folders["atac_timepoints_bed_dir"]))
+    if len(timepoints_files) == 0:
+        atac_peak_files = sorted(
+            glob.glob('{0}/{1}'.format(
+                args.atac['data_dir'],
+                args.atac['idr_peak_glob'])))
+        for atac_peak_file in atac_peak_files:
+            copy = "cp {} {}".format(
+                atac_peak_file,
+                args.folders["atac_timepoints_bed_dir"])
+            print copy
+            os.system(copy)
     
     # 1) generate a master regions file
     logging.info("ATAC: Generating master file...")

@@ -4,6 +4,7 @@
     "results_dir":"results",
     
     "atac_dir":"results/atac",
+    "atac_timepoints_bed_dir":"results/atac/timepoints/bed",
     "atac_timeseries_dir":"results/atac/timeseries",
     "atac_deseq2_dir":"results/atac/timeseries/deseq2",
     "atac_dp-gp_dir":"results/atac/dp_gp",
