@@ -10,15 +10,15 @@ def run_homer(
         parallel=12):
     """Generic wrapper to run homer on a set of regions (vs background)
     """
-    run_homer = ("findMotifsGenome.pl {0} hg19 {1}"
-                 "-bg {2}"
-                 "-p {3}"
+    run_homer = ("findMotifsGenome.pl <(zcat {0}) hg19 {1} "
+                 "-bg <(zcat {2}) "
+                 "-p {3} "
                  "-nomotif").format(positives_bed,
                                     out_dir,
                                     background_bed,
                                     parallel)
     print run_homer
-    os.system(run_homer)
+    os.system('GREPDB="{}"; /bin/bash -c "$GREPDB"'.format(run_homer))
 
     return None
 

@@ -83,7 +83,6 @@ def track_runs(args):
 def main():
     """Run all code
     """
-    
     # setup
     args = parse_args()
     os.system("mkdir -p {}".format(args.out_dir))
@@ -102,24 +101,17 @@ def main():
     # run histone analyses
     from ggr.histone_analysis import run
     args = run(args)
-    
 
     # run integrative analyses
-    # this is approx fig 2
     from ggr.integrate_atac_histone import run
     args = run(args)
 
-    
-
     # deep learning: tronn
+    from ggr.deeplearning_analysis import run
+    args = run(args)
     
-    
-    
-    
-
 
     return None
-
 
 
 if __name__ == '__main__':

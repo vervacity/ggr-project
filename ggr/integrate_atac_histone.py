@@ -10,6 +10,7 @@ import pandas as pd
 import numpy as np
 
 from ggr.util.bioinformatics import make_deeptools_heatmap
+from ggr.util.bioinformatics import run_homer
 from ggr.util.bed_utils import id_to_bed
 
 
@@ -423,6 +424,19 @@ def order_and_viz_stable_epigenome(
     stable_plots_dir = "{}/plots".format(out_dir)
     os.system("mkdir -p {}".format(stable_plots_dir))
 
+    # TODO(dk) take mats, go to R to make colorbars
+    # read in mat file, plot 3x for each histone
+    out_prefix = os.path.basename(
+        args.integrative["atac_stable_w_histones_dynamic_mat"].split(".mat")[0])
+    color_bar_files = glob.glob("{0}/{1}.colorbar*".format(stable_plots_dir, out_prefix))
+    if len(color_bar_files) == 0:
+        plot_colorbars = (
+            "plot_stable_epigenome_colorbars.R {0} {1}").format(
+                args.integrative["atac_stable_w_histones_dynamic_mat"],
+                "{0}/{1}".format(stable_plots_dir, out_prefix))
+        print plot_colorbars
+        os.system(plot_colorbars)
+    
     bed_to_plot = [
         args.integrative["atac_stable_w_histones_dynamic_bed"],
         args.integrative["atac_stable_w_histones_stable_bed"]
@@ -431,8 +445,6 @@ def order_and_viz_stable_epigenome(
     for bed_file in bed_to_plot:
 
         prefix = os.path.basename(bed_file).split(".bed")[0]
-        
-        # TODO go into R, make fake heatmap to get color bars for histone marks
         histone_colors = ["Reds", "Blues", "Greens"]
         for histone_idx in range(len(histones)):
             
@@ -525,21 +537,10 @@ def run(args):
             stable_epigenome_prefix,
             min_region_num=args.params["chrom_state_cluster_min_size"])
 
-    # TODO now go through all folders and run GREAT and HOMER
-    # key groups: ATAC final trajectorie (no histone info), dynamic atac (mark/state), stable atac (mark/state)
-    # 5 folders
-
-    label_dir_handles = [
-        "atac_dp-gp_final_bed_dir",
-        "epigenome_dynamic_mark_bed_dir",
-        "epigenome_dynamic_state_bed_dir",
-        "epigenome_stable_mark_bed_dir",
-        "epigenome_stable_state_bed_dir"
-    ]
-    
-    for label_dir_handle in label_dir_handles:
+    # now go through all folders and run GREAT and HOMER
+    for label_dir_handle in args.params["label_dir_handles"]:
         label_bed_files = glob.glob("{}/*bed.gz".format(args.folders[label_dir_handle]))
-
+        
         # run GREAT
         great_dir = "{}/great".format(args.folders[label_dir_handle].split("/bed")[0])
         os.system("mkdir -p {}".format(great_dir))
@@ -553,16 +554,17 @@ def run(args):
                     label_bed_prefix)
                 print run_great
                 os.system(run_great)
-        
+
         # run HOMER
         homer_dir = "{}/homer".format(args.folders[label_dir_handle].split("/bed")[0])
         os.system("mkdir -p {}".format(homer_dir))
         for label_bed_file in label_bed_files:
             label_bed_prefix = os.path.basename(label_bed_file).split(".bed")[0]
-            homer_files = glob.glob("{0}/{1}*".format(great_dir, label_bed_prefix))
-            if len(homer_files) == 0:
+            label_bed_dir = "{0}/{1}".format(homer_dir, label_bed_prefix)
+            if not os.path.isdir(label_bed_dir):
+                os.system("mkdir -p {}".format(label_bed_dir))
                 run_homer(label_bed_file,
                           args.atac["master_bed"],
-                          homer_dir)
+                          label_bed_dir)
 
     return args
