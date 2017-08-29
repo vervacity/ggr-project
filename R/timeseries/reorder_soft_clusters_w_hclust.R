@@ -64,11 +64,7 @@ if (tweak_diana) {
     # first reverse things
     cluster_order[1:6] <- rev(cluster_order[1:6])
     cluster_order[7:10] <- rev(cluster_order[7:10])
-
-    # move 2 and 3 
-    tmp <- cluster_order[2]
-    cluster_order[2] <- cluster_order[3]
-    cluster_order[3] <- tmp
+    cluster_order[8:11] <- rev(cluster_order[8:11])
     
 }
 

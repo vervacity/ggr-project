@@ -220,7 +220,4 @@ def run(args):
                 os.path.basename(atac_cluster_id_file).split('.txt')[0])
             id_to_bed(atac_cluster_id_file, atac_cluster_bed_file, sort=True)
 
-
-    quit()
-            
     return args
