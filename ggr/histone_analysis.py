@@ -184,7 +184,5 @@ def run(args):
                     args.chipseq["histones"][histone]["clusters_bed"])
             print make_bed
             os.system(make_bed)
-
-    quit()
             
     return args

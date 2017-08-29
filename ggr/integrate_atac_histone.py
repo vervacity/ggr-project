@@ -537,6 +537,8 @@ def run(args):
             stable_epigenome_prefix,
             min_region_num=args.params["chrom_state_cluster_min_size"])
 
+    quit()
+        
     # now go through all folders and run GREAT and HOMER
     for label_dir_handle in args.params["label_dir_handles"]:
         if "timepoints" in label_dir_handle:
