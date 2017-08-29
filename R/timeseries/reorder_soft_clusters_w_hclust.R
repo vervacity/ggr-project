@@ -65,6 +65,7 @@ if (tweak_diana) {
     cluster_order[1:6] <- rev(cluster_order[1:6])
     cluster_order[7:10] <- rev(cluster_order[7:10])
     cluster_order[8:11] <- rev(cluster_order[8:11])
+    cluster_order[9:10] <- rev(cluster_order[9:10])
     
 }
 
@@ -199,6 +200,7 @@ if (tweak_diana) {
     dend[[1]][[2]] <- rev(dend[[1]][[2]])
     dend[[2]] <- rev(dend[[2]])
     dend[[2]][[2]][[2]][[1]] <- rev(dend[[2]][[2]][[2]][[1]])
+    #dend[[1]][[2]][[1]][[1]] <- rev(dend[[1]][[2]][[1]][[1]])
     
 }
 

@@ -198,7 +198,7 @@ def run(args):
         epsilon=args.params["rep_to_cluster_epsilon"])
 
     # 8) reorder (ie renumber) the SOFT clusters (numerically) by order of hclust and make sure to propagate to hard clusters
-    args.atac["final_hard_clusters"] = "{}/{}.clusters.hard.renumbered.txt.gz".format(
+    args.atac["final_hard_clusters"] = "{}/{}.clusters.hard.renumbered.all.txt.gz".format(
         args.folders["atac_dp-gp_final_dir"],
         atac_prefix)
     if not os.path.isfile(args.atac["final_hard_clusters"]):

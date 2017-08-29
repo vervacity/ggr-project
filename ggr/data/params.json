@@ -9,13 +9,13 @@
     
     "histones":{
 	"H3K27ac":{
-	    "overlap_extend_len":1000
+	    "overlap_extend_len":500
 	},
 	"H3K4me1":{
-	    "overlap_extend_len":1000
+	    "overlap_extend_len":500
 	},
 	"H3K27me3":{
-	    "overlap_extend_len":1000
+	    "overlap_extend_len":5000
 	}
     },
     
