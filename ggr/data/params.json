@@ -19,7 +19,7 @@
 	}
     },
     
-    "histone_fdr":0.10,
+    "histone_fdr":0.25,
     "histone_master_region_method":"atac_midpoint",
     "histone_overlap_assignment":"nearest",
     "chrom_state_cluster_min_size":500,
