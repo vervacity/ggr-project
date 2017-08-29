@@ -218,5 +218,5 @@ def run(args):
                 args.folders["atac_dp-gp_final_bed_dir"],
                 os.path.basename(atac_cluster_id_file).split('.txt')[0])
             id_to_bed(atac_cluster_id_file, atac_cluster_bed_file, sort=True)
-
+            
     return args

@@ -22,7 +22,7 @@ soft_cluster_files <- args[3:length(args)]
 #agglom_method <- "single"
 agglom_method <- "complete"
 
-manual_tweak <- FALSE # use with complete method
+# minor tweaks to ordering for better viz
 tweak_diana <- TRUE
 
 # set up cluster means table
@@ -40,7 +40,7 @@ for (i in 1:length(soft_cluster_files)) {
     cluster_mean <- colMeans(data)
     cluster_means <- rbind(cluster_means, cluster_mean)
 
-    cluster_sizes <- c(cluster_sizes, nrow(data))
+    cluster_sizes <- c(cluster_sizes, nrow(data)) # TODO need to get cluster sizes from hard clusters
 
     # also extract cluster number from filename
     suffix_tmp <- unlist(strsplit(basename(soft_cluster_files[i]), ".cluster_", fixed=TRUE))[2]
@@ -50,44 +50,26 @@ for (i in 1:length(soft_cluster_files)) {
 }
 
 #hclust_means <- hclust(dist(as.matrix(cluster_means)), method="ward.D2", members=cluster_sizes)
-hclust_means <- hclust(dist(as.matrix(cluster_means)), method=agglom_method, members=cluster_sizes)
-cluster_order <- hclust_means$order
+#hclust_means <- hclust(dist(as.matrix(cluster_means)), method=agglom_method, members=cluster_sizes)
+#cluster_order <- hclust_means$order
 
 # testing divisive agglom
-test <- as.hclust(
+dclust <- as.hclust(
     diana(dist(as.matrix(cluster_means))))
-cluster_order <- test$order
+cluster_order <- dclust$order
 
-# TRICK: flip the top half of the cluster order
-#dend <- as.dendrogram(hclust_means)
-#left_members <- attributes(dend[[1]])$members
-#cluster_order[1:left_members] <- rev(cluster_order[1:left_members])
-
-if (manual_tweak) {
-
-    # reorder 4,5 and 9,10
-    tmp <- cluster_order[4]
-    cluster_order[4] <- cluster_order[5]
-    cluster_order[5] <- tmp
-
-    tmp <- cluster_order[9]
-    cluster_order[9] <- cluster_order[10]
-    cluster_order[10] <- tmp
-    
-}
 
 if (tweak_diana) {
 
-    # move 1 below 5
-    # then rev 7, 8, 9
-    tmp <- cluster_order[1]
-    cluster_order[1:4] <- cluster_order[2:5]
-    cluster_order[5] <- tmp
+    # first reverse things
+    cluster_order[1:6] <- rev(cluster_order[1:6])
+    cluster_order[7:10] <- rev(cluster_order[7:10])
 
-    tmp <- rev(cluster_order[7:8])
-    cluster_order[7] <- cluster_order[9]
-    cluster_order[8:9] <- tmp
-
+    # move 2 and 3 
+    tmp <- cluster_order[2]
+    cluster_order[2] <- cluster_order[3]
+    cluster_order[3] <- tmp
+    
 }
 
 # now copy and rename all cluster files with new names
@@ -102,20 +84,26 @@ for (i in 1:length(cluster_order)) {
     print(new_filename)
 
     copy_file <- paste("cp", soft_cluster_files[old_cluster_idx], new_filename)
-    print(copy_file)
+    #print(copy_file)
     system(copy_file)
     
 }
-
-print(cluster_nums)
-print(cluster_order)
-print(cluster_sizes)
 
 # and for the hard cluster files, reorder
 hard_clusters <- read.table(gzfile(hard_cluster_file), header=FALSE, sep='\t')
 colnames(hard_clusters)[ncol(hard_clusters)] <- "cluster"
 hard_clusters$new_clusters_tmp <- match(hard_clusters$cluster, cluster_nums)
 hard_clusters$new_clusters <- match(hard_clusters$new_clusters_tmp, cluster_order)
+
+# and also get cluster sizes
+cluster_sizes <- c()
+for (i in 1:length(cluster_nums)) {
+
+    hard_cluster_data_tmp <- hard_clusters[hard_clusters$cluster == cluster_nums[i],]
+    cluster_sizes <- c(cluster_sizes, nrow(hard_cluster_data_tmp))
+    
+}
+
 hard_clusters$new_clusters_tmp <- NULL
 hard_clusters$cluster <- NULL
 hard_clusters <- hard_clusters[with(hard_clusters, order(new_clusters)), ]
@@ -130,10 +118,10 @@ write.table(hard_clusters, file=gzfile(new_filename), sep='\t', row.names=FALSE,
 rownames(hard_clusters) <- hard_clusters$V1
 hard_clusters$V1 <- NULL
 
-
+# get subsample
 evenly_spaced_subsample <- hard_clusters[seq(1, nrow(hard_clusters), 20), ]
 
-# TODO determine row sep points
+# determine row sep points
 rowsep <- c()
 cluster <- 1
 new_clusters <- evenly_spaced_subsample$new_clusters
@@ -146,9 +134,6 @@ for (i in 1:nrow(evenly_spaced_subsample)) {
     }
 
 }
-
-print(rowsep)
-
 
 # plotting
 plot_file <- paste(out_dir, "/", prefix, ".hard.sanity_check.heatmap.png", sep="")
@@ -203,84 +188,35 @@ for (cluster_idx in 1:length(ratios)) {
 }
 
 # hclust
-hclust_dendro <- hclust(dist(as.matrix(cluster_means_rep)), method=agglom_method)
+#hclust_dendro <- hclust(dist(as.matrix(cluster_means_rep)), method=agglom_method)
 #hclust_dendro <- my_hclust(dist(as.matrix(cluster_means_rep)))
-dend <- as.dendrogram(hclust_dendro)
+#dend <- as.dendrogram(hclust_dendro)
 
-dend_old <- dend
-
-# TRICK flip the top half of the dendrogram
-flip_dend <- function(dend) {
-    # recursive
-
-    # at this node, flip left and right
-    left_tmp <- dend[[1]]
-    right_tmp <- dend[[2]]
-
-    dend[[1]] <- right_tmp
-    dend[[2]] <- left_tmp
-    
-    # if children are not leaves, keep going down
-    if (is.null(attr(dend[[1]], "leaf"))) {
-        dend[[1]] <- flip_dend(dend[[1]])
-    }
-    if (is.null(attr(dend[[2]], "leaf"))) {
-        dend[[2]] <- flip_dend(dend[[2]])
-    }
-    
-    return(dend)
-    
-}
-
-test <- as.hclust(
+dclust_dendro <- as.hclust(
     diana(dist(as.matrix(cluster_means_rep))))
-dend <- as.dendrogram(test)
-
-#dend[[1]] <- rev(dend[[1]])
-
-if (manual_tweak) {
-
-    # reorder 4,5 and 9,10
-
-    dend[[1]][[2]] <- rev(dend[[1]][[2]])
-    dend[[2]][[2]][[2]][[2]] <- rev(dend[[2]][[2]][[2]][[2]])
-
-}
+dend <- as.dendrogram(dclust_dendro)
 
 if (tweak_diana) {
 
-    # move 1 below 5
-    # then rev 7, 8, 9
-
-    dend[[1]] <- rev(dend[[1]])
-    dend[[1]][[1]] <- rev(dend[[1]][[1]])
-
-    #dend[[1]][[2]][[1]] <- rev(dend[[1]][[2]][[1]])
-    dend[[2]][[1]][[2]] <- rev(dend[[2]][[1]][[2]])
+    # reverse top and bottom
+    dend <- rev(dend)
+    dend[[1]][[2]] <- rev(dend[[1]][[2]])
+    dend[[2]] <- rev(dend[[2]])
+    dend[[2]][[2]][[2]][[1]] <- rev(dend[[2]][[2]][[2]][[1]])
     
 }
-
 
 # for color bar
 my_palette <- colorRampPalette(brewer.pal(11, "Spectral"))(nrow(cluster_means))
 cluster_means_group_ordered <- match(cluster_means_group, cluster_order) # get the cluster order right
 colors <- my_palette[cluster_means_group_ordered]
 
-#print(my_palette)
-#print(my_palette[c(4, 8, 9)])
-#print(head(cluster_means_group_ordered))
-#print(head(colors))
-
 plot_file <- paste(out_dir, "/", prefix, ".hard.dendro.png", sep="")
 png(plot_file)
 par(mar = c(4,1,1,12))
-plot(dend, horiz=TRUE, xlab="", ylab="", sub="")
+plot(dend, horiz=TRUE, xlab="", ylab="", sub="", leaflab="none")
 colored_bars(colors, dend, rowLabels="ATAC", horiz = TRUE)
 dev.off()
-
-
-
-
 
 # plotting
 plot_file <- paste(out_dir, "/", prefix, ".hard.dendro_sanity_check.heatmap.png", sep="")
