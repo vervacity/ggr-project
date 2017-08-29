@@ -180,7 +180,8 @@ def get_consistent_soft_clusters_by_region(
         cluster_names,
         timepoint_vectors,
         pdf_cutoff,
-        corr_cutoff):
+        corr_cutoff,
+        epsilon):
     """Given a list of timepoint vectors, compare to all clusters
     then perform an intersect to get consistent clusters
     utilizing a multivariate normal distribution
@@ -227,7 +228,7 @@ def get_consistent_soft_clusters_by_region(
     consistent_clusters = [cluster_names[cluster_idx]
                            for cluster_idx in consistent_cluster_indices]
     
-    # TODO(dk) with the consistent clusters, figure out best fit (to have a hard cluster assignment)
+    # With the consistent clusters, figure out best fit (to have a hard cluster assignment)
     best_pdf_val = 0
     hard_cluster = None
     for cluster_idx in consistent_cluster_indices:
@@ -240,8 +241,22 @@ def get_consistent_soft_clusters_by_region(
         if pdf_val > best_pdf_val:
             best_pdf_val = pdf_val
             hard_cluster = cluster_names[cluster_idx]
+
+    # TODO(dk) now filter consistent clusters - if they are within {error} of pdf val, then keep
+    # this would mean the region is fairly close to both
+    filtered_consistent_clusters = []
+    for cluster_idx in consistent_cluster_indices:
+        # get pdf val
+        pdf_val = multivariate_normal.pdf(
+            timepoint_vectors[2],
+            mean=cluster_means[cluster_idx],
+            cov=cluster_covariances[cluster_idx],
+            allow_singular=True)
+        if (best_pdf_val - pdf_val) < (epsilon * best_pdf_val):
+            filtered_consistent_clusters.append(cluster_names[cluster_idx])
     
-    return consistent_clusters, hard_cluster
+    #return consistent_clusters, hard_cluster
+    return filtered_consistent_clusters, hard_cluster
 
 
 def get_consistent_soft_clusters(
@@ -254,7 +269,8 @@ def get_consistent_soft_clusters(
         cluster_covariances,
         cluster_names,
         ci=0.95,
-        corr_cutoff=0.05):
+        corr_cutoff=0.05,
+        epsilon=0.10):
     """Given rep1/rep2/pooled timeseries files, go through
     regions and check for consistency after soft clustering
     """
@@ -305,7 +321,8 @@ def get_consistent_soft_clusters(
                         cluster_names,
                         [rep1_timepoints, rep2_timepoints, pooled_timepoints],
                         pdf_cutoff,
-                        corr_cutoff)
+                        corr_cutoff,
+                        epsilon)
                     
                     for cluster in consistent_clusters:
                         
@@ -316,15 +333,22 @@ def get_consistent_soft_clusters(
                                 pooled_region,
                                 "\t".join(map(str, pooled_timepoints.tolist()))))
                             
-                    # save out hard cluster
+                    # save out hard clusters
                     if hard_cluster is not None:
-                        hard_cluster_file = "{}/soft/{}.clusters.hard.txt.gz".format(out_dir, prefix)
+                        hard_cluster_file = "{}/hard/{}.clusters.hard.all.txt.gz".format(out_dir, prefix)
                         with gzip.open(hard_cluster_file, "a") as out:
                             out.write("{}\t{}\t{}\n".format(
                                 pooled_region,
                                 "\t".join(map(str, pooled_timepoints.tolist())),
                                 hard_cluster))
-                            
+
+                        # Write out to individual hard cluster file
+                        cluster_file = "{}/hard/{}.cluster_{}.hard.txt.gz".format(out_dir, prefix, hard_cluster)
+                        with gzip.open(cluster_file, 'a') as out:
+                            out.write("{}\t{}\n".format(
+                                pooled_region,
+                                "\t".join(map(str, pooled_timepoints.tolist()))))
+                        
                     region_idx += 1
                     if region_idx % 1000 == 0:
                         print region_idx
@@ -355,7 +379,8 @@ def get_consistent_dpgp_trajectories(
         raw_cluster_min_size=1000,
         raw_cluster_reject_null_ci_interval=0.999,
         rep_to_cluster_ci_interval=0.95,        
-        rep_to_cluster_corr_cutoff=0.05):
+        rep_to_cluster_corr_cutoff=0.05,
+        epsilon=0.10):
     """Given count matrices for replicates, gets 
     consistent trajectories
 
@@ -401,8 +426,10 @@ def get_consistent_dpgp_trajectories(
 
     # stage 2: soft clustering
     soft_cluster_dir = "{}/soft".format(out_dir)
+    hard_cluster_dir = "{}/hard".format(out_dir)
     if not os.path.isdir(soft_cluster_dir):
         os.system("mkdir -p {}".format(soft_cluster_dir))
+        os.system("mkdir -p {}".format(hard_cluster_dir))
     
         # for each cluster (from POOLED clusters), get the mean and covariance matrix (assuming multivariate normal)
         cluster_means, cluster_covariances, cluster_sizes, cluster_names = get_cluster_sufficient_stats(
@@ -434,17 +461,26 @@ def get_consistent_dpgp_trajectories(
             cluster_covariances,
             cluster_names,
             ci=rep_to_cluster_ci_interval,
-            corr_cutoff=rep_to_cluster_corr_cutoff)
+            corr_cutoff=rep_to_cluster_corr_cutoff,
+            epsilon=epsilon)
                             
-    # sanity check - replot the soft clusters
+    # sanity check - replot the clusters
     plot_dir = "{}/soft/plot".format(out_dir)
     if not os.path.isdir(plot_dir):
         os.system("mkdir -p {}".format(plot_dir))
-        
         # use R to plot 
         plot_soft_clusters = ("plot_soft_trajectories.R {0}/soft/plot {0}/soft/{1}").format(
             out_dir, "*soft*.gz")
         print plot_soft_clusters
         os.system(plot_soft_clusters)
-    
+
+    plot_dir = "{}/hard/plot".format(out_dir)
+    if not os.path.isdir(plot_dir):
+        os.system("mkdir -p {}".format(plot_dir))
+        # use R to plot 
+        plot_hard_clusters = ("plot_soft_trajectories.R {0}/hard/plot {0}/hard/{1}").format(
+            out_dir, "*cluster_*hard*.gz")
+        print plot_hard_clusters
+        os.system(plot_hard_clusters)
+        
     return

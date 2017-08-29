@@ -194,14 +194,15 @@ def run(args):
         raw_cluster_min_size=args.params["raw_cluster_min_size"],
         raw_cluster_reject_null_ci_interval=args.params["raw_cluster_reject_null_ci_interval"],
         rep_to_cluster_ci_interval=args.params["rep_to_cluster_ci_interval"],
-        rep_to_cluster_corr_cutoff=args.params["rep_to_cluster_corr_cutoff"])
+        rep_to_cluster_corr_cutoff=args.params["rep_to_cluster_corr_cutoff"],
+        epsilon=args.params["rep_to_cluster_epsilon"])
 
     # 8) reorder (ie renumber) the SOFT clusters (numerically) by order of hclust and make sure to propagate to hard clusters
     args.atac["final_hard_clusters"] = "{}/{}.clusters.hard.renumbered.txt.gz".format(
         args.folders["atac_dp-gp_final_dir"],
         atac_prefix)
     if not os.path.isfile(args.atac["final_hard_clusters"]):
-        reorder_clusters = "reorder_soft_clusters_w_hclust.R {0} {1}/soft/*hard*gz {1}/soft/*soft*gz".format(
+        reorder_clusters = "reorder_soft_clusters_w_hclust.R {0} {1}/hard/*hard.all*gz {1}/soft/*soft*gz".format(
             args.folders["atac_dp-gp_final_dir"],
             args.folders["atac_dp-gp_dir"])
         print reorder_clusters
@@ -218,5 +219,8 @@ def run(args):
                 args.folders["atac_dp-gp_final_bed_dir"],
                 os.path.basename(atac_cluster_id_file).split('.txt')[0])
             id_to_bed(atac_cluster_id_file, atac_cluster_bed_file, sort=True)
+
+
+    quit()
             
     return args

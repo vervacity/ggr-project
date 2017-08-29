@@ -5,6 +5,7 @@
     "raw_cluster_reject_null_ci_interval":0.999,
     "rep_to_cluster_ci_interval":0.95,
     "rep_to_cluster_corr_cutoff":0.05,
+    "rep_to_cluster_epsilon":0.10,
     
     "histones":{
 	"H3K27ac":{
