@@ -39,8 +39,6 @@
     "epigenome_dynamic_state_bed_dir":"results/epigenome/dynamic/clusters/by_state/bed",
     "epigenome_dynamic_state_ids_dir":"results/epigenome/dynamic/clusters/by_state/ids",
 
-    "learning_dir":"leaning",
-    
     "rna_dir":"results/rna",
     "tf_dir":"results/tf"
 }
