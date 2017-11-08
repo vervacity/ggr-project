@@ -4,6 +4,7 @@
 import os
 import gzip
 import glob
+import logging
 import pandas as pd
 
 def get_proteincoding_gene_list(gtf_file, out_file):
@@ -227,39 +228,49 @@ def get_tss_atac_regions(gene_id_file, tss_file, atac_regions_file, out_dir):
 def run(args):
     """Run annotations
     """
-    # Make directories
+    # setup logging, directories, etc
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logging.INFO)
     ANNOT_DIR = args.folders['annot_dir']
     os.system('mkdir -p {}'.format(ANNOT_DIR))
-    
+    args.annot = args.annot[args.cluster] # set up correct files
+
     # List of protein coding genes
     args.annot['gencode_proteincoding_ensembl'] = '{}/gencode.hg19.pc.geneids.txt.gz'.format(ANNOT_DIR)
     if not os.path.isfile(args.annot['gencode_proteincoding_ensembl']):
-        get_proteincoding_gene_list(args.annot['gencode_proteincoding_gtf'],
-                                    args.annot['gencode_proteincoding_ensembl'])
+        logger.info("ANNOTATIONS: Make protein coding genes list...")
+        get_proteincoding_gene_list(
+            args.annot['gencode_proteincoding_gtf'],
+            args.annot['gencode_proteincoding_ensembl'])
         
     # list of TFs (ensembl IDs)
     args.annot['fantom5_transcriptionfactor_entrez-ensembl'] = '{}/fantom5.hg19.tf.entrez_to_ensembl.txt.gz'.format(ANNOT_DIR)
     args.annot['fantom5_transcriptionfactor_ensembl'] = '{}/fantom5.hg19.tf.ensembl_geneids.txt.gz'.format(ANNOT_DIR)
     if not os.path.isfile(args.annot['fantom5_transcriptionfactor_ensembl']):
-        convert_entrez_to_ensembl = 'entrez_to_ensembl.R {0} {1} {2}'.format(args.annot['fantom5_transcriptionfactor_csv'],
-                                                                             args.annot['fantom5_transcriptionfactor_entrez-ensembl'],
-                                                                             args.annot['fantom5_transcriptionfactor_ensembl'])
+        logger.info("ANNOTATIONS: make transcription factor list...")
+        convert_entrez_to_ensembl = 'entrez_to_ensembl.R {0} {1} {2}'.format(
+            args.annot['fantom5_transcriptionfactor_csv'],
+            args.annot['fantom5_transcriptionfactor_entrez-ensembl'],
+            args.annot['fantom5_transcriptionfactor_ensembl'])
         print convert_entrez_to_ensembl
         os.system(convert_entrez_to_ensembl)
     
     # make a TSS file from GENCODE annotations
     args.annot['gencode_proteincoding_tss'] = '{}/gencode.hg19.tss.bed.gz'.format(ANNOT_DIR)
     if not os.path.isfile(args.annot['gencode_proteincoding_tss']):
-        make_tss_file = ("cat {0} | "
-                         "grep -P '\tgene\t' | "
-                         "grep 'protein_coding' | "
-                         "awk -F '[\t|\"]' '{{ print $1\"\t\"$4\"\t\"$5\"\t\"$10\"\t0\t\"$7 }}' | "
-                         "awk -F '\t' 'BEGIN{{ OFS=\"\t\" }} {{ if ($6==\"+\") {{ $3=$2-1; $2=$2-2 }} else {{ $2=$3; $3=$3+1 }} print }}' | "
-                         "sort -k1,1 -k2,2n | "
-                         "gzip -c "
-                         "> {1}").format(args.annot['gencode_all_gtf'],
-                                         args.annot['gencode_proteincoding_tss'])
+        logger.info("ANNOTATIONS: make TSS file from GENCODE annotations...")
+        make_tss_file = (
+            "cat {0} | "
+            "grep -P '\tgene\t' | "
+            "grep 'protein_coding' | "
+            "awk -F '[\t|\"]' '{{ print $1\"\t\"$4\"\t\"$5\"\t\"$10\"\t0\t\"$7 }}' | "
+            "awk -F '\t' 'BEGIN{{ OFS=\"\t\" }} {{ if ($6==\"+\") {{ $3=$2-1; $2=$2-2 }} else {{ $2=$3; $3=$3+1 }} print }}' | "
+            "sort -k1,1 -k2,2n | "
+            "gzip -c "
+            "> {1}").format(
+                args.annot['gencode_all_gtf'],
+                args.annot['gencode_proteincoding_tss'])
         print make_tss_file
         os.system(make_tss_file)
-    
+
     return args

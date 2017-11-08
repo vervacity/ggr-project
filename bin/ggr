@@ -21,14 +21,17 @@ def parse_args():
     parser.add_argument(
         "-o", "--out_dir", dest="out_dir", type=str, default=os.getcwd(),
         help = "Output directory (default: current dir)")
-    load_data_files(parser)
+    parser.add_argument(
+        "--cluster", type=str, required=True,
+        help = "Cluster where analysis is running (sets up files correctly)")
+    add_data_file_parser(parser)
     
     args = parser.parse_args()
     
     return args
 
 
-def load_data_files(parser):
+def add_data_file_parser(parser):
     """Load all json files in so that we have handles on all data
     """
     logging.info("Loading jsons...")
@@ -69,8 +72,8 @@ def track_runs(args):
     # track github commit
     git_repo_path = os.path.dirname(os.path.realpath(__file__))
     os.system('echo "commit:" > {0}'.format(logging_file))
-    os.system('git -C {0} rev-parse HEAD >> {1}'.format(
-        git_repo_path, logging_file))
+    os.system('git --git-dir={0}/.git rev-parse HEAD >> {1}'.format(
+        git_repo_path.split("/bin")[0], logging_file))
     os.system('echo "" >> {0}'.format(logging_file))
     
     # write out the command
@@ -88,8 +91,7 @@ def main():
     os.system("mkdir -p {}".format(args.out_dir))
     logging_file = track_runs(args)
     setup_folders(args)
-    logging.basicConfig(filename=logging_file, level=logging.INFO)
-    
+
     # setup annotations
     from ggr.annotations import run
     args = run(args)

@@ -16,7 +16,6 @@
     "H3K27ac_dir":"results/histone/H3K27ac",
     "H3K27ac_diff_dir":"results/histone/H3K27ac/diff",
     
-
     "H3K4me1_dir":"results/histone/H3K4me1",
     "H3K4me1_diff_dir":"results/histone/H3K4me1/diff",
     

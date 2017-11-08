@@ -26,12 +26,16 @@ from ggr.util.bioinformatics import make_deeptools_heatmap
 def run(args):
     """Run all ATAC analyses
     """
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logging.INFO)
     atac_prefix = 'ggr.atac'
+    args.atac = args.atac[args.cluster]
 
     # 0) download peak files into a folder (timepoint labels)
     timepoints_files = glob.glob("{}/*.narrowPeak.gz".format(
         args.folders["atac_timepoints_bed_dir"]))
     if len(timepoints_files) == 0:
+        logger.info("Downloading peak files...")
         atac_peak_files = sorted(
             glob.glob('{0}/{1}'.format(
                 args.atac['data_dir'],
@@ -44,10 +48,10 @@ def run(args):
             os.system(copy)
     
     # 1) generate a master regions file
-    logging.info("ATAC: Generating master file...")
     args.atac['master_bed'] = '{0}/{1}.idr.master.bed.gz'.format(
         args.folders["data_dir"], atac_prefix)
     if not os.path.isfile(args.atac["master_bed"]):
+        logger.info("Make master ATAC bed file...")
         atac_peak_files = sorted(
             glob.glob('{0}/{1}'.format(
                 args.atac['data_dir'],
@@ -55,11 +59,11 @@ def run(args):
         merge_regions(atac_peak_files, args.atac['master_bed'])
     
     # 2) get read counts in these regions (for DESeq2 analysis)
-    logging.info("ATAC: Generating read counts per master region...")
     adjustment = "ends"
     args.atac['counts'] = '{0}/{1}.{2}.counts.mat.txt.gz'.format(
         args.folders['data_dir'], atac_prefix, adjustment)
     if not os.path.isfile(args.atac['counts']):
+        logger.info("Get read counts in these regions...")
         # glob tagalign files
         atac_tagalign_files = sorted(
             glob.glob('{0}/{1}'.format(
@@ -80,10 +84,10 @@ def run(args):
             tmp_dir=args.folders["atac_dir"])
 
     # 3) with read counts run DESeq2 as timeseries mode
-    logging.info("ATAC: Running DESeq2 on all pairs of timepoints...")
     args.atac['dynamic_ids'] = '{0}/{1}.dynamic.ids.txt.gz'.format(
         args.folders['atac_timeseries_dir'], atac_prefix)
     if not os.path.isfile(args.atac['dynamic_ids']):
+        logger.info("Run DESeq2 in timeseries mode...")
 	run_timeseries_deseq2 = "run_deseq2_timediff.R {0} {1} {2} {3} full".format(
             args.atac['counts'],
             '{0}/{1}'.format(
@@ -100,17 +104,19 @@ def run(args):
     args.atac["counts_rep2"] = "{}.rep2.mat.txt.gz".format(counts_prefix)
     args.atac["counts_pooled"] = "{}.pooled.mat.txt.gz".format(counts_prefix)
     
-    logging.info("ATAC: Separating count mat into reps/pooled...")
+
     if not os.path.isfile(args.atac["counts_pooled"]):
+        logger.info("ATAC: Separating count mat into reps/pooled...")
         split_count_matrix_by_replicate(
             args.atac["counts"],
             args.atac["counts_rep1"],
             args.atac["counts_rep2"],
             args.atac["counts_pooled"])
 
-    logging.info("ATAC: normalizing count files...")
+
     if not os.path.isfile("{}.rlog.mat.txt.gz".format(
             args.atac["counts_pooled"].split(".mat")[0])):
+        logger.info("ATAC: normalizing count files...")
         run_rlogs = "normalize_count_mats.R {0} {1} {2} {3}".format(
             args.atac["counts"],
             args.atac["counts_rep1"],
@@ -120,7 +126,7 @@ def run(args):
         os.system(run_rlogs)
     
     # for each of the counts files:
-    logging.info("ATAC: filtering dynamic/stable...")
+    logger.info("ATAC: filtering dynamic/stable...")
     counts_files_to_normalize = ["counts_rep1", "counts_rep2", "counts_pooled"]
     for counts_handle in counts_files_to_normalize:
 

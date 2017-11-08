@@ -414,7 +414,7 @@ def get_consistent_dpgp_trajectories(
         # cluster
         os.system("mkdir -p {}".format(pooled_dir))
         cluster = (
-            "DP_GP_cluster.py -i {} -o {} -p png --plot").format(
+            "DP_GP_cluster.py -i {} -o {} -p png --plot --fast").format(
                 pooled_unzipped_file,
                 "{0}/{1}.pooled".format(
                     pooled_dir, prefix))

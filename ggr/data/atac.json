@@ -1,7 +1,17 @@
 {
-    "data_dir":"/mnt/lab_data/kundaje/projects/skin/data/bds/processed.atac.2016-10-09.bioreps_peaks_signals",
-    "tagalign_glob":"*/*/rep*/*tn5.tagAlign.gz",
-    "idr_peak_glob":"*/*/idr/true_reps/*/*IDR*filt*narrowPeak.gz",
-    "bigwig_glob":"*/*/*/rep*/*fc*bigwig",
-    "bigwig_pooled_glob":"*/*/*/pooled_rep/*fc*bigwig"
+    "kundaje":{
+	"data_dir":"/mnt/lab_data/kundaje/projects/skin/data/bds/processed.atac.2016-10-09.bioreps_peaks_signals",
+	"tagalign_glob":"*/*/rep*/*tn5.tagAlign.gz",
+	"idr_peak_glob":"*/*/idr/true_reps/*/*IDR*filt*narrowPeak.gz",
+	"bigwig_glob":"*/*/*/rep*/*fc*bigwig",
+	"bigwig_pooled_glob":"*/*/*/pooled_rep/*fc*bigwig"
+    },
+    "sherlock":{
+	"data_dir":"/oak/stanford/groups/khavari/users/dskim89/ggr/data/freeze.2017-11-08/bds/processed.atac.2016-10-09.bioreps_peaks_signals",
+	"tagalign_glob":"*/*/rep*/*tn5.tagAlign.gz",
+	"idr_peak_glob":"*/*/idr/true_reps/*/*IDR*filt*narrowPeak.gz",
+	"bigwig_glob":"*/*/*/rep*/*fc*bigwig",
+	"bigwig_pooled_glob":"*/*/*/pooled_rep/*fc*bigwig"
+    }
+
 }
