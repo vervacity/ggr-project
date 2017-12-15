@@ -4,15 +4,17 @@
 import os
 import glob
 import signal
+import logging
 
 import pandas as pd
 
+from ggr.util.utils import run_shell_cmd
 from ggr.util.bed_utils import merge_regions
 from ggr.util.parallelize import setup_multiprocessing_queue
 from ggr.util.parallelize import run_in_parallel
 
 
-def make_ends_file(tagalign_file, out_file):
+def make_ends_file(tagalign_file, out_file, cluster="sherlock"):
     """Take a tagAlign file and get read ends only
     Generally used for ATAC-seq/DNase-seq, where the key
     information in the read is the END of the read (where 
@@ -26,6 +28,7 @@ def make_ends_file(tagalign_file, out_file):
     assert os.path.splitext(tagalign_file)[1] == ".gz"
     
     # Hack for python multiprocessing
+    #if not cluster == "sherlock":
     signal.signal(signal.SIGPIPE, signal.SIG_DFL)
     
     # awk is faster than python
@@ -41,12 +44,13 @@ def make_ends_file(tagalign_file, out_file):
             tagalign_file, out_file)
     
     print make_ends
-    os.system(make_ends)
+    logging.info(make_ends)
+    run_shell_cmd(make_ends)
 
     return None
 
 
-def make_midpoints_file(bedpe_file, out_file):
+def make_midpoints_file(bedpe_file, out_file, cluster="sherlock"):
     """Get the midpoint base pair from a paired ended dataset.
     This is the cleanest signal for where a factor was bound 
     to the fragment, ie use for paired ended ChIP-seq data.
@@ -60,7 +64,8 @@ def make_midpoints_file(bedpe_file, out_file):
     assert os.path.splitext(out_file)[1] == ".gz"
 
     # for multiprocessing purposes
-    signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+    if not cluster == "sherlock":
+        signal.signal(signal.SIGPIPE, signal.SIG_DFL)
     
     # awk is faster than python
     make_midpoints = (
@@ -76,7 +81,7 @@ def make_midpoints_file(bedpe_file, out_file):
             out_file)
 
     print make_midpoints
-    os.system(make_midpoints)
+    run_shell_cmd(make_midpoints)
     
     return None
 
@@ -153,7 +158,7 @@ def get_counts_from_tagalign(
             out_counts_file)
     
     print get_coverage
-    os.system(get_coverage)
+    run_shell_cmd(get_coverage)
     
     return
 

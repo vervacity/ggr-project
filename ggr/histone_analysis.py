@@ -10,6 +10,7 @@ import signal
 import pandas as pd
 
 from ggr.util.utils import add_folder
+from ggr.util.utils import run_shell_cmd
 from ggr.util.counting import make_count_matrix
 from ggr.util.counting import split_count_matrix_by_replicate
 from ggr.util.bed_utils import merge_regions
@@ -53,7 +54,7 @@ def setup_master_regions(args, histone, method="atac_midpoint", filter_w_overlap
                     args.params["histones"][histone]["overlap_extend_len"],
                     args.atac["master_slop_bed"])
             print slop_bed
-            os.system(slop_bed)
+            run_shell_cmd(slop_bed)
 
         if filter_w_overlap:
             # now intersect ATAC with the naive overlap files and only keep region if has an overlap
@@ -68,7 +69,7 @@ def setup_master_regions(args, histone, method="atac_midpoint", filter_w_overlap
                         args.chipseq["histones"][histone]["overlap_master_regions"],
                         args.chipseq["histones"][histone]["master_slop_marked_bed"])
                 print keep_marked
-                os.system(keep_marked)
+                run_shell_cmd(keep_marked)
             master_regions = args.chipseq["histones"][histone]["master_slop_marked_bed"]
             
         else:
@@ -129,7 +130,7 @@ def run(args):
                 args.params["histone_fdr"],
                 args.chipseq["histones"][histone]["dynamic_ids"])
             print run_deseq2
-            os.system(run_deseq2)
+            run_shell_cmd(run_deseq2)
             
         # 4) run rlog to have standardized matrix (to viz and do QC)
         logging.info("HISTONE: {}: splitting count mat into reps/pooled...".format(histone))
@@ -155,7 +156,7 @@ def run(args):
                 args.chipseq["histones"][histone]["counts"],
                 args.chipseq["histones"][histone]["counts_pooled"])
             print run_rlogs
-            os.system(run_rlogs)
+            run_shell_cmd(run_rlogs)
             
         # 5) enumerate trajectories (9 groups)
         sig_up_files = sorted(glob.glob("{}/*sigResultsUp.txt.gz".format(histone_diff_dir)))
@@ -183,6 +184,6 @@ def run(args):
                     args.chipseq["histones"][histone]["sig_mat"],
                     args.chipseq["histones"][histone]["clusters_bed"])
             print make_bed
-            os.system(make_bed)
+            run_shell_cmd(make_bed)
             
     return args

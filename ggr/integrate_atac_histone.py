@@ -13,6 +13,8 @@ from ggr.util.bioinformatics import make_deeptools_heatmap
 from ggr.util.bioinformatics import run_homer
 from ggr.util.bed_utils import id_to_bed
 
+from ggr.util.utils import run_shell_cmd
+
 
 def get_nearest_mark(intersect_bed_file, out_file, histone_assignment):
     """Assumes that you did an intersect 
@@ -92,7 +94,7 @@ def get_histone_overlaps(
                 master_bed_file,
                 out_tmp_file)
         print intersect_bed
-        os.system(intersect_bed)
+        run_shell_cmd(intersect_bed)
 
         # and then adjust to get nearest histone
         out_nearest_tmp = "{}/{}.overlap.{}.nearest.tmp.txt.gz".format(
@@ -168,7 +170,7 @@ def order_and_viz_dynamic_epigenome(
     """
     # get overlap with histones
     dynamic_histone_overlap_dir = "{}/histone_overlap".format(out_dir)
-    os.system("mkdir -p {}".format(dynamic_histone_overlap_dir))
+    run_shell_cmd("mkdir -p {}".format(dynamic_histone_overlap_dir))
 
     args.integrative["atac_dynamic_w_histones_mat"] = (
         "{0}/{1}.overlaps.mat.txt.gz").format(
@@ -187,7 +189,7 @@ def order_and_viz_dynamic_epigenome(
     # Now merge in histone clusters, and sort by ATAC + histone
     # this ordering is the FINAL ordering
     dynamic_plots_dir = "{}/plots".format(out_dir)
-    os.system("mkdir -p {}".format(dynamic_plots_dir))
+    run_shell_cmd("mkdir -p {}".format(dynamic_plots_dir))
     dynamic_atac_plot_prefix = "{}/{}.atac.epigenome_ordered".format(
         dynamic_plots_dir, prefix)
     dynamic_atac_subsample_file = "{}/{}.atac.ordered.subsample.txt.gz".format(
@@ -202,7 +204,7 @@ def order_and_viz_dynamic_epigenome(
                 dynamic_atac_plot_prefix,
                 dynamic_atac_subsample_file)
         print order_and_plot_atac
-        os.system(order_and_plot_atac)
+        run_shell_cmd(order_and_plot_atac)
         
     # take subsample file and make BED
     dynamic_atac_subsample_bed = "{}.bed.gz".format(
@@ -217,7 +219,7 @@ def order_and_viz_dynamic_epigenome(
                 dynamic_atac_subsample_file,
                 dynamic_atac_subsample_bed)
         print make_bed
-        os.system(make_bed)
+        run_shell_cmd(make_bed)
 
     # and then run through deeptools for histone marks
     histone_colors = args.chipseq["histones"]["ordered_deeptools_colors"]
@@ -259,7 +261,7 @@ def cluster_by_chromatin_state(
     # set up directories for each type of split
     mark_dir = "{}/by_mark".format(out_dir)
     state_dir = "{}/by_state".format(out_dir)
-    os.system("mkdir -p {0} {0}/ids {0}/bed {1} {1}/ids {1}/bed".format(
+    run_shell_cmd("mkdir -p {0} {0}/ids {0}/bed {1} {1}/ids {1}/bed".format(
         mark_dir, state_dir))
 
     for soft_cluster_file in soft_cluster_files:
@@ -373,7 +375,7 @@ def order_and_viz_stable_epigenome(
     """
     # get histone overlap with stable ATAC
     stable_histone_overlap_dir = "{}/histone_overlap".format(out_dir)
-    os.system("mkdir -p {}".format(stable_histone_overlap_dir))
+    run_shell_cmd("mkdir -p {}".format(stable_histone_overlap_dir))
     
     args.integrative["atac_stable_w_histones_mat"] = (
         "{0}/{1}.overlaps.mat.txt.gz").format(
@@ -422,7 +424,7 @@ def order_and_viz_stable_epigenome(
 
     # plot
     stable_plots_dir = "{}/plots".format(out_dir)
-    os.system("mkdir -p {}".format(stable_plots_dir))
+    run_shell_cmd("mkdir -p {}".format(stable_plots_dir))
 
     # TODO(dk) take mats, go to R to make colorbars
     # read in mat file, plot 3x for each histone
@@ -435,7 +437,7 @@ def order_and_viz_stable_epigenome(
                 args.integrative["atac_stable_w_histones_dynamic_mat"],
                 "{0}/{1}".format(stable_plots_dir, out_prefix))
         print plot_colorbars
-        os.system(plot_colorbars)
+        run_shell_cmd(plot_colorbars)
     
     bed_to_plot = [
         args.integrative["atac_stable_w_histones_dynamic_bed"],
@@ -546,7 +548,7 @@ def run(args):
         
         # run GREAT
         great_dir = "{}/great".format(args.folders[label_dir_handle].split("/bed")[0])
-        os.system("mkdir -p {}".format(great_dir))
+        run_shell_cmd("mkdir -p {}".format(great_dir))
         for label_bed_file in label_bed_files:
             label_bed_prefix = os.path.basename(label_bed_file).split(".bed")[0]
             great_files = glob.glob("{0}/{1}*".format(great_dir, label_bed_prefix))
@@ -556,18 +558,18 @@ def run(args):
                     great_dir,
                     label_bed_prefix)
                 print run_great
-                os.system(run_great)
+                run_shell_cmd(run_great)
 
         continue
 
         # run HOMER
         homer_dir = "{}/homer".format(args.folders[label_dir_handle].split("/bed")[0])
-        os.system("mkdir -p {}".format(homer_dir))
+        run_shell_cmd("mkdir -p {}".format(homer_dir))
         for label_bed_file in label_bed_files:
             label_bed_prefix = os.path.basename(label_bed_file).split(".bed")[0]
             label_bed_dir = "{0}/{1}".format(homer_dir, label_bed_prefix)
             if not os.path.isdir(label_bed_dir):
-                os.system("mkdir -p {}".format(label_bed_dir))
+                run_shell_cmd("mkdir -p {}".format(label_bed_dir))
                 run_homer(label_bed_file,
                           args.atac["master_bed"],
                           label_bed_dir)

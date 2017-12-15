@@ -22,6 +22,7 @@ from ggr.util.counting import split_count_matrix_by_replicate
 
 from ggr.util.bioinformatics import make_deeptools_heatmap
 
+from ggr.util.utils import run_shell_cmd
 
 def run(args):
     """Run all ATAC analyses
@@ -45,7 +46,7 @@ def run(args):
                 atac_peak_file,
                 args.folders["atac_timepoints_bed_dir"])
             print copy
-            os.system(copy)
+            run_shell_cmd(copy)
     
     # 1) generate a master regions file
     args.atac['master_bed'] = '{0}/{1}.idr.master.bed.gz'.format(
@@ -96,7 +97,7 @@ def run(args):
             args.params['atac_deseq2_fdr'],
             args.atac['dynamic_ids'])
         print run_timeseries_deseq2
-        os.system(run_timeseries_deseq2)
+        run_shell_cmd(run_timeseries_deseq2)
 
     # 4) trajectories: make normalized rep1, rep2, pooled files (for DP_GP analysis)
     counts_prefix = args.atac["counts"].split(".mat")[0]
@@ -123,7 +124,7 @@ def run(args):
             args.atac["counts_rep2"],
             args.atac["counts_pooled"])
         print run_rlogs
-        os.system(run_rlogs)
+        run_shell_cmd(run_rlogs)
     
     # for each of the counts files:
     logger.info("ATAC: filtering dynamic/stable...")
@@ -170,7 +171,7 @@ def run(args):
                         args.atac[stable_handle],
                         args.atac[stable_bed_handle])
                 print make_bed
-                os.system(make_bed)
+                run_shell_cmd(make_bed)
 
             # also make a dynamic BED file for downstream analyses
             dynamic_bed_handle = "{}_bed".format(dynamic_handle)
@@ -188,7 +189,7 @@ def run(args):
                         args.atac[dynamic_handle],
                         args.atac[dynamic_bed_handle])
                 print make_bed
-                os.system(make_bed)
+                run_shell_cmd(make_bed)
                 
     # 7) Run trajectories (on dynamic set) using DP_GP clustering
     args.atac["consistent_clusters"] = get_consistent_dpgp_trajectories(
@@ -212,7 +213,7 @@ def run(args):
             args.folders["atac_dp-gp_final_dir"],
             args.folders["atac_dp-gp_dir"])
         print reorder_clusters
-        os.system(reorder_clusters)
+        run_shell_cmd(reorder_clusters)
     args.atac["final_soft_clusters"] = sorted(
         glob.glob("{}/*soft*.gz".format(args.folders["atac_dp-gp_final_dir"])))
 

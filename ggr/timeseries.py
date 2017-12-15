@@ -15,6 +15,7 @@ from scipy.stats import chi2
 from ggr.util.parallelize import setup_multiprocessing_queue
 from ggr.util.parallelize import run_in_parallel
 
+from ggr.util.utils import run_shell_cmd
 
 def merge_cluster_files(cluster_files, out_file, cluster_name_pos=2):
     """Given a list of cluster files, merge
@@ -409,27 +410,27 @@ def get_consistent_dpgp_trajectories(
         unzip_mat = ("zcat {0} > {1}").format(
             pooled_timeseries_file, pooled_unzipped_file)
         print unzip_mat
-        os.system(unzip_mat)
+        run_shell_cmd(unzip_mat)
 
         # cluster
-        os.system("mkdir -p {}".format(pooled_dir))
+        run_shell_cmd("mkdir -p {}".format(pooled_dir))
         cluster = (
             "DP_GP_cluster.py -i {} -o {} -p png --plot --fast").format(
                 pooled_unzipped_file,
                 "{0}/{1}.pooled".format(
                     pooled_dir, prefix))
         print cluster
-        os.system(cluster)
+        run_shell_cmd(cluster)
 
         # delete the unzipped tmp files
-        os.system("rm {}/*.tmp".format(out_dir))
+        run_shell_cmd("rm {}/*.tmp".format(out_dir))
 
     # stage 2: soft clustering
     soft_cluster_dir = "{}/soft".format(out_dir)
     hard_cluster_dir = "{}/hard".format(out_dir)
     if not os.path.isdir(soft_cluster_dir):
-        os.system("mkdir -p {}".format(soft_cluster_dir))
-        os.system("mkdir -p {}".format(hard_cluster_dir))
+        run_shell_cmd("mkdir -p {}".format(soft_cluster_dir))
+        run_shell_cmd("mkdir -p {}".format(hard_cluster_dir))
     
         # for each cluster (from POOLED clusters), get the mean and covariance matrix (assuming multivariate normal)
         cluster_means, cluster_covariances, cluster_sizes, cluster_names = get_cluster_sufficient_stats(
@@ -467,20 +468,20 @@ def get_consistent_dpgp_trajectories(
     # sanity check - replot the clusters
     plot_dir = "{}/soft/plot".format(out_dir)
     if not os.path.isdir(plot_dir):
-        os.system("mkdir -p {}".format(plot_dir))
+        run_shell_cmd("mkdir -p {}".format(plot_dir))
         # use R to plot 
         plot_soft_clusters = ("plot_soft_trajectories.R {0}/soft/plot {0}/soft/{1}").format(
             out_dir, "*soft*.gz")
         print plot_soft_clusters
-        os.system(plot_soft_clusters)
+        run_shell_cmd(plot_soft_clusters)
 
     plot_dir = "{}/hard/plot".format(out_dir)
     if not os.path.isdir(plot_dir):
-        os.system("mkdir -p {}".format(plot_dir))
+        run_shell_cmd("mkdir -p {}".format(plot_dir))
         # use R to plot 
         plot_hard_clusters = ("plot_soft_trajectories.R {0}/hard/plot {0}/hard/{1}").format(
             out_dir, "*cluster_*hard*.gz")
         print plot_hard_clusters
-        os.system(plot_hard_clusters)
+        run_shell_cmd(plot_hard_clusters)
         
     return

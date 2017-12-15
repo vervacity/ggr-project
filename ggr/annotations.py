@@ -7,6 +7,8 @@ import glob
 import logging
 import pandas as pd
 
+from ggr.util.utils import run_shell_cmd
+
 def get_proteincoding_gene_list(gtf_file, out_file):
     """Using a gtf file of protein coding genes, extract ids
     Note that it leaves the decimals on there
@@ -23,7 +25,7 @@ def get_proteincoding_gene_list(gtf_file, out_file):
                         "gzip -c > {1}").format(gtf_file,
                                                 out_file)
     print extract_gene_ids
-    os.system(extract_gene_ids)
+    run_shell_cmd(extract_gene_ids)
     
     return None
 
@@ -42,7 +44,7 @@ def build_ordered_tss_file(ordered_gene_list, gtf_file, out_bed):
         "gzip -c > {1}").format(gtf_file, tmp_gene_file)
     if not os.path.isfile(tmp_gene_file):
         print make_gene_file_from_gtf
-        os.system(make_gene_file_from_gtf)
+        run_shell_cmd(make_gene_file_from_gtf)
 
     # read in ordered gene list and tmp list and sort
     ordered_genes = pd.read_table(ordered_gene_list)
@@ -74,7 +76,7 @@ def build_grouped_tss_file(ordered_gene_list, gtf_file, out_bed):
         "gzip -c > {1}").format(gtf_file, tmp_gene_file)
     if not os.path.isfile(tmp_gene_file):
         print make_gene_file_from_gtf
-        os.system(make_gene_file_from_gtf)
+        run_shell_cmd(make_gene_file_from_gtf)
 
     # read in ordered gene list and tmp list and sort
     ordered_genes = pd.read_table(ordered_gene_list)
