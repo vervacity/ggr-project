@@ -99,9 +99,13 @@ def run_expressed_threshold_workflow(args, prefix, mat_key="rna.counts.pc.mat"):
     out_results[geneids_expressed_key] = "{}.txt.gz".format(
         out_results[rlog_expressed_key].split(".mat")[0])
     if not os.path.isfile(out_results[geneids_expressed_key]):
-        get_ids = "zcat {} | awk -F '\t' '{{ print $1 }}' | grep -v -e '^$' | gzip -c > {}".format(
-            out_results[rlog_expressed_key],
-            out_results[geneids_expressed_key])
+        get_ids = (
+            "zcat {} | "
+            "awk -F '\t' '{{ print $1 }}' | "
+            "grep -v -e '^$' | "
+            "gzip -c > {}").format(
+                out_results[rlog_expressed_key],
+                out_results[geneids_expressed_key])
         run_shell_cmd(get_ids)
 
     # and use to filter out the initial input count matrix

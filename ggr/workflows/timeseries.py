@@ -11,6 +11,19 @@ from ggr.analyses.counting import split_count_matrix_by_replicate
 from ggr.analyses.timeseries import get_consistent_dpgp_trajectories
 
 
+
+# filter for consistency
+# separate this out so that can re-run for hard and soft clusters
+
+
+
+
+
+# consistent DPGP trajectories workflow
+
+
+
+
 def run_timeseries_workflow(args, prefix, mat_key="counts.mat"):
     """Run GGR timeseries workflow
     Use for both ATAC and RNA to have same 
@@ -53,7 +66,8 @@ def run_timeseries_workflow(args, prefix, mat_key="counts.mat"):
     # ------------------------------------------------
     logger.info("ANALYSIS: run pairwise deseq2 with multiple hypothesis correction")
     run_shell_cmd("mkdir -p {}/deseq2".format(results_dir))
-    out_results["dynamic_ids.list"] = "{}/deseq2/{}.dynamic.ids.txt.gz".format(results_dir, prefix)
+    out_results["dynamic_ids.list"] = "{}/deseq2/{}.dynamic.ids.txt.gz".format(
+        results_dir, prefix)
     if not os.path.isfile(out_results["dynamic_ids.list"]):
         run_timeseries_deseq2 = "timeseries.pairwise_deseq2.R {0} {1} {2} {3} full".format(
             out_data[mat_key],
@@ -78,7 +92,9 @@ def run_timeseries_workflow(args, prefix, mat_key="counts.mat"):
 
     pooled_handle = "{}.{}.mat".format(mat_key.split(".mat")[0], matrix_types[-1])
     if not os.path.isfile(out_data[pooled_handle]):
-        split_count_matrix_by_replicate(out_data[mat_key], *[out_data[handle] for handle in matrix_handles])
+        split_count_matrix_by_replicate(
+            out_data[mat_key],
+            *[out_data[handle] for handle in matrix_handles])
         
     # ------------------------------------------------
     # ANALYSIS 2 - normalize by rlog
