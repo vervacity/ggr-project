@@ -39,5 +39,7 @@
     "epigenome_dynamic_state_ids_dir":"results/epigenome/dynamic/clusters/by_state/ids",
 
     "rna_dir":"results/rna",
+    "rna_timeseries_dir":"results/rna/timeseries",
+    "rna_dpgp_dir":"results/rna/timeseries/dp_gp",
     "tf_dir":"results/tf"
 }

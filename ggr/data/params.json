@@ -1,7 +1,16 @@
 {
-    "atac_deseq2_fdr":0.0005,
+
+    "lo_res_days":["d0", "d3", "d6"],
+    "hi_res_days":["d00", "d05", "d10", "d15", "d20", "d25", "d30", "d35", "d40", "d45", "d50", "d55", "d60"],
+    "hi_res_filt_days":["d00", "d05", "d10", "d15", "d20", "d25", "d30", "d45", "d50", "d60"],
+    "media_timepoints":["d35", "d40", "d55"],
+
+    "rna_empirical_rlog_thresh": 4.0,
+    
+    "pairwise_deseq2_fdr":0.0005,
     
     "raw_cluster_min_size":1000,
+    "rna_cluster_min_size":50,
     "raw_cluster_reject_null_ci_interval":0.999,
     "rep_to_cluster_ci_interval":0.95,
     "rep_to_cluster_corr_cutoff":0.05,

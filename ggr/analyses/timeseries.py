@@ -17,6 +17,7 @@ from ggr.util.parallelize import run_in_parallel
 
 from ggr.util.utils import run_shell_cmd
 
+
 def merge_cluster_files(cluster_files, out_file, cluster_name_pos=2):
     """Given a list of cluster files, merge
     """
@@ -372,9 +373,7 @@ def get_corr_mat(mat_a, mat_b):
 
 
 def get_consistent_dpgp_trajectories(
-        rep1_timeseries_file,
-        rep2_timeseries_file,
-        pooled_timeseries_file,
+        matrices,
         out_dir,
         prefix,
         raw_cluster_min_size=1000,
@@ -393,6 +392,12 @@ def get_consistent_dpgp_trajectories(
 
 
     """
+    run_shell_cmd("mkdir -p {}".format(out_dir))
+    
+    rep1_timeseries_file = matrices[0]
+    rep2_timeseries_file = matrices[1]
+    pooled_timeseries_file = matrices[2]
+    
     assert ".gz" in rep1_timeseries_file
     assert ".gz" in rep2_timeseries_file
     assert ".gz" in pooled_timeseries_file
@@ -409,8 +414,10 @@ def get_consistent_dpgp_trajectories(
             os.path.basename(pooled_timeseries_file).split(".mat")[0])
         unzip_mat = ("zcat {0} > {1}").format(
             pooled_timeseries_file, pooled_unzipped_file)
-        print unzip_mat
         run_shell_cmd(unzip_mat)
+
+        # TODO(dk) convert header as needed?
+        
 
         # cluster
         run_shell_cmd("mkdir -p {}".format(pooled_dir))
@@ -419,13 +426,13 @@ def get_consistent_dpgp_trajectories(
                 pooled_unzipped_file,
                 "{0}/{1}.pooled".format(
                     pooled_dir, prefix))
-        print cluster
         run_shell_cmd(cluster)
 
         # delete the unzipped tmp files
         run_shell_cmd("rm {}/*.tmp".format(out_dir))
 
     # stage 2: soft clustering
+    # TODO(dk) separate this out from DPGP consistency?
     soft_cluster_dir = "{}/soft".format(out_dir)
     hard_cluster_dir = "{}/hard".format(out_dir)
     if not os.path.isdir(soft_cluster_dir):
@@ -483,5 +490,8 @@ def get_consistent_dpgp_trajectories(
             out_dir, "*cluster_*hard*.gz")
         print plot_hard_clusters
         run_shell_cmd(plot_hard_clusters)
+
+    # TODO(dk): return the soft and hard clusters as lists
+        
         
     return

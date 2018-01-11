@@ -22,9 +22,9 @@ def parse_args():
         "-o", "--out_dir", dest="out_dir", type=str, default=os.getcwd(),
         help = "Output directory (default: current dir)")
     parser.add_argument(
-        "--cluster", type=str, required=True,
+        "--cluster", type=str, default="kundaje",
         help = "Cluster where analysis is running (sets up files correctly)")
-    add_data_file_parser(parser)
+    #add_data_file_parser(parser)
     
     args = parser.parse_args()
     
@@ -84,22 +84,58 @@ def track_runs(args):
 
 
 def main():
-    """Run all code
+    """Run all workflows across GGR datasets
     """
-    # setup
+    # parse args
     args = parse_args()
     os.system("mkdir -p {}".format(args.out_dir))
+
+    # set up inputs
+    args.inputs = {}
+    json_files = glob.glob(
+        pkg_resources.resource_filename('ggr', 'data/*.json'))
+    for json_file in json_files:
+        key_name = os.path.basename(json_file).split('.json')[0]
+        with open(json_file, 'r') as fp:
+            args.inputs[key_name] = json.load(fp)
+
+    # make output dict to track files
+    args.outputs = {}
+    
+    # set up logging
     logging_file = track_runs(args)
-    setup_folders(args)
+    reload(logging) # reload because Anaconda co-opts logging (i think)
+    logging.basicConfig(filename=logging_file, level=logging.DEBUG)
+    logging.getLogger().addHandler(logging.StreamHandler())
 
-    # setup annotations
-    from ggr.annotations import run
-    args = run(args)
+    # set up top level: annotations, data, results
+    toplevel_dirnames = ["annotations", "data", "results"]
+    for dirname in toplevel_dirnames:
+        args.outputs[dirname] = {
+            "dir": "{}/{}".format(args.out_dir, dirname)}
+    
+    # run annotations workflow
+    from ggr.workflows.annotations import runall
+    args = runall(args, "hg19")
 
+    # run rna workflow
+    from ggr.workflows.rna import runall
+    args.rna = runall(args, "ggr.rna")
+
+    
+    # save outputs dict to json
+    with open("outputs.json", "w") as fp:
+        json.dump(args.outputs, fp, sort_keys=True, indent=4)
+
+
+    quit()
+    
     # run atac analyses
-    from ggr.atac_analysis import run
-    args = run(args)
+    from ggr.workflows.atac import runall
+    args = runall(args)
 
+    quit()
+    
     # run histone analyses
     from ggr.histone_analysis import run
     args = run(args)

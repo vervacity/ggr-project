@@ -9,7 +9,7 @@ import logging
 import pandas as pd
 
 from ggr.util.utils import run_shell_cmd
-from ggr.util.bed_utils import merge_regions
+
 from ggr.util.parallelize import setup_multiprocessing_queue
 from ggr.util.parallelize import run_in_parallel
 
@@ -287,6 +287,39 @@ def make_count_matrix(
     return None
 
 
+def pull_single_replicate(mat_file, out_file, rep="b1"):
+    """From a matrix, pull one replicate out
+    """
+    assert ".mat" in mat_file
+    data = pd.read_table(mat_file, index_col=0)
+    
+    rep_columns = [
+        colname for colname in data.columns
+        if rep in colname]
+    data_rep = data[rep_columns]
+    data_rep.to_csv(out_file, sep='\t', compression="gzip")
+
+    return None
+
+
+def pool_replicates(mat_file, out_file):
+    """Pool replicates, assumes naming
+    structure is *_b1, *_b2.
+    """
+    assert ".mat" in mat_file
+    data = pd.read_table(mat_file, index_col=0)
+
+    samples = sorted(
+        list(set([colname.split("_")[0]
+                  for colname in data.columns])))
+    for sample in samples:
+        data[sample] = data["{}_b1".format(sample)] + data["{}_b2".format(sample)]
+    data_pooled = data[samples].astype(int)
+    data_pooled.to_csv(out_file, sep='\t', compression="gzip")
+
+    return None
+
+
 def split_count_matrix_by_replicate(
         count_matrix_file,
         rep1_file,
@@ -296,30 +329,15 @@ def split_count_matrix_by_replicate(
     and a pooled file.
     """
     assert ".mat" in count_matrix_file
-    data = pd.read_table(count_matrix_file)
     
     # rep1
-    rep1_columns = [
-        colname for colname in data.columns
-        if "b1" in colname]
-    data_rep1 = data[rep1_columns]
-    data_rep1.to_csv(rep1_file, sep='\t', compression="gzip")
+    pull_single_replicate(count_matrix_file, rep1_file, rep="b1")
 
     # rep2
-    rep2_columns = [
-        colname for colname in data.columns
-        if "b2" in colname]
-    data_rep2 = data[rep2_columns]
-    data_rep2.to_csv(rep2_file, sep='\t', compression="gzip")
+    pull_single_replicate(count_matrix_file, rep2_file, rep="b2")
 
     # pooled
-    samples = sorted(
-        list(set([colname.split("_")[0]
-                  for colname in data.columns])))
-    for sample in samples:
-        data[sample] = data["{}_b1".format(sample)] + data["{}_b2".format(sample)]
-    data_pooled = data[samples].astype(int)
-    data_pooled.to_csv(pooled_file, sep='\t', compression="gzip")
+    pool_replicates(count_matrix_file, pooled_file)
 
     return None
 

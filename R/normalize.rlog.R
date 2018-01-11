@@ -9,7 +9,11 @@ args <- commandArgs(trailingOnly=TRUE)
 data_file <- args[1]
 out_file <- args[2]
 
-data <- read.table(gzfile(data_file), header=TRUE, row.names=1, sep='\t')
+data <- read.table(
+    gzfile(data_file),
+    header=TRUE,
+    row.names=1,
+    sep='\t')
 
 # Set up conditions table
 conditions <- sub("_b.", "", colnames(data))
