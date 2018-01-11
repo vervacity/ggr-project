@@ -103,6 +103,7 @@ def get_cluster_sufficient_stats(cluster_file, timeseries_file):
     timeseries_df["regions"] = timeseries_df.index
     
     # merge the two
+    # TODO make sure to remove examples that are not among the clusters
     merged_data = timeseries_df.merge(clusters_df, on="regions")
     del merged_data["regions"]
     
@@ -133,7 +134,7 @@ def get_cluster_sufficient_stats(cluster_file, timeseries_file):
     return cluster_means, cluster_covariances, cluster_sizes, cluster_names
 
 
-def filter_null_and_small_clusters(
+def filter_null_and_small_clusters_old(
         cluster_means,
         cluster_covariances,
         cluster_sizes,
@@ -165,6 +166,62 @@ def filter_null_and_small_clusters(
     print cluster_sizes
     print indices_to_delete
     
+    # fix clusters
+    for index in sorted(indices_to_delete, reverse=True):
+        del cluster_means[index]
+        del cluster_covariances[index]
+        del cluster_sizes[index]
+        del cluster_names[index]
+    
+    return cluster_means, cluster_covariances, cluster_sizes, cluster_names
+
+
+def filter_null_and_small_clusters(
+        mat_file,
+        cluster_file,
+        out_cluster_file,
+        ci=0.999, # sort of multiple hypothesis correction
+        size_cutoff=1000):
+    """Quick filters to remove trajectory groups whose multivariate Gaussian
+    does NOT reject the null (ie, vector of zeros falls in the confidence
+    interval) as well as small clusters
+    
+    Args:
+      mat_file: file with the timepoint data, with 0-column with ids
+      cluster_file: file with clusters, 0-column is clusters, 1-column is ids
+    """
+    # first get sufficient statistics for the clusters
+    cluster_means, cluster_covariances, cluster_sizes, cluster_names = get_cluster_sufficient_stats(
+            cluster_file, mat_file)
+
+    # calculate what the chi2 cutoffs are based on the means and confidence intervals
+    pdf_cutoff = chi2.pdf(1-ci, cluster_means[0].shape[0])
+    indices_to_delete = []
+    for cluster_idx in range(len(cluster_means)):
+
+        # remove clusters by cluster size
+        if cluster_sizes[cluster_idx] <= size_cutoff:
+            indices_to_delete.append(cluster_idx)
+            continue
+
+        # calculate the multivariate normal (GP) and determine if cluster
+        # does not reject the null.
+        pdf_val = multivariate_normal.pdf(
+            np.array([0 for i in range(cluster_means[0].shape[0])]),
+            mean=cluster_means[cluster_idx],
+            cov=cluster_covariances[cluster_idx],
+            allow_singular=True)
+        
+        if pdf_val > pdf_cutoff:
+            indices_to_delete.append(cluster_idx)
+            continue
+
+    print cluster_sizes
+    print indices_to_delete
+    
+    # return new matrices and clusters
+    
+
     # fix clusters
     for index in sorted(indices_to_delete, reverse=True):
         del cluster_means[index]
@@ -261,7 +318,7 @@ def get_consistent_soft_clusters_by_region(
     return filtered_consistent_clusters, hard_cluster
 
 
-def get_consistent_soft_clusters(
+def get_consistent_soft_clusters_old(
         rep1_timeseries_file,
         rep2_timeseries_file,
         pooled_timeseries_file,
@@ -358,6 +415,112 @@ def get_consistent_soft_clusters(
     return
 
 
+def get_reproducible_clusters(
+        clusters_file,
+        pooled_mat_file,
+        rep1_timeseries_file,
+        rep2_timeseries_file,
+        out_dir,
+        prefix,
+        ci=0.95,
+        corr_cutoff=0.05,
+        epsilon=0.10):
+    """Given rep1/rep2/pooled timeseries files, go through
+    regions and check for consistency after soft clustering
+    """
+    cluster_means, cluster_covariances, cluster_sizes, cluster_names = get_cluster_sufficient_stats(
+        pooled_mat_file, clusters_file)
+
+    # get pdf val for confidence interval
+    # note that the multivariate normal pdf is distributed
+    # as chi2(alpha) where alpha is the chosen significance
+    pdf_cutoff = chi2.pdf(1-ci, cluster_means[0].shape[0])
+
+    # open all files to stream regions
+    region_idx = 0
+    with gzip.open(rep1_timeseries_file, 'r') as rep1:
+        with gzip.open(rep2_timeseries_file, 'r') as rep2:
+            with gzip.open(pooled_timeseries_file, 'r') as pooled:
+
+                while True:
+                    
+                    # read lines
+                    rep1_line = rep1.readline()
+                    rep2_line = rep2.readline()
+                    pooled_line = pooled.readline()
+                
+                    # break if end of file
+                    if rep1_line == "":
+                        break
+                
+                    # ignore header line
+                    if rep1_line.strip().startswith("d"):
+                        continue
+
+                    # separate to fields
+                    rep1_fields = rep1_line.strip().split("\t")
+                    rep2_fields = rep2_line.strip().split("\t")
+                    pooled_fields = pooled_line.strip().split("\t")
+
+                    # split out regions and timepoints
+                    rep1_region, rep1_timepoints = rep1_fields[0], zscore(
+                        np.array(map(float, rep1_fields[1:])))
+                    rep2_region, rep2_timepoints = rep2_fields[0], zscore(
+                        np.array(map(float, rep2_fields[1:])))
+                    pooled_region, pooled_timepoints = pooled_fields[0], zscore(
+                        np.array(map(float, pooled_fields[1:])))
+
+                    assert rep1_region == rep2_region
+                    assert rep1_region == pooled_region
+                    assert rep2_region == pooled_region
+
+                    # now for each cluster, check consistency and get soft/hard clusters
+                    # TODO: rename this function - assign_region_to_cluster
+                    consistent_clusters, hard_cluster = get_consistent_soft_clusters_by_region(
+                        cluster_means,
+                        cluster_covariances,
+                        cluster_names,
+                        [rep1_timepoints, rep2_timepoints, pooled_timepoints],
+                        pdf_cutoff,
+                        corr_cutoff,
+                        epsilon)
+                    
+                    for cluster in consistent_clusters:
+                        
+                        # write out to file
+                        cluster_file = "{}/soft/{}.cluster_{}.soft.txt.gz".format(
+                            out_dir, prefix, cluster)
+                        with gzip.open(cluster_file, 'a') as out:
+                            out.write("{}\t{}\n".format(
+                                pooled_region,
+                                "\t".join(map(str, pooled_timepoints.tolist()))))
+                            
+                    # save out hard clusters
+                    if hard_cluster is not None:
+                        hard_cluster_file = "{}/hard/{}.clusters.hard.all.txt.gz".format(
+                            out_dir, prefix)
+                        with gzip.open(hard_cluster_file, "a") as out:
+                            out.write("{}\t{}\t{}\n".format(
+                                pooled_region,
+                                "\t".join(map(str, pooled_timepoints.tolist())),
+                                hard_cluster))
+
+                        # Write out to individual hard cluster file
+                        cluster_file = "{}/hard/{}.cluster_{}.hard.txt.gz".format(
+                            out_dir, prefix, hard_cluster)
+                        with gzip.open(cluster_file, 'a') as out:
+                            out.write("{}\t{}\n".format(
+                                pooled_region,
+                                "\t".join(map(str, pooled_timepoints.tolist()))))
+                        
+                    region_idx += 1
+                    if region_idx % 1000 == 0:
+                        print region_idx
+
+    return
+
+
+
 def get_corr_mat(mat_a, mat_b):
     """given two matrices, calculate correlations between
     the rows of the two
@@ -372,6 +535,38 @@ def get_corr_mat(mat_a, mat_b):
     return corr_mat
 
 
+def run_dpgp(mat_file, prefix, out_dir, tmp_dir):
+    """Run DP-GP while managing files correctly
+    """
+    run_shell_cmd("mkdir -p {}".format(out_dir))
+    run_shell_cmd("mkdir -p {}".format(tmp_dir))
+
+    # unzip file if needed
+    if mat_file.endswith(".gz"):
+        input_mat_file = "{}/{}.dpgp.tmp".format(
+            tmp_dir, os.path.basename(mat_file).split(".txt")[0])
+        unzip_mat = "zcat {0} > {1}".format(
+            mat_file, input_mat_file)
+        run_shell_cmd(unzip_mat)
+    else:
+        input_mat_file = mat_file
+
+    # TODO change header if need be
+    cluster = (
+        "DP_GP_cluster.py -i {} -o {} -p png --plot --fast").format(
+            input_mat_file,
+            "{0}/{1}".format(out_dir, prefix))
+    run_shell_cmd(cluster)
+
+    # delete the unzipped tmp files
+    run_shell_cmd("rm {}/*.dpgp.tmp".format(tmp_dir))
+
+    optimal_clusters = "{}/{}_optimal_clustering.txt".format(out_dir, prefix)
+
+    return optimal_clusters
+
+
+# TODO this should be a workflow, not an analysis
 def get_consistent_dpgp_trajectories(
         matrices,
         out_dir,
@@ -471,7 +666,8 @@ def get_consistent_dpgp_trajectories(
             ci=rep_to_cluster_ci_interval,
             corr_cutoff=rep_to_cluster_corr_cutoff,
             epsilon=epsilon)
-                            
+    
+    # TODO separate this out as a viz analysis
     # sanity check - replot the clusters
     plot_dir = "{}/soft/plot".format(out_dir)
     if not os.path.isdir(plot_dir):
