@@ -8,22 +8,85 @@ from ggr.util.utils import run_shell_cmd
 from ggr.analyses.filtering import filter_for_ids
 
 from ggr.analyses.counting import split_count_matrix_by_replicate
+
+from ggr.analyses.filtering import get_ordered_subsample
+
 from ggr.analyses.timeseries import get_consistent_dpgp_trajectories
 from ggr.analyses.timeseries import run_dpgp
+from ggr.analyses.timeseries import filter_null_and_small_clusters
+from ggr.analyses.timeseries import get_reproducible_clusters
+from ggr.analyses.timeseries import split_mat_to_clusters
+from ggr.analyses.timeseries import plot_clusters
+from ggr.analyses.timeseries import reorder_clusters
 
 
-# filter for consistency
-# separate this out so that can re-run for hard and soft clusters
+def run_cluster_plotting_subworkflow(
+        out_data,
+        out_results,
+        out_dir,
+        prefix,
+        mat_key,
+        cluster_list_key):
+    """subsample and plot
+    """
+    # subsample
+    cluster_list_subsample_key = "{}.subsample.list".format(cluster_list_key.split(".list")[0])
+    out_results[cluster_list_subsample_key] = "{}.subsampled.txt".format(
+        out_results[cluster_list_key].split(".txt")[0])
+    if not os.path.isfile(out_results[cluster_list_subsample_key]):
+        get_ordered_subsample(
+            out_results[cluster_list_key],
+            out_results[cluster_list_subsample_key])
+
+    # plot
+    plot_dir = "{}/plots".format(out_dir)
+    if not os.path.isdir(plot_dir):
+        plot_clusters(
+            out_results[cluster_list_key],
+            out_results[cluster_list_subsample_key],
+            out_data[mat_key],
+            "{}/plots".format(out_dir),
+            "{}".format(prefix))
+
+    return out_data, out_results
+
+
+def run_cluster_reordering_subworkflow(
+        out_data,
+        out_results,
+        out_dir,
+        prefix,
+        mat_key,
+        cluster_list_key):
+    """Reorder clusters based on hclust - try to order by time
+    """
+    # run reordering
+    run_shell_cmd("mkdir -p {}".format(out_dir))
+    cluster_list_reordered_key = "{}.reordered.list".format(cluster_list_key.split(".list")[0])
+    out_results[cluster_list_reordered_key] = "{}/{}.reordered.clustering.txt".format(
+        out_dir, os.path.basename(out_results[cluster_list_key]).split(".txt")[0])
+    if not os.path.isfile(out_results[cluster_list_reordered_key]):
+        reorder_clusters(
+            out_results[cluster_list_key],
+            out_data[mat_key],
+            out_results[cluster_list_reordered_key])
+    
+    run_cluster_plotting_subworkflow(
+        out_data,
+        out_results,
+        out_dir,
+        prefix,
+        mat_key,
+        cluster_list_reordered_key)
+    
+    return out_data, out_results
 
 
 
-
-
-# consistent DPGP trajectories workflow
 def run_reproducibility_dpgp_workflow(
         args, 
-        prefix, d
-        atatype="rna", 
+        prefix,
+        datatype="rna", 
         rep1_mat_key="counts.mat",
         rep2_mat_key="counts.mat",
         pooled_mat_key="counts.mat"):
@@ -46,9 +109,9 @@ def run_reproducibility_dpgp_workflow(
     
     results_dirname = "dp_gp"
     results_dir = "{}/{}".format(
-        args.outputs["results"][data_type]["timeseries"]["dir"], 
+        args.outputs["results"][datatype]["timeseries"]["dir"], 
         results_dirname)
-    args.outputs["results"][data_type]["timeseries"][results_dirname] = {
+    args.outputs["results"][datatype]["timeseries"][results_dirname] = {
         "dir": results_dir}
     run_shell_cmd("mkdir -p {}".format(results_dir))
     logging.debug("results going to {}".format(results_dir))
@@ -59,6 +122,7 @@ def run_reproducibility_dpgp_workflow(
     # input: normalized count matrix
     # output: clustering files
     # ------------------------------------------------
+    logger.info("ANALYSIS: run DP GP trajectory analysis")
     dpgp_pooled_dir = "{}/pooled".format(results_dir)
     clusters_raw_handle = "clusters.raw.list"
     out_results[clusters_raw_handle] = "{0}/{1}.pooled_optimal_clustering.txt".format(
@@ -70,23 +134,57 @@ def run_reproducibility_dpgp_workflow(
             dpgp_pooled_dir, 
             results_dir)
 
+    # subsample and plot
+    out_data, out_results = run_cluster_plotting_subworkflow(
+        out_data,
+        out_results,
+        dpgp_pooled_dir,
+        "{}.pooled".format(prefix),
+        pooled_mat_key,
+        clusters_raw_handle)
+    
+    # reorder
+    reorder_dir = "{}/reordered".format(dpgp_pooled_dir)
+    out_data, out_results = run_cluster_reordering_subworkflow(
+        out_data,
+        out_results,
+        reorder_dir,
+        "{}.raw.reordered".format(prefix),
+        pooled_mat_key,
+        clusters_raw_handle)
+    clusters_raw_reordered_handle = "{}.reordered.list".format(
+        clusters_raw_handle.split(".list")[0])
+    
     # ------------------------------------------------
     # ANALYSIS 1 - filter null and small clusters
     # input: cluster list and mat file
     # output: filtered clusters
     # ------------------------------------------------
+    logger.info("ANALYSIS: filter out null and small clusters")
     nullfilt_dir = "{}/nullfilt".format(results_dir)
     clusters_nullfilt_handle = "clusters.null_filt.list"
     out_results[clusters_nullfilt_handle] = "{0}/{1}.nullfilt.clustering.txt".format(
         nullfilt_dir, prefix)
     if not os.path.isfile(out_results[clusters_nullfilt_handle]):
         filter_null_and_small_clusters(
-            out_results[clusters_raw_handle],
+            out_results[clusters_raw_reordered_handle],
             out_data[pooled_mat_key],
-            out_results[clusters_nullfilt_handle])
+            out_results[clusters_nullfilt_handle],
+            ci=0.95,
+            size_cutoff=10)
+
+    # and reorder
+    reorder_dir = "{}/reordered".format(nullfilt_dir)
+    out_data, out_results = run_cluster_reordering_subworkflow(
+        out_data,
+        out_results,
+        reorder_dir,
+        "{}.nullfilt.reordered".format(prefix),
+        pooled_mat_key,
+        clusters_nullfilt_handle)
 
     # ------------------------------------------------
-    # ANALYSIS 2 - remove inconsistent samples, based on rep1/rep2
+    # ANALYSIS 2 - run reproducibility
     # input: cluster list, mat files (rep1, rep2, pooled)
     # output: filtered hard and soft clusters
     # notes: this softens the clusters. this is important 
@@ -95,30 +193,38 @@ def run_reproducibility_dpgp_workflow(
     #   cluster than another, though the hard clusters
     #   are similar to each other.
     # ------------------------------------------------
-    # remove inconsistent samples (between two reps)
+    logger.info("ANALYSIS: check reproducibility of trajectories")
     reproducible_dir = "{}/reproducible".format(results_dir)
-    clusters_reproducible_handle = "clusters.reproducible.list"
-    out_results[clusters_reproducible_handle] = "{0}/{1}.reproducible.clustering.txt".format(
+    clusters_reproducible_soft_handle = "clusters.reproducible.soft.list"
+    out_results[clusters_reproducible_soft_handle] = "{0}/{1}.reproducible.soft.clustering.txt".format(
         reproducible_dir, prefix)
-    if not os.path.isfile(out_results[clusters_reproducible_handle]):
+    clusters_reproducible_hard_handle = "clusters.reproducible.hard.list"
+    out_results[clusters_reproducible_hard_handle] = "{0}/{1}.reproducible.hard.clustering.txt".format(
+        reproducible_dir, prefix)
+    if not os.path.isfile(out_results[clusters_reproducible_soft_handle]):
         get_reproducible_clusters(
             out_results[clusters_nullfilt_handle],
             out_data[pooled_mat_key],
             out_data[rep1_mat_key],
             out_data[rep2_mat_key],
-            out_results[clusters_reproducible_handle])
+            out_results[clusters_reproducible_soft_handle],
+            out_results[clusters_reproducible_hard_handle],
+            reproducible_dir,
+            "{}.reproducible".format(prefix))
         # TODO add in params
 
-    # ------------------------------------------------
-    # ANALYSIS 4 - reorder in deterministic way (hclust?)
-    # input: cluster list
-    # output: reordered cluster list
-    # notes: do this for both hard and soft clusters
-    #   make an analysis function for this to be able to rerun easily
-    # ------------------------------------------------
+    # and reorder
+    reorder_dir = "{}/hard/reordered".format(reproducible_dir)
+    out_data, out_results = run_cluster_reordering_subworkflow(
+        out_data,
+        out_results,
+        reorder_dir,
+        "{}.reproducible.hard.reordered".format(prefix),
+        pooled_mat_key,
+        clusters_reproducible_hard_handle)
 
-    # for the below: factor out and make different workflow/analysis
-
+    quit()
+    
 
     return args
 
@@ -236,9 +342,25 @@ def run_timeseries_workflow(args, prefix, mat_key="counts.mat"):
 
 
     # store outputs in prep for DP GP clustering
+    args.outputs["data"] = out_data
+    args.outputs["results"]["rna"][results_dirname] = out_results
 
+    # ------------------------------------------------
+    # ANALYSIS 4 - run reproducible dpgp workflow
+    # input: normalized count matrices
+    # output: dynamic clusters
+    # ------------------------------------------------ 
     key = "rna.counts.pc.pooled.rlog.dynamic.mat"
-
+    run_reproducibility_dpgp_workflow(
+        args, 
+        prefix,
+        datatype="rna", 
+        rep1_mat_key=dynamic_mat_handles[0],
+        rep2_mat_key=dynamic_mat_handles[1],
+        pooled_mat_key=dynamic_mat_handles[2])
+    
+    quit()
+    
     # run trajectories using consistent DP_GP clustering
     # gives soft and hard clusters
 
@@ -259,7 +381,6 @@ def run_timeseries_workflow(args, prefix, mat_key="counts.mat"):
 
 
     
-    # reorder in a deterministic (ish) way....
 
     # ------------------------------------------------
     # ANALYSIS 3 - merge "similar" clusters? do this for both hard/soft clusters?

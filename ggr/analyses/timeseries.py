@@ -177,8 +177,8 @@ def filter_null_and_small_clusters_old(
 
 
 def filter_null_and_small_clusters(
-        mat_file,
         cluster_file,
+        mat_file,
         out_cluster_file,
         ci=0.999, # sort of multiple hypothesis correction
         size_cutoff=1000):
@@ -218,18 +218,23 @@ def filter_null_and_small_clusters(
 
     print cluster_sizes
     print indices_to_delete
+    cluster_names_to_delete = (np.array(indices_to_delete) + 1).tolist()
     
-    # return new matrices and clusters
-    
+    # return cluster file
+    cluster_list = pd.read_table(cluster_file)
+    cluster_list = cluster_list[~cluster_list["cluster"].isin(cluster_names_to_delete)]
 
-    # fix clusters
-    for index in sorted(indices_to_delete, reverse=True):
-        del cluster_means[index]
-        del cluster_covariances[index]
-        del cluster_sizes[index]
-        del cluster_names[index]
+    # and now renumber
+    clusters_remaining = cluster_list["cluster"].unique().tolist()
+    renumbering = dict(zip(clusters_remaining, range(1, len(clusters_remaining)+1)))
+    print renumbering
+    cluster_list["cluster"].replace(renumbering, inplace=True)
+    cluster_list = cluster_list.sort_values("cluster")
+
+    # save out
+    cluster_list.to_csv(out_cluster_file, sep="\t", index=False)
     
-    return cluster_means, cluster_covariances, cluster_sizes, cluster_names
+    return None
 
 
 
@@ -382,6 +387,8 @@ def get_consistent_soft_clusters_old(
                         pdf_cutoff,
                         corr_cutoff,
                         epsilon)
+
+                    # write to cluster file
                     
                     for cluster in consistent_clusters:
                         
@@ -420,6 +427,8 @@ def get_reproducible_clusters(
         pooled_mat_file,
         rep1_timeseries_file,
         rep2_timeseries_file,
+        out_soft_clusters_file,
+        out_hard_clusters_file,
         out_dir,
         prefix,
         ci=0.95,
@@ -428,19 +437,25 @@ def get_reproducible_clusters(
     """Given rep1/rep2/pooled timeseries files, go through
     regions and check for consistency after soft clustering
     """
+    run_shell_cmd("mkdir -p {0}/soft {0}/hard".format(out_dir))
     cluster_means, cluster_covariances, cluster_sizes, cluster_names = get_cluster_sufficient_stats(
-        pooled_mat_file, clusters_file)
+        clusters_file, pooled_mat_file)
 
     # get pdf val for confidence interval
     # note that the multivariate normal pdf is distributed
     # as chi2(alpha) where alpha is the chosen significance
     pdf_cutoff = chi2.pdf(1-ci, cluster_means[0].shape[0])
 
+    with open(out_hard_clusters_file, "a") as out:
+        out.write("cluster\tid\n")
+    with open(out_soft_clusters_file, "a") as out:
+        out.write("cluster\tid\n")
+    
     # open all files to stream regions
     region_idx = 0
     with gzip.open(rep1_timeseries_file, 'r') as rep1:
         with gzip.open(rep2_timeseries_file, 'r') as rep2:
-            with gzip.open(pooled_timeseries_file, 'r') as pooled:
+            with gzip.open(pooled_mat_file, 'r') as pooled:
 
                 while True:
                     
@@ -484,7 +499,19 @@ def get_reproducible_clusters(
                         pdf_cutoff,
                         corr_cutoff,
                         epsilon)
-                    
+
+                    # TODO: save out to cluster files instead of splitting
+                    if len(consistent_clusters) > 0:
+                        with open(out_soft_clusters_file, "a") as out:
+                            for cluster in consistent_clusters:
+                                out.write("{}\t{}\n".format(cluster, pooled_region))
+
+                    if hard_cluster is not None:
+                        with open(out_hard_clusters_file, "a") as out:
+                            out.write("{}\t{}\n".format(hard_cluster, pooled_region))
+
+                    # START DROP
+                    # TODO: consider dropping this other stuff for now
                     for cluster in consistent_clusters:
                         
                         # write out to file
@@ -512,6 +539,8 @@ def get_reproducible_clusters(
                             out.write("{}\t{}\n".format(
                                 pooled_region,
                                 "\t".join(map(str, pooled_timepoints.tolist()))))
+
+                    # END DROP
                         
                     region_idx += 1
                     if region_idx % 1000 == 0:
@@ -553,7 +582,7 @@ def run_dpgp(mat_file, prefix, out_dir, tmp_dir):
 
     # TODO change header if need be
     cluster = (
-        "DP_GP_cluster.py -i {} -o {} -p png --plot --fast").format(
+        "DP_GP_cluster.py -i {} -o {} -p pdf --plot --fast").format(
             input_mat_file,
             "{0}/{1}".format(out_dir, prefix))
     run_shell_cmd(cluster)
@@ -561,6 +590,7 @@ def run_dpgp(mat_file, prefix, out_dir, tmp_dir):
     # delete the unzipped tmp files
     run_shell_cmd("rm {}/*.dpgp.tmp".format(tmp_dir))
 
+    # outfile name
     optimal_clusters = "{}/{}_optimal_clustering.txt".format(out_dir, prefix)
 
     return optimal_clusters
@@ -617,7 +647,7 @@ def get_consistent_dpgp_trajectories(
         # cluster
         run_shell_cmd("mkdir -p {}".format(pooled_dir))
         cluster = (
-            "DP_GP_cluster.py -i {} -o {} -p png --plot --fast").format(
+            "DP_GP_cluster.py -i {} -o {} -p pdf --plot --fast").format(
                 pooled_unzipped_file,
                 "{0}/{1}.pooled".format(
                     pooled_dir, prefix))
@@ -691,3 +721,90 @@ def get_consistent_dpgp_trajectories(
         
         
     return
+
+
+def split_mat_to_clusters(cluster_file, cluster_mat, out_dir, prefix):
+    """helper function to split a mat (given a cluster file)
+    into cluster mat files and also lists
+    """
+    # use pandas
+    clusters = pd.read_table(cluster_file, header=True)
+    data = pd.read_table(cluster_mat, header=True)
+
+    import ipdb
+    ipdb.set_trace()
+
+    return None
+
+
+def plot_clusters(
+        cluster_file,
+        cluster_subsample_file,
+        cluster_mat,
+        out_dir,
+        prefix):
+    """plots clusters given in the cluster file using the
+    data in cluster mat
+    """
+    run_shell_cmd("mkdir -p {}".format(out_dir))
+    # heatmap plot
+    r_plot_heatmap = (
+        "viz.plot_timeseries_heatmap.R "
+        "{0} {1} {2} {3}").format(
+            cluster_subsample_file, cluster_mat, out_dir, prefix)
+    run_shell_cmd(r_plot_heatmap)
+    
+    # individual clusters
+    r_plot_clusters = (
+        "viz.plot_timeseries_clusters.R "
+        "{0} {1} {2} {3}").format(
+            cluster_file, cluster_mat, out_dir, prefix)
+    run_shell_cmd(r_plot_clusters)
+
+    return None
+
+
+def reorder_clusters(cluster_file, cluster_mat, out_cluster_file):
+    """Sort clusters by hclust similarity (agglomerative clustering in sklearn)
+    """
+    from scipy.cluster.hierarchy import linkage, leaves_list, fcluster
+    #from scipy.spatial.distance import pdist, squareform
+    from scipy.stats import zscore
+    
+    # first extract cluster means
+    cluster_means, cluster_covariances, cluster_sizes, cluster_names = get_cluster_sufficient_stats(
+        cluster_file, cluster_mat)
+    
+    means_z = zscore(np.array(cluster_means), axis=0)
+    
+    #cluster_dist = pdist(np.array(cluster_means), "euclidean")
+    hclust = linkage(means_z, method="ward")
+
+    # using leaves_list and fcluster, determine split and reverse the FIRST half
+    top_cut = fcluster(hclust, 2, criterion="maxclust")
+    ordered_leaves = leaves_list(hclust)
+    for i in xrange(ordered_leaves.shape[0]):
+        current_leaf = ordered_leaves[i]
+        if top_cut[current_leaf] == 2:
+            # found the leaf
+            split_point = i
+            break
+
+    # take left side of dendrogram and reverse
+    ordered_leaves[0:split_point] = np.flip(ordered_leaves[0:split_point], axis=0)
+    ordered_leaves[split_point:] = np.flip(ordered_leaves[split_point:], axis=0)
+    print ordered_leaves + 1
+    
+    # build renumbering dict
+    renumbering = dict(zip((ordered_leaves+1).tolist(), range(1, len(ordered_leaves)+1)))
+    print renumbering
+    
+    # read in cluster file
+    cluster_list = pd.read_table(cluster_file)
+
+    # renumber and sort
+    cluster_list["cluster"].replace(renumbering, inplace=True)
+    cluster_list = cluster_list.sort_values("cluster")
+    cluster_list.to_csv(out_cluster_file, sep="\t", index=False)
+    
+    return None
