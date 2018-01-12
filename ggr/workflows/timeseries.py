@@ -1,23 +1,23 @@
-# Description: workflow starting from a count matrix to trajectories
+# description: workflows for timeseries clustering
 
 import os
+import glob
 import logging
 
 from ggr.util.utils import run_shell_cmd
 
 from ggr.analyses.filtering import filter_for_ids
+from ggr.analyses.filtering import get_ordered_subsample
 
 from ggr.analyses.counting import split_count_matrix_by_replicate
 
-from ggr.analyses.filtering import get_ordered_subsample
-
-#from ggr.analyses.timeseries import get_consistent_dpgp_trajectories
 from ggr.analyses.timeseries import run_dpgp
 from ggr.analyses.timeseries import filter_null_and_small_clusters
 from ggr.analyses.timeseries import get_reproducible_clusters
 from ggr.analyses.timeseries import split_mat_to_clusters
 from ggr.analyses.timeseries import plot_clusters
 from ggr.analyses.timeseries import reorder_clusters
+from ggr.analyses.timeseries import split_clusters
 
 
 def run_cluster_plotting_subworkflow(
@@ -56,6 +56,11 @@ def run_cluster_plotting_subworkflow(
             "{}/plots".format(out_dir),
             prefix)
 
+    # splitting
+    individual_cluster_files = glob.glob("{}/*cluster_*".format(out_dir))
+    if len(individual_cluster_files) == 0:
+        split_clusters(out_results[cluster_list_key])
+
     return out_data, out_results
 
 
@@ -78,7 +83,7 @@ def run_cluster_reordering_subworkflow(
     cluster_list_reordered_key = "{}.reordered.list".format(
         cluster_list_key.split(".list")[0])
     out_results[cluster_list_reordered_key] = "{}/{}.reordered.clustering.txt".format(
-        out_dir, os.path.basename(out_results[cluster_list_key]).split(".txt")[0])
+        out_dir, os.path.basename(out_results[cluster_list_key]).split(".clustering")[0])
     if not os.path.isfile(out_results[cluster_list_reordered_key]):
         reorder_clusters(
             out_results[cluster_list_key],
@@ -176,6 +181,7 @@ def run_reproducibility_dpgp_workflow(
     # ------------------------------------------------
     logger.info("ANALYSIS: filter out null and small clusters")
     nullfilt_dir = "{}/nullfilt".format(results_dir)
+    run_shell_cmd("mkdir -p {}".format(nullfilt_dir))
     clusters_nullfilt_handle = "clusters.null_filt.list"
     out_results[clusters_nullfilt_handle] = "{0}/{1}.nullfilt.clustering.txt".format(
         nullfilt_dir, prefix)
@@ -205,11 +211,13 @@ def run_reproducibility_dpgp_workflow(
     logger.info("ANALYSIS: check reproducibility of trajectories")
     reproducible_dir = "{}/reproducible".format(results_dir)
     clusters_reproducible_soft_handle = "clusters.reproducible.soft.list"
-    out_results[clusters_reproducible_soft_handle] = "{0}/{1}.reproducible.soft.clustering.txt".format(
-        reproducible_dir, prefix)
+    out_results[clusters_reproducible_soft_handle] = (
+        "{0}/soft/{1}.reproducible.soft.clustering.txt").format(
+            reproducible_dir, prefix)
     clusters_reproducible_hard_handle = "clusters.reproducible.hard.list"
-    out_results[clusters_reproducible_hard_handle] = "{0}/{1}.reproducible.hard.clustering.txt".format(
-        reproducible_dir, prefix)
+    out_results[clusters_reproducible_hard_handle] = (
+        "{0}/hard/{1}.reproducible.hard.clustering.txt").format(
+            reproducible_dir, prefix)
     if not os.path.isfile(out_results[clusters_reproducible_soft_handle]):
         get_reproducible_clusters(
             out_results[clusters_nullfilt_handle],
@@ -361,7 +369,7 @@ def run_timeseries_workflow(args, prefix, datatype_key="rna", mat_key="counts.ma
     # output: dynamic clusters
     # ------------------------------------------------ 
     key = "{}.counts.pc.pooled.rlog.dynamic.mat".format(datatype_key)
-    run_reproducibility_dpgp_workflow(
+    args = run_reproducibility_dpgp_workflow(
         args, 
         prefix,
         datatype_key=datatype_key,
@@ -369,11 +377,9 @@ def run_timeseries_workflow(args, prefix, datatype_key="rna", mat_key="counts.ma
         rep1_mat_key=dynamic_mat_handles[0],
         rep2_mat_key=dynamic_mat_handles[1])
     
-    quit()
-
     if False:
         # ------------------------------------------------
-        # ANALYSIS 3 - merge "similar" clusters? do this for both hard/soft clusters?
+        # ANALYSIS 4b - merge "similar" clusters? do this for both hard/soft clusters?
         # input: cluster list, mat files (rep1, rep2, pooled)
         # output: filtered hard and soft clusters
         # notes: impose hclust on the clusters, merge from
@@ -388,30 +394,9 @@ def run_timeseries_workflow(args, prefix, datatype_key="rna", mat_key="counts.ma
         if not os.path.isfile(out_results[clusters_merged_handle]):
             pass
 
-    # track critical TFs and figure out which trajectories they are part of
-    # keep track of them in params
-
-
-    # plotting
-
-    # plot timeseries heatmaps
-    # 1) plot like waddington-ot (change from initial, use fold change?)
-    # 2) plot zscores
-    # 3) Plot mean/stdv on the trajectories (to put next to the heatmaps)
-    # for integrative analysis - plot the promoters next to the clusters too, to see
-    # additionally, the histone marks
-    
-    # fig 1a) trajectories (line plot)
-    # fig 1b) heatmap (either 1 or 2 from above) marked with TFs (and key biomarkers) and GO terms
-    # fig 1c) promoters: ATAC + histone marks <- this will be some work to get the correct promoter
-    
-    # separately, analysis on stable and off genes at promoters to see their epigenetic context
-
-    # 3D - genomic positioning of these genes (circos plot, or just sorted by genomic coordinate heatmap)
-    
-
+    # don't use below at the moment, since last return point was args
     # before return, make sure to save outputs to args
-    args.outputs["data"] = out_data
-    args.outputs["results"][datatype_key][results_dirname] = out_results
+    #args.outputs["data"] = out_data
+    #args.outputs["results"][datatype_key][results_dirname] = out_results
     
     return args

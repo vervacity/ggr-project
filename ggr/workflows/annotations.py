@@ -7,6 +7,7 @@ from ggr.util.utils import run_shell_cmd
 
 from ggr.analyses.annotations import get_proteincoding_gene_list_from_gtf
 from ggr.analyses.annotations import get_proteincoding_tss_bed_from_gtf
+from ggr.analyses.annotations import get_ensembl_to_geneid_mapping
 
 
 def runall(args, prefix):
@@ -65,13 +66,28 @@ def runall(args, prefix):
     # -------------------------------------------------
     logger.info("ANALYSIS: make a TSS file")
     tss_pc_key = "tss.pc.bed"
-    outputs[tss_pc_key] = "{}/hg19.tss.gencode19.bed.gz".format(
+    outputs[tss_pc_key] = "{}/{}.tss.gencode19.bed.gz".format(
         out_dir, prefix)
     if not os.path.isfile(outputs[tss_pc_key]):
         get_proteincoding_tss_bed_from_gtf(
             inputs["gencode_proteincoding_gtf"],
             outputs[tss_pc_key])
 
+    # -------------------------------------------------
+    # ANALYSIS 3 - make an ensembl <-> HGNC mapping table
+    # input: ensembl gene ids
+    # output: conversion table
+    # -------------------------------------------------
+    logger.info("ANALYSIS: make a ensembl to HGNC mapping table")
+    mapping_mat_key = "geneids.mappings.mat"
+    outputs[mapping_mat_key] = "{}/{}.ensembl_geneids.pc.gencode19.mappings.mat.gz".format(
+        out_dir, prefix)
+    if not os.path.isfile(outputs[mapping_mat_key]):
+        # make an analysis that produces this table
+        get_ensembl_to_geneid_mapping(
+            outputs[geneids_pc_key],
+            outputs[mapping_mat_key])
+        
     # add outputs and finish
     args.outputs["annotations"] = outputs
     logger.info("DONE")

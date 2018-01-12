@@ -9,6 +9,8 @@ from ggr.util.filtering import filter_for_ids
 
 from ggr.analyses.rna import make_rsem_matrix
 from ggr.analyses.rna import threshold_empirically_off_genes
+from ggr.analyses.rna import filter_clusters_for_tfs
+from ggr.analyses.rna import run_rdavid
 
 from ggr.workflows.timeseries import run_timeseries_workflow
 
@@ -218,7 +220,9 @@ def runall(args, prefix):
     # output: count matrix of ON genes 
     # ----------------------------------------------------
     args = run_expressed_threshold_workflow(
-        args, prefix, mat_key="rna.counts.pc.mat")
+        args,
+        prefix,
+        mat_key="rna.counts.pc.mat")
 
     # ----------------------------------------------------
     # ANALYSIS 3 - run timeseries analysis on these genes
@@ -226,14 +230,81 @@ def runall(args, prefix):
     # output: gene trajectories
     # ----------------------------------------------------
     args = run_timeseries_workflow(
-        args, prefix, mat_key="rna.counts.pc.expressed.mat")
+        args,
+        prefix,
+        datatype_key="rna",
+        mat_key="rna.counts.pc.expressed.mat")
 
-
+    # TODO: maybe need to have a link to the cluster path and dir
+    
+    cluster_key = "clusters.reproducible.hard.reordered.list"
+    out_data = args.outputs["data"]
+    out_results = args.outputs["results"][results_dirname]
+    
+    # ------------------------------------------------
+    # ANALYSIS 4 - mark key TFs/biomarkers per cluster
+    # input: cluster file
+    # output: key TFs per cluster file
+    # ------------------------------------------------ 
+    cluster_results = out_results["timeseries"]["dp_gp"]
+    cluster_tfs_key = "{}.tfs_only.list".format(cluster_key.split(".list")[0])
+    cluster_results[cluster_tfs_key] = (
+        "{}.tfs_only.hgnc.clustering.txt").format(
+        cluster_results[cluster_key].split(".clustering")[0])
+    if not os.path.isfile(cluster_results[cluster_tfs_key]):
+        filter_list = args.inputs["params"]["known_tfs_hgnc"]
+        filter_list += args.inputs["params"]["known_biomarkers_hgnc"]
+        filter_clusters_for_tfs(
+            cluster_results[cluster_key],
+            cluster_results[cluster_tfs_key],
+            args.outputs["annotations"]["geneids.mappings.mat"],
+            filter_list)
+    out_results["timeseries"]["dp_gp"] = cluster_results
+        
+    # ------------------------------------------------
+    # ANALYSIS 5 - Gene Ontology enrichments
+    # input: gene clusters
+    # output: annotations
+    # ------------------------------------------------
+    single_cluster_files = sorted(
+        glob.glob("{}/reproducible/hard/reordered/*cluster_*txt.gz".format(
+            out_results["timeseries"]["dp_gp"]["dir"])))
+    
+    # rDAVID
+    cluster_dir = "{}/reproducible/hard/reordered".format(
+        out_results["timeseries"]["dp_gp"]["dir"])
+    go_dir = "{}/go.rdavid".format(cluster_dir)
+    if not os.path.isdir(go_dir):
+        run_shell_cmd("mkdir -p {}".format(go_dir))
+        for single_cluster_file in single_cluster_files:
+            run_rdavid(
+                single_cluster_file,
+                args.outputs["annotations"]["geneids.pc.list"],
+                go_dir)
+    
     quit()
+    
+    # ------------------------------------------------
+    # ANALYSIS 5 - visualizations
+    # input: all RNA files
+    # output: figures
+    # ------------------------------------------------ 
+    # plotting
 
-    # Run bioinformatics - GREAT, GSEA,
+    # plot timeseries heatmaps
+    # 1) plot like waddington-ot (change from initial, use fold change?)
+    # 2) plot zscores
+    # 3) Plot mean/stdv on the trajectories (to put next to the heatmaps)
+    
+    # fig 1a) trajectories (line plot)
+    # fig 1b) heatmap (either 1 or 2 from above) marked with TFs (and key biomarkers) and GO terms
 
 
+    # TODO LATER
+    # with epigenetics:
+    # fig 1c) promoters: ATAC + histone marks <- this will be some work to get the correct promoter
+    # separately, analysis on stable and off genes at promoters to see their epigenetic context
+    # 3D - genomic positioning of these genes (circos plot, or just sorted by genomic coordinate heatmap)
     # TODO: HOMER (on promoters?) is integrative with the epigenetic data
 
     

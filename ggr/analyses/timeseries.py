@@ -229,6 +229,7 @@ def filter_null_and_small_clusters(
     renumbering = dict(zip(clusters_remaining, range(1, len(clusters_remaining)+1)))
     print renumbering
     cluster_list["cluster"].replace(renumbering, inplace=True)
+    cluster_list.columns = ["cluster", "id"]
     cluster_list = cluster_list.sort_values("cluster")
 
     # save out
@@ -776,5 +777,31 @@ def reorder_clusters(cluster_file, cluster_mat, out_cluster_file):
     cluster_list["cluster"].replace(renumbering, inplace=True)
     cluster_list = cluster_list.sort_values("cluster")
     cluster_list.to_csv(out_cluster_file, sep="\t", index=False)
+    
+    return None
+
+
+def split_clusters(cluster_file):
+    """Split cluster file into files of ids per cluster
+    """
+
+    cluster_data = pd.read_table(cluster_file)
+    cluster_names = cluster_data["cluster"].unique().tolist()
+
+    for cluster_name in cluster_names:
+        # get that subset
+        single_cluster = cluster_data.loc[cluster_data["cluster"] == cluster_name]
+        
+        # and write out
+        out_file = "{}.cluster_{}.txt.gz".format(
+            cluster_file.split(".clustering")[0],
+            cluster_name)
+        single_cluster.to_csv(
+            out_file,
+            columns=["id"],
+            compression="gzip",
+            sep='\t',
+            header=False,
+            index=False)
     
     return None

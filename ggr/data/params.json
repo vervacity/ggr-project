@@ -1,10 +1,22 @@
 {
 
     "lo_res_days":["d0", "d3", "d6"],
-    "hi_res_days":["d00", "d05", "d10", "d15", "d20", "d25", "d30", "d35", "d40", "d45", "d50", "d55", "d60"],
-    "hi_res_filt_days":["d00", "d05", "d10", "d15", "d20", "d25", "d30", "d45", "d50", "d60"],
+    "hi_res_days":[
+	"d00", "d05", "d10", "d15", "d20", "d25",
+	"d30", "d35", "d40", "d45", "d50", "d55", "d60"],
+    "hi_res_filt_days":[
+	"d00", "d05", "d10", "d15", "d20", "d25",
+	"d30", "d45", "d50", "d60"],
     "media_timepoints":["d35", "d40", "d55"],
 
+    "known_tfs_hgnc": [
+	"TP63", "KLF4", "ZNF750", "MAF", "MAFB",
+	"OVOL1", "GRHL3"],
+
+    "known_biomarkers_hgnc": [
+	"KRT", "SPRR", "LCE", "IVL",
+	"FLG", "LOR", "S100"],
+    
     "rna_empirical_rlog_thresh": 4.0,
 
     "old_pairwise_deseq2_fdr":0.0005,

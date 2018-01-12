@@ -7,12 +7,14 @@ library("RDAVIDWebService")
 
 # folders files etc
 args <- commandArgs(trailingOnly=TRUE)
-prefix <- args[1]
-gene_list_file <- args[2]
-background_list_file <- args[3]
+gene_list_file <- args[1]
+background_list_file <- args[2]
+out_dir <- args[3]
 
-gene_list <- read.table(gene_list_file, stringsAsFactors=FALSE)$V1
-background_list <- read.table(background_list_file, stringsAsFactors=FALSE)$V1
+gene_list <- read.table(gzfile(gene_list_file), stringsAsFactors=FALSE)$V1
+background_list <- read.table(gzfile(background_list_file), stringsAsFactors=FALSE)$V1
+
+prefix <- sub('\\.txt.gz$', "", basename(gene_list_file))
 
 padj_cutoff <- 0.1
 
@@ -31,8 +33,19 @@ result <- addList(david, gene_list,
                   listName=prefix,
                   listType="Gene")
 
-# choose annotations and get clusters
-setAnnotationCategories(david, c("GOTERM_BP_ALL", "GOTERM_MF_ALL", "GOTERM_CC_ALL"))
-termCluster<-getClusterReport(david, type="Term")
-out_file <- paste(prefix, '.david_go_enrich.txt', sep='')
-getFunctionalAnnotationChartFile(object=david, fileName=out_file, threshold=padj_cutoff)
+# TODO figure out what column is actually being thresholded
+annotation_categories <- c("GOTERM_BP_ALL", "GOTERM_MF_ALL", "GOTERM_CC_ALL")
+for (i in 1:length(annotation_categories)) {
+
+    # choose annotations and get clusters
+    setAnnotationCategories(david, annotation_categories[i])
+    termCluster<-getClusterReport(david, type="Term")
+    
+    # and save out
+    out_file <- paste(out_dir, "/", prefix, ".go_rdavid.", annotation_categories[i],".txt", sep="")
+    getFunctionalAnnotationChartFile(object=david, fileName=out_file, threshold=padj_cutoff)
+
+    # TODO - make plots?
+    
+    
+}

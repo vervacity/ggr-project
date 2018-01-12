@@ -68,6 +68,22 @@ def get_proteincoding_tss_bed_from_gtf(gtf_file, out_file):
 
 
 
+def get_ensembl_to_geneid_mapping(ensembl_id_file, out_mapping_file):
+    """uses biomart to produce a mapping table
+    """
+    get_mappings = ("annot.ensembl_to_mappings.R {} {}").format(
+        ensembl_id_file, out_mapping_file)
+    run_shell_cmd(get_mappings)
+    
+    return None
+
+
+# TODO write a conversion function (ensembl to other ID)
+
+
+
+
+
 def build_ordered_tss_file(ordered_gene_list, gtf_file, out_bed):
     """Using an ensembl list, build a TSS file
     """

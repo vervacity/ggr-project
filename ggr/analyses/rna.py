@@ -2,8 +2,11 @@
 
 
 import os
+import gzip
 import pandas as pd
 import numpy as np
+
+from ggr.util.utils import run_shell_cmd
 
 
 def make_rsem_matrix(quant_files, out_file, colname="expected_count"):
@@ -37,3 +40,54 @@ def threshold_empirically_off_genes(mat_file, out_file, thresh=1.0):
     data_thresh.to_csv(out_file, compression="gzip", sep='\t')
     
     return None
+
+
+def filter_clusters_for_tfs(
+        cluster_file,
+        out_cluster_file,
+        mapping_file,
+        keep_list):
+    """Filter cluster file for id strings in list
+    """
+    keep_list = [str(keep) for keep in keep_list]
+
+    # read in mapping file
+    mappings = {}
+    with gzip.open(mapping_file, "r") as fp:
+        for line in fp:
+            fields = line.strip().split("\t")
+            mappings[fields[0]] = fields[1]
+    
+    # open files and write out
+    with open(cluster_file, "r") as fp:
+        with open(out_cluster_file, "w") as out:
+
+            for line in fp:
+                fields = line.strip().split("\t")
+                if "cluster" in fields[0]:
+                    out.write(line)
+                    continue
+
+                current_id_string = fields[1]
+                try:
+                    mapped_symbol = mappings[current_id_string]
+                except:
+                    continue
+                for keep_id in keep_list:
+                    if keep_id in mapped_symbol:
+                        out.write("{}\t{}\n".format(line.strip(), mapped_symbol))
+                        
+    return None
+
+
+def run_rdavid(gene_list, background_gene_list, out_dir):
+    """Run DAVID using R
+    """
+    rdavid = ("bioinformatics.go.rdavid.R {} {} {}").format(
+        gene_list,
+        background_gene_list,
+        out_dir)
+    run_shell_cmd(rdavid)
+    
+    return None
+
