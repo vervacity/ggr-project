@@ -6,8 +6,9 @@
     "media_timepoints":["d35", "d40", "d55"],
 
     "rna_empirical_rlog_thresh": 4.0,
-    
-    "pairwise_deseq2_fdr":0.0005,
+
+    "old_pairwise_deseq2_fdr":0.0005,
+    "pairwise_deseq2_fdr":0.0001,
     
     "raw_cluster_min_size":1000,
     "rna_cluster_min_size":50,

@@ -510,43 +510,11 @@ def get_reproducible_clusters(
                         with open(out_hard_clusters_file, "a") as out:
                             out.write("{}\t{}\n".format(hard_cluster, pooled_region))
 
-                    # START DROP
-                    # TODO: consider dropping this other stuff for now
-                    for cluster in consistent_clusters:
-                        
-                        # write out to file
-                        cluster_file = "{}/soft/{}.cluster_{}.soft.txt.gz".format(
-                            out_dir, prefix, cluster)
-                        with gzip.open(cluster_file, 'a') as out:
-                            out.write("{}\t{}\n".format(
-                                pooled_region,
-                                "\t".join(map(str, pooled_timepoints.tolist()))))
-                            
-                    # save out hard clusters
-                    if hard_cluster is not None:
-                        hard_cluster_file = "{}/hard/{}.clusters.hard.all.txt.gz".format(
-                            out_dir, prefix)
-                        with gzip.open(hard_cluster_file, "a") as out:
-                            out.write("{}\t{}\t{}\n".format(
-                                pooled_region,
-                                "\t".join(map(str, pooled_timepoints.tolist())),
-                                hard_cluster))
-
-                        # Write out to individual hard cluster file
-                        cluster_file = "{}/hard/{}.cluster_{}.hard.txt.gz".format(
-                            out_dir, prefix, hard_cluster)
-                        with gzip.open(cluster_file, 'a') as out:
-                            out.write("{}\t{}\n".format(
-                                pooled_region,
-                                "\t".join(map(str, pooled_timepoints.tolist()))))
-
-                    # END DROP
-                        
                     region_idx += 1
                     if region_idx % 1000 == 0:
                         print region_idx
 
-    return
+    return None
 
 
 
@@ -746,7 +714,9 @@ def plot_clusters(
     """plots clusters given in the cluster file using the
     data in cluster mat
     """
-    run_shell_cmd("mkdir -p {}".format(out_dir))
+    # assertions
+    assert os.path.isdir(out_dir)
+    
     # heatmap plot
     r_plot_heatmap = (
         "viz.plot_timeseries_heatmap.R "
@@ -791,7 +761,7 @@ def reorder_clusters(cluster_file, cluster_mat, out_cluster_file):
             break
 
     # take left side of dendrogram and reverse
-    ordered_leaves[0:split_point] = np.flip(ordered_leaves[0:split_point], axis=0)
+    #ordered_leaves[0:split_point] = np.flip(ordered_leaves[0:split_point], axis=0)
     ordered_leaves[split_point:] = np.flip(ordered_leaves[split_point:], axis=0)
     print ordered_leaves + 1
     

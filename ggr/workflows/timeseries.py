@@ -11,7 +11,7 @@ from ggr.analyses.counting import split_count_matrix_by_replicate
 
 from ggr.analyses.filtering import get_ordered_subsample
 
-from ggr.analyses.timeseries import get_consistent_dpgp_trajectories
+#from ggr.analyses.timeseries import get_consistent_dpgp_trajectories
 from ggr.analyses.timeseries import run_dpgp
 from ggr.analyses.timeseries import filter_null_and_small_clusters
 from ggr.analyses.timeseries import get_reproducible_clusters
@@ -29,8 +29,15 @@ def run_cluster_plotting_subworkflow(
         cluster_list_key):
     """subsample and plot
     """
+    # assertions
+    assert out_data.get(mat_key) is not None
+    assert out_results.get(cluster_list_key) is not None
+
+    run_shell_cmd("mkdir -p {}".format(out_dir))
+    
     # subsample
-    cluster_list_subsample_key = "{}.subsample.list".format(cluster_list_key.split(".list")[0])
+    cluster_list_subsample_key = "{}.subsample.list".format(
+        cluster_list_key.split(".list")[0])
     out_results[cluster_list_subsample_key] = "{}.subsampled.txt".format(
         out_results[cluster_list_key].split(".txt")[0])
     if not os.path.isfile(out_results[cluster_list_subsample_key]):
@@ -38,15 +45,16 @@ def run_cluster_plotting_subworkflow(
             out_results[cluster_list_key],
             out_results[cluster_list_subsample_key])
 
-    # plot
+    # plotting
     plot_dir = "{}/plots".format(out_dir)
     if not os.path.isdir(plot_dir):
+        run_shell_cmd("mkdir -p {}".format(plot_dir))
         plot_clusters(
             out_results[cluster_list_key],
             out_results[cluster_list_subsample_key],
             out_data[mat_key],
             "{}/plots".format(out_dir),
-            "{}".format(prefix))
+            prefix)
 
     return out_data, out_results
 
@@ -60,9 +68,15 @@ def run_cluster_reordering_subworkflow(
         cluster_list_key):
     """Reorder clusters based on hclust - try to order by time
     """
-    # run reordering
+    # assertions
+    assert out_data.get(mat_key) is not None
+    assert out_results.get(cluster_list_key) is not None
+
     run_shell_cmd("mkdir -p {}".format(out_dir))
-    cluster_list_reordered_key = "{}.reordered.list".format(cluster_list_key.split(".list")[0])
+    
+    # run reordering
+    cluster_list_reordered_key = "{}.reordered.list".format(
+        cluster_list_key.split(".list")[0])
     out_results[cluster_list_reordered_key] = "{}/{}.reordered.clustering.txt".format(
         out_dir, os.path.basename(out_results[cluster_list_key]).split(".txt")[0])
     if not os.path.isfile(out_results[cluster_list_reordered_key]):
@@ -70,8 +84,9 @@ def run_cluster_reordering_subworkflow(
             out_results[cluster_list_key],
             out_data[mat_key],
             out_results[cluster_list_reordered_key])
-    
-    run_cluster_plotting_subworkflow(
+
+    # run plotting subworkflow
+    out_data, out_results = run_cluster_plotting_subworkflow(
         out_data,
         out_results,
         out_dir,
@@ -82,14 +97,13 @@ def run_cluster_reordering_subworkflow(
     return out_data, out_results
 
 
-
 def run_reproducibility_dpgp_workflow(
         args, 
         prefix,
-        datatype="rna", 
-        rep1_mat_key="counts.mat",
-        rep2_mat_key="counts.mat",
-        pooled_mat_key="counts.mat"):
+        datatype_key="rna",
+        pooled_mat_key="counts.pooled.mat",
+        rep1_mat_key="counts.rep1.mat",
+        rep2_mat_key="counts.rep2.mat"):
     """run DP-GP algorithm and then do reproducibility checks. 
     Requires replicates.
     """
@@ -98,24 +112,24 @@ def run_reproducibility_dpgp_workflow(
     logger.info("WORKFLOW: get reproducible DP-GP trajectories")
     
     # assertions
+    assert args.outputs["data"].get(pooled_mat_key) is not None
     assert args.outputs["data"].get(rep1_mat_key) is not None
     assert args.outputs["data"].get(rep2_mat_key) is not None
-    assert args.outputs["data"].get(pooled_mat_key) is not None
     assert args.outputs["data"].get("dir") is not None
-    assert args.outputs["results"][datatype]["timeseries"].get("dir") is not None
-    
+    assert args.outputs["results"][datatype_key]["timeseries"].get("dir") is not None
+
+    # setup data and results
     data_dir = args.outputs["data"]["dir"]
     out_data = args.outputs["data"]
     
     results_dirname = "dp_gp"
     results_dir = "{}/{}".format(
-        args.outputs["results"][datatype]["timeseries"]["dir"], 
+        args.outputs["results"][datatype_key]["timeseries"]["dir"], 
         results_dirname)
-    args.outputs["results"][datatype]["timeseries"][results_dirname] = {
+    args.outputs["results"][datatype_key]["timeseries"][results_dirname] = {
         "dir": results_dir}
     run_shell_cmd("mkdir -p {}".format(results_dir))
-    logging.debug("results going to {}".format(results_dir))
-    out_results = args.outputs["results"][datatype]["timeseries"][results_dirname]
+    out_results = args.outputs["results"][datatype_key]["timeseries"][results_dirname]
 
     # ------------------------------------------------
     # ANALYSIS 0 - run DP GP
@@ -129,7 +143,7 @@ def run_reproducibility_dpgp_workflow(
         dpgp_pooled_dir, prefix)
     if not os.path.isfile(out_results[clusters_raw_handle]):
         run_dpgp(
-            out_data[pooled_mat_key], 
+            out_data[pooled_mat_key],
             "{}.pooled".format(prefix), 
             dpgp_pooled_dir, 
             results_dir)
@@ -187,11 +201,6 @@ def run_reproducibility_dpgp_workflow(
     # ANALYSIS 2 - run reproducibility
     # input: cluster list, mat files (rep1, rep2, pooled)
     # output: filtered hard and soft clusters
-    # notes: this softens the clusters. this is important 
-    #   because with semi similar clusters, it's often 
-    #   the case that one rep ends in a different hard 
-    #   cluster than another, though the hard clusters
-    #   are similar to each other.
     # ------------------------------------------------
     logger.info("ANALYSIS: check reproducibility of trajectories")
     reproducible_dir = "{}/reproducible".format(results_dir)
@@ -210,8 +219,10 @@ def run_reproducibility_dpgp_workflow(
             out_results[clusters_reproducible_soft_handle],
             out_results[clusters_reproducible_hard_handle],
             reproducible_dir,
-            "{}.reproducible".format(prefix))
-        # TODO add in params
+            "{}.reproducible".format(prefix),
+            ci=0.95,
+            corr_cutoff=0.05,
+            epsilon=0.10)
 
     # and reorder
     reorder_dir = "{}/hard/reordered".format(reproducible_dir)
@@ -223,14 +234,14 @@ def run_reproducibility_dpgp_workflow(
         pooled_mat_key,
         clusters_reproducible_hard_handle)
 
-    quit()
+    # store data and results
+    args.outputs["data"] = out_data
+    args.outputs["results"][datatype_key]["timeseries"][results_dirname] = out_results
     
-
     return args
 
 
-
-def run_timeseries_workflow(args, prefix, mat_key="counts.mat"):
+def run_timeseries_workflow(args, prefix, datatype_key="rna", mat_key="counts.mat"):
     """Run GGR timeseries workflow
     Use for both ATAC and RNA to have same 
     process applied to both
@@ -249,7 +260,7 @@ def run_timeseries_workflow(args, prefix, mat_key="counts.mat"):
     # assertions
     assert args.outputs["data"].get(mat_key) is not None
     assert args.outputs["data"].get("dir") is not None
-    assert args.outputs["results"]["rna"].get("dir") is not None
+    assert args.outputs["results"][datatype_key].get("dir") is not None
     assert args.inputs["params"].get("pairwise_deseq2_fdr") is not None
     logger.debug("using count matrix {}".format(args.outputs["data"][mat_key]))
     
@@ -260,11 +271,11 @@ def run_timeseries_workflow(args, prefix, mat_key="counts.mat"):
     out_data = args.outputs["data"]
     
     results_dirname = "timeseries"
-    results_dir = "{}/{}".format(args.outputs["results"]["rna"]["dir"], results_dirname)
-    args.outputs["results"]["rna"][results_dirname] = {"dir": results_dir}
+    results_dir = "{}/{}".format(args.outputs["results"][datatype_key]["dir"], results_dirname)
+    args.outputs["results"][datatype_key][results_dirname] = {"dir": results_dir}
     run_shell_cmd("mkdir -p {}".format(results_dir))
     logging.debug("results going to {}".format(results_dir))
-    out_results = args.outputs["results"]["rna"][results_dirname]
+    out_results = args.outputs["results"][datatype_key][results_dirname]
 
     # ------------------------------------------------
     # ANALYSIS 0 - run pairwise DESeq to get dynamic IDs
@@ -340,63 +351,42 @@ def run_timeseries_workflow(args, prefix, mat_key="counts.mat"):
                 out_results["dynamic_ids.list"],
                 out_data[dynamic_handle])
 
-
     # store outputs in prep for DP GP clustering
     args.outputs["data"] = out_data
-    args.outputs["results"]["rna"][results_dirname] = out_results
+    args.outputs["results"][datatype_key][results_dirname] = out_results
 
     # ------------------------------------------------
     # ANALYSIS 4 - run reproducible dpgp workflow
     # input: normalized count matrices
     # output: dynamic clusters
     # ------------------------------------------------ 
-    key = "rna.counts.pc.pooled.rlog.dynamic.mat"
+    key = "{}.counts.pc.pooled.rlog.dynamic.mat".format(datatype_key)
     run_reproducibility_dpgp_workflow(
         args, 
         prefix,
-        datatype="rna", 
+        datatype_key=datatype_key,
+        pooled_mat_key=dynamic_mat_handles[2],
         rep1_mat_key=dynamic_mat_handles[0],
-        rep2_mat_key=dynamic_mat_handles[1],
-        pooled_mat_key=dynamic_mat_handles[2])
+        rep2_mat_key=dynamic_mat_handles[1])
     
     quit()
-    
-    # run trajectories using consistent DP_GP clustering
-    # gives soft and hard clusters
 
-
-
-
-    out_results["dpgp.clusters"] = get_consistent_dpgp_trajectories(
-        [out_data[handle] for handle in dynamic_mat_handles],
-        "{}/dp_gp".format(results_dir), # todo: register this folder?
-        prefix,
-        raw_cluster_min_size=args.inputs["params"]["rna_cluster_min_size"], # TODO convert this into a fract
-        raw_cluster_reject_null_ci_interval=args.inputs["params"]["raw_cluster_reject_null_ci_interval"],
-        rep_to_cluster_ci_interval=args.inputs["params"]["rep_to_cluster_ci_interval"],
-        rep_to_cluster_corr_cutoff=args.inputs["params"]["rep_to_cluster_corr_cutoff"],
-        epsilon=args.inputs["params"]["rep_to_cluster_epsilon"])
-
-    quit()
-
-
-    
-
-    # ------------------------------------------------
-    # ANALYSIS 3 - merge "similar" clusters? do this for both hard/soft clusters?
-    # input: cluster list, mat files (rep1, rep2, pooled)
-    # output: filtered hard and soft clusters
-    # notes: impose hclust on the clusters, merge from
-    #  leaves until they are no longer similar (ie distribution
-    #  test)
-    # ------------------------------------------------
-    # bootstrap test 
-    merged_dir = "{}/merged".format(results_dir)
-    clusters_merged_handle = "clusters.merged.list"
-    out_results[clusters_merged_handle] = "{0}/{1}.merged.clustering.txt".format(
-        merged_dir, prefix)
-    if not os.path.isfile(out_results[clusters_merged_handle]):
-        pass
+    if False:
+        # ------------------------------------------------
+        # ANALYSIS 3 - merge "similar" clusters? do this for both hard/soft clusters?
+        # input: cluster list, mat files (rep1, rep2, pooled)
+        # output: filtered hard and soft clusters
+        # notes: impose hclust on the clusters, merge from
+        #  leaves until they are no longer similar (ie distribution
+        #  test)
+        # ------------------------------------------------
+        # bootstrap test 
+        merged_dir = "{}/merged".format(results_dir)
+        clusters_merged_handle = "clusters.merged.list"
+        out_results[clusters_merged_handle] = "{0}/{1}.merged.clustering.txt".format(
+            merged_dir, prefix)
+        if not os.path.isfile(out_results[clusters_merged_handle]):
+            pass
 
     # track critical TFs and figure out which trajectories they are part of
     # keep track of them in params
@@ -421,8 +411,7 @@ def run_timeseries_workflow(args, prefix, mat_key="counts.mat"):
     
 
     # before return, make sure to save outputs to args
-
-
-
+    args.outputs["data"] = out_data
+    args.outputs["results"][datatype_key][results_dirname] = out_results
     
     return args
