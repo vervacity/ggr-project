@@ -8,6 +8,8 @@ from scipy.stats import pearsonr
 from scipy.cluster.hierarchy import linkage, leaves_list, fcluster
 from scipy.spatial.distance import squareform
 
+from multiprocessing import Pool
+
 
 def read_pwm_file(pwm_file, as_dict=False):
     """Extracts motifs into PWM class format
@@ -249,13 +251,90 @@ class PWM(object):
         return None
 
 
+    def plot(self):
+        """Plot out PWM to visualize
+        """
+        
+        
+        return None
+
+
+def correlate_pwm_pair(input_list):
+    """get cor and ncor for pwm1 and pwm2
+    Set up this way because multiprocessing pool only takes 1
+    input
+    """
+    i = input_list[0]
+    j = input_list[1]
+    pwm1 = input_list[2]
+    pwm2 = input_list[3]
+    
+    motif_cor = pwm1.rsat_cor(pwm2)
+    motif_ncor = pwm1.rsat_cor(pwm2, ncor=True)
+
+    return i, j, motif_cor, motif_ncor
+
+
 def correlate_pwms(
         pwms,
-        cor_thresh=0.6
+        cor_thresh=0.6,
+        ncor_thresh=0.4,
+        num_threads=24):
+    """Correlate PWMS
+    """
+    # set up
+    num_pwms = len(pwms)
+    cor_mat = np.zeros((num_pwms, num_pwms))
+    ncor_mat = np.zeros((num_pwms, num_pwms))
+
+    pool = Pool(processes=num_threads)
+    pool_inputs = []
+    # for each pair of motifs, get correlation information
+    for i in xrange(num_pwms):
+        for j in xrange(num_pwms):
+
+            # only calculate upper triangle
+            if i > j:
+                continue
+
+            pwm_i = pwms[i]
+            pwm_j = pwms[j]
+            
+            pool_inputs.append((i, j, pwm_i, pwm_j))
+
+    # run multiprocessing
+    pool_outputs = pool.map(correlate_pwm_pair, pool_inputs)
+
+    for i, j, motif_cor, motif_ncor in pool_outputs:
+        # if passes cutoffs, save out to matrix
+        if (motif_cor >= cor_thresh) and (motif_ncor >= ncor_thresh):
+            cor_mat[i,j] = motif_cor
+            ncor_mat[i,j] = motif_ncor        
+
+    # and reflect over the triangle
+    lower_triangle_indices = np.tril_indices(cor_mat.shape[0], -1)
+    cor_mat[lower_triangle_indices] = cor_mat.T[lower_triangle_indices]
+    ncor_mat[lower_triangle_indices] = ncor_mat.T[lower_triangle_indices]
+
+    # multiply each by the other to double threshold
+    cor_present = (cor_mat > 0).astype(float)
+    ncor_present = (ncor_mat > 0).astype(float)
+
+    # and mask
+    cor_filt_mat = cor_mat * ncor_present
+    ncor_filt_mat = ncor_mat * cor_present
+
+    return cor_filt_mat, ncor_filt_mat
+
+
+def correlate_pwms_old(
+        pwms,
+        cor_thresh=0.6,
         ncor_thresh=0.4):
     """Correlate PWMS
     """
     # set up
+    pwms_ids = [pwm.name for pwm in pwms]
     num_pwms = len(pwms)
     cor_mat = np.zeros((num_pwms, num_pwms))
     ncor_mat = np.zeros((num_pwms, num_pwms))
@@ -304,7 +383,6 @@ def correlate_pwms(
 
 
     return cor_filt_mat, ncor_filt_mat
-
 
 
 def hagglom_pwms(
@@ -379,7 +457,7 @@ def hagglom_pwms(
 
 def reduce_pwm_redundancy(
         pwm_file,
-        out_pwm_file
+        out_pwm_file,
         tmp_prefix="motif",
         ic_thresh=0.4,
         cor_thresh=0.6,
@@ -400,19 +478,20 @@ def reduce_pwm_redundancy(
         pwm_dict[key] = pwm_dict[key].chomp(ic_thresh=ic_thresh)
     pwms_ids = [pwm.name for pwm in pwms]
     
-    # correlate pwms - this is slow
-    cor_filt_mat, ncor_filt_mat = correlate_pwms(
-        pwms,
-        cor_thresh=cor_thresh,
-        ncor_thresh=ncor_thresh)
+    # correlate pwms - uses multiprocessing
+    cor_mat_file = "test2.cor.motifs.mat.txt"
+    ncor_mat_file = "test2.ncor.motifs.mat.txt"
+    if False:
+        cor_filt_mat, ncor_filt_mat = correlate_pwms(
+            pwms,
+            cor_thresh=cor_thresh,
+            ncor_thresh=ncor_thresh)
         
-    # pandas and save out
-    cor_mat_file = "testing.cor.motifs.mat.txt"
-    ncor_mat_file = "testing.ncor.motifs.mat.txt"
-    cor_df = pd.DataFrame(cor_filt_mat, index=pwms_ids, columns=pwms_ids)
-    cor_df.to_csv(cor_mat_file, sep="\t")
-    ncor_df = pd.DataFrame(ncor_filt_mat, index=pwms_ids, columns=pwms_ids)
-    cor_df.to_csv(ncor_mat_file, sep="\t")
+        # pandas and save out
+        cor_df = pd.DataFrame(cor_filt_mat, index=pwms_ids, columns=pwms_ids)
+        cor_df.to_csv(cor_mat_file, sep="\t")
+        ncor_df = pd.DataFrame(ncor_filt_mat, index=pwms_ids, columns=pwms_ids)
+        cor_df.to_csv(ncor_mat_file, sep="\t")
 
     # read in matrix to save time
     non_redundant_pwms = hagglom_pwms(
@@ -424,12 +503,13 @@ def reduce_pwm_redundancy(
     
     # save out reduced list to file
     for pwm in non_redundant_pwms:
-        pwm.to_motif_file(self, out_pwm_file)
+        pwm.to_motif_file(out_pwm_file)
 
     return
-
 
 # testing
 reduce_pwm_redundancy(
     "/mnt/lab_data/kundaje/users/dskim89/annotations/hocomoco/hocomoco.v10.pwms_HUMAN_mono.txt",
     "hocomoco.reduced.pwms.txt")
+
+
