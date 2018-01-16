@@ -3,9 +3,12 @@
 # description: plot already ordered heatmap
 # does not adjust the order of input.
 
-#library(fastcluster)
 library(gplots)
 library(RColorBrewer)
+library(fastcluster)
+
+# do i need these?
+#library(cluster)
 #library(dendextend)
 
 set.seed(1337)
@@ -28,6 +31,23 @@ data_w_clusters <- merge(clusters, data, by="id", sort=FALSE)
 rownames(data_w_clusters) <- data_w_clusters$id
 data_w_clusters$id <- NULL
 
+# NOT USED RIGHT NOW
+# determine cluster sizes and means (for dendrogram purposes)
+cluster_names <- unique(data_w_clusters$cluster)
+cluster_sizes <- c()
+cluster_means <- data.frame()
+for (i in 1:length(cluster_names)) {
+    
+    single_cluster <- data_w_clusters[data_w_clusters$cluster == cluster_names[i], ]
+    single_cluster$cluster <- NULL
+    
+    single_cluster_z <- t(scale(t(single_cluster), center=TRUE, scale=TRUE))
+    
+    cluster_mean <- colMeans(single_cluster_z)
+    cluster_means <- rbind(cluster_means, cluster_mean)
+    cluster_sizes <- c(cluster_sizes, nrow(single_cluster))
+}
+
 # determine row sep points
 rowsep <- c()
 cluster <- 1
@@ -39,7 +59,6 @@ for (i in 1:nrow(data_w_clusters)) {
         rowsep <- c(rowsep, i)
         cluster <- cluster_ids_per_example[i]
     }
-
 }
 
 data_z <- t(scale(t(data_w_clusters), center=TRUE, scale=TRUE))
@@ -55,9 +74,17 @@ if (nrow(data_w_clusters) > max_n) {
 plot_file <- paste(out_dir, "/", prefix, ".clusters.heatmap.pdf", sep="")
 my_palette <- rev(colorRampPalette(brewer.pal(11, "RdBu"))(49))
 
+# color bar
+cluster_palette <- colorRampPalette(brewer.pal(11, "Spectral"))(nrow(cluster_means))
+cluster_colors <- cluster_palette[cluster_ids_per_example]
+
 # heatmap2 grid
-mylmat = rbind(c(0,3,0),c(2,1,0),c(0,4,0))
-mylwid = c(2,6,2)
+#mylmat = rbind(c(0,3,0),c(2,1,0),c(0,4,0))
+#mylwid = c(2,6,2)
+#mylhei = c(0.5,12,1.5)
+
+mylmat = rbind(c(0,0,3,0),c(4,1,2,0),c(0,0,5,0))
+mylwid = c(2,0.5,6,2)
 mylhei = c(0.5,12,1.5)
 
 pdf(plot_file, height=18, width=6)
@@ -86,12 +113,185 @@ heatmap.2(
     lwid=mylwid,
     lhei=mylhei,
     rowsep=rowsep,
+    sepcolor="black",
+    RowSideColors=cluster_colors)
+dev.off()
+
+# ====================
+# dendro, adjust in illustrator
+
+# just cluster means
+dclust_dendro <- hclust(dist(as.matrix(cluster_means)), method="ward.D")
+dend <- as.dendrogram(dclust_dendro)
+
+plot_file <- paste(out_dir, "/", prefix, ".clusters.dendro.pdf", sep="")
+pdf(plot_file)
+par(mar = c(4,1,1,12))
+plot(dend, horiz=TRUE, xlab="", ylab="", sub="", leaflab="none")
+#colored_bars(colors, dend, rowLabels="ATAC", horiz = TRUE) # TODO change here
+dev.off()
+
+# plotting
+plot_file <- paste(out_dir, "/", prefix, ".clusters.dendro.sanity_check.heatmap.pdf", sep="")
+my_palette <- rev(colorRampPalette(brewer.pal(11, "RdBu"))(49))
+
+# heatmap2 grid
+mylmat = rbind(c(0,3,0),c(2,1,0),c(0,4,0))
+mylwid = c(2,6,2)
+mylhei = c(0.5,12,1.5)
+
+pdf(plot_file, height=18, width=6)
+#pdf(plot_file, height=18, width=6, units="in", res=200)
+heatmap.2(
+    as.matrix(cluster_means),
+    Rowv=dend,
+    Colv=FALSE,
+    dendrogram="row",
+    trace='none',
+    density.info="none",
+    keysize=0.1,
+    key.title=NA,
+    key.xlab=NA,
+    key.par=list(pin=c(4,0.1),
+        mar=c(6.1,0,5.1,0),
+        mgp=c(3,2,0),
+        cex.axis=2.0,
+        font.axis=2),
+    srtCol=45,
+    cexCol=3.0,
+    labRow="",
+    margins=c(3,0),
+    col=my_palette,
+    lmat=mylmat,
+    lwid=mylwid,
+    lhei=mylhei,
+    #rowsep=rowsep,
+    sepcolor="black")
+dev.off()
+
+
+quit()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# OLD BELOW
+
+# ===============================================
+# make a fake dataset to plot a dendrogram
+
+ratios <- as.integer(25 * cluster_sizes / min(cluster_sizes)) # increase by factor of 10 to even out better
+
+# set up repeated clusters
+cluster_means_rep <- data.frame()
+cluster_means_group <- c()
+for (cluster_idx in 1:length(ratios)) {
+    for (i in 1:ratios[cluster_idx]) {
+        cluster_means_rep <- rbind(cluster_means_rep, jitter(as.numeric(cluster_means[cluster_idx,])))
+        #cluster_means_group <- c(cluster_means_group, cluster_order[cluster_idx])
+        cluster_means_group <- c(cluster_means_group, cluster_idx)
+    }
+}
+
+print(dim(cluster_means_rep))
+
+
+
+
+
+# hclust
+dclust_dendro <- hclust(dist(as.matrix(cluster_means_rep)), method="ward.D")
+#dclust_dendro <- hclust(dist(as.matrix(cluster_means_rep)))
+#hclust_dendro <- my_hclust(dist(as.matrix(cluster_means_rep)))
+#dend <- as.dendrogram(hclust_dendro)
+
+# TODO add diana library back
+#dclust_dendro <- as.hclust(
+#    diana(dist(as.matrix(cluster_means_rep))))
+cluster_order <- dclust_dendro$order
+dend <- as.dendrogram(dclust_dendro)
+#dend <- reorder(dend, 1:nrow(cluster_means_rep))
+
+
+# for color bar
+my_palette <- colorRampPalette(brewer.pal(11, "Spectral"))(nrow(cluster_means))
+#cluster_means_group_ordered <- match(cluster_means_group, cluster_order) # get the cluster order right
+#colors <- my_palette[cluster_means_group_ordered]
+
+plot_file <- paste(out_dir, "/", prefix, ".clusters.dendro.pdf", sep="")
+pdf(plot_file)
+par(mar = c(4,1,1,12))
+plot(dend, horiz=TRUE, xlab="", ylab="", sub="", leaflab="none")
+#colored_bars(colors, dend, rowLabels="ATAC", horiz = TRUE) # TODO change here
+dev.off()
+
+# plotting
+plot_file <- paste(out_dir, "/", prefix, ".clusters.dendro.sanity_check.heatmap.pdf", sep="")
+my_palette <- rev(colorRampPalette(brewer.pal(11, "RdBu"))(49))
+
+# heatmap2 grid
+mylmat = rbind(c(0,3,0),c(2,1,0),c(0,4,0))
+mylwid = c(2,6,2)
+mylhei = c(0.5,12,1.5)
+
+pdf(plot_file, height=18, width=6)
+#pdf(plot_file, height=18, width=6, units="in", res=200)
+heatmap.2(
+    as.matrix(cluster_means_rep),
+    Rowv=dend,
+    Colv=FALSE,
+    dendrogram="row",
+    trace='none',
+    density.info="none",
+    keysize=0.1,
+    key.title=NA,
+    key.xlab=NA,
+    key.par=list(pin=c(4,0.1),
+        mar=c(6.1,0,5.1,0),
+        mgp=c(3,2,0),
+        cex.axis=2.0,
+        font.axis=2),
+    srtCol=45,
+    cexCol=3.0,
+    labRow="",
+    margins=c(3,0),
+    col=my_palette,
+    lmat=mylmat,
+    lwid=mylwid,
+    lhei=mylhei,
+    #rowsep=rowsep,
     sepcolor="black")
 dev.off()
 
 
 
 quit()
+
+
+
+
+
+
+
+
+
+# OLDBELOW
+
+
+
+
 
 
 # Given a cluster file and data file, organizes

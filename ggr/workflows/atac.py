@@ -6,42 +6,53 @@ import glob
 import signal
 import logging
 
-import pandas as pd
-
+#import pandas as pd
 
 from ggr.util.utils import run_shell_cmd
 from ggr.util.utils import parallel_copy
 
-from ggr.util.parallelize import setup_multiprocessing_queue
-from ggr.util.parallelize import run_in_parallel
+#from ggr.util.parallelize import setup_multiprocessing_queue
+#from ggr.util.parallelize import run_in_parallel
 
-from ggr.timeseries import get_consistent_dpgp_trajectories
-from ggr.timeseries import merge_cluster_files
-
+#from ggr.timeseries import get_consistent_dpgp_trajectories
+#from ggr.timeseries import merge_cluster_files
 
 from ggr.util.bed_utils import merge_regions
 from ggr.util.bed_utils import id_to_bed
 from ggr.util.filtering import filter_for_ids
 
 from ggr.analyses.counting import make_count_matrix
-from ggr.analyses.counting import split_count_matrix_by_replicate
+#from ggr.analyses.counting import split_count_matrix_by_replicate
 
 from ggr.workflows.timeseries import run_timeseries_workflow
 
-from ggr.util.bioinformatics import make_deeptools_heatmap
+#from ggr.util.bioinformatics import make_deeptools_heatmap
 
 
-def runall(args):
-    """Run all ATAC analyses
+def runall(args, prefix):
+    """all workflows for atac-seq data
     """
     # set up logging, files, folders
-    ATAC_DIR = args.folders["atac_dir"]
-    run_shell_cmd("mkdir -p {}".format(ATAC_DIR))
-    args.atac = args.atac[args.cluster]    
-    atac_prefix = 'ggr.atac'
-    
     logger = logging.getLogger(__name__)
     logger.info("WORKFLOW: run atac analyses")
+
+    # set up inputs
+    inputs = args.inputs["atac"][args.cluster]
+    
+    # assertions
+    assert inputs.get("data_dir") is not None
+    assert inputs.get("idr_peak_glob") is not None
+
+    # set up data
+    data_dir = args.outputs["data"]["dir"]
+    run_shell_cmd("mkdir -p {}".format(data_dir))
+    out_data = args.outputs["data"]
+    
+    results_dirname = "atac"
+    results_dir = "{}/{}".format(args.outputs["results"]["dir"], results_dirname)
+    args.outputs["results"][results_dirname] = {"dir": results_dir}
+    run_shell_cmd("mkdir -p {}".format(results_dir))
+    out_results = args.outputs["results"][results_dirname]
 
     # -------------------------------------------
     # ANALYSIS 0 - download timepoint BED files
@@ -51,27 +62,30 @@ def runall(args):
     logger.info("ANALYSIS: copy idr peak files to new dir")
     atac_peak_files = sorted(
         glob.glob('{0}/{1}'.format(
-            args.atac['data_dir'],
-            args.atac['idr_peak_glob'])))
+            inputs['data_dir'],
+            inputs['idr_peak_glob'])))
+    timepoint_dir = "{}/peaks.timepoints".format(results_dir)
+    out_results["timepoint_region_dir"] = timepoint_dir
     timepoints_files = glob.glob("{}/*.narrowPeak.gz".format(
-        args.folders["atac_timepoints_bed_dir"]))
+        timepoint_dir))
     if len(timepoints_files) != len(atac_peak_files):
         parallel_copy(
             atac_peak_files,
-            args.folders["atac_timepoints_bed_dir"])
+            timepoint_dir)
     timepoints_files = glob.glob("{}/*.narrowPeak.gz".format(
-        args.folders["atac_timepoints_bed_dir"]))
-        
+        timepoint_dir))
+    
     # -------------------------------------------
     # ANALYSIS 1 - generate master regions file
     # input: peak files
     # output: master peak file (BED)
     # -------------------------------------------
     logger.info("ANALYSIS: generate master regions file")
-    args.atac['master_regions.bed'] = '{0}/{1}.idr.master.bed.gz'.format(
-        args.folders["data_dir"], atac_prefix)
-    if not os.path.isfile(args.atac["master_regions.bed"]):
-        merge_regions(timepoints_files, args.atac['master_regions.bed'])
+    master_regions_key = "atac.master.bed"
+    out_data[master_regions_key] = '{0}/{1}.idr.master.bed.gz'.format(
+        data_dir, prefix)
+    if not os.path.isfile(out_data[master_regions_key]):
+        merge_regions(timepoints_files, out_results[master_regions_key])
 
     # -------------------------------------------
     # ANALYSIS 2 - get read counts in these regions
@@ -80,42 +94,46 @@ def runall(args):
     # -------------------------------------------
     logger.info("ANALYSIS: get read counts per region")
     adjustment = "ends"
-    args.atac["counts.mat"] = '{0}/{1}.{2}.counts.mat.txt.gz'.format(
-        args.folders['data_dir'], atac_prefix, adjustment)
-    if not os.path.isfile(args.atac['counts.mat']):
+    counts_key = "atac.counts.mat"
+    out_data[counts_key] = '{0}/{1}.{2}.counts.mat.txt.gz'.format(
+        data_dir, prefix, adjustment)
+    if not os.path.isfile(out_data[counts_key]):
         # glob tagalign files
         atac_tagalign_files = sorted(
             glob.glob('{0}/{1}'.format(
-                args.atac['data_dir'],
-                args.atac['tagalign_glob'])))
+                inputs["data_dir"],
+                inputs["tagalign_glob"])))
         # remove files from media influenced timepoints
-        for timepoint_string in args.misc["media_timepoints"]:
+        for timepoint_string in args.inputs["params"]["media_timepoints"]:
             atac_tagalign_files = [
                 filename for filename in atac_tagalign_files
                 if timepoint_string not in filename]
         # make count matrix
         make_count_matrix(
-            args.atac['master_regions.bed'],
+            out_data[master_regions_key],
             atac_tagalign_files,
-            args.atac['counts.mat'],
+            out_data[counts_key],
             "ATAC",
-            adjustment="ends",
-            tmp_dir=args.folders["atac_dir"])
+            adjustment=adjustment,
+            tmp_dir=results_dir)
 
-    # ANALYSIS 3 - run timeseries clustering
+    # -------------------------------------------
+    # ANALYSIS 3 - run timeseries analysis on these regions
+    # input: count matrix of regions
+    # output: region trajectories
+    # -------------------------------------------
     args = run_timeseries_workflow(
-        args.atac,
-        args.params,
-        args.folders["atac_timeseries_dir"],
-        atac_prefix)
+        args,
+        prefix,
+        datatype_key="atac",
+        mat_key=counts_key)
 
+    quit()
     
-    # extract dynamic BED and stable BED
-
+    # extract dynamic BED and stable BED files
+    # also cluster BED files
 
     # also set up stable mat for ATAC pooled
-
-
 
     # bioinformatics: GREAT, HOMER
 

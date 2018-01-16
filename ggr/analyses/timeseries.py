@@ -724,7 +724,7 @@ def plot_clusters(
         "{0} {1} {2} {3}").format(
             cluster_subsample_file, cluster_mat, out_dir, prefix)
     run_shell_cmd(r_plot_heatmap)
-    
+
     # individual clusters
     r_plot_clusters = (
         "viz.plot_timeseries_clusters.R "
@@ -732,6 +732,9 @@ def plot_clusters(
             cluster_file, cluster_mat, out_dir, prefix)
     run_shell_cmd(r_plot_clusters)
 
+    print "plot_clusters function (analyses/timeseries.py)"
+    quit()
+    
     return None
 
 

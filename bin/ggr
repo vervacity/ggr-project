@@ -118,21 +118,20 @@ def main():
     from ggr.workflows.annotations import runall
     args = runall(args, "hg19")
 
-    # run rna workflow
-    from ggr.workflows.rna import runall
-    args.rna = runall(args, "ggr.rna")
-
+    if False:
+        # run atac workflow
+        from ggr.workflows.atac import runall
+        args = runall(args, "ggr.atac")
+    
+    if True:
+        # run rna workflow
+        from ggr.workflows.rna import runall
+        args = runall(args, "ggr.rna")
     
     # save outputs dict to json
     with open("outputs.json", "w") as fp:
         json.dump(args.outputs, fp, sort_keys=True, indent=4)
 
-
-    quit()
-    
-    # run atac analyses
-    from ggr.workflows.atac import runall
-    args = runall(args)
 
     quit()
     

@@ -11,7 +11,8 @@
 
     "known_tfs_hgnc": [
 	"TP63", "KLF4", "ZNF750", "MAF", "MAFB",
-	"OVOL1", "GRHL3"],
+	"OVOL1", "GRHL3", "CEBP", "EHF",
+	"JUN", "FOS", "MYC"],
 
     "known_biomarkers_hgnc": [
 	"KRT", "SPRR", "LCE", "IVL",
@@ -19,8 +20,7 @@
     
     "rna_empirical_rlog_thresh": 4.0,
 
-    "old_pairwise_deseq2_fdr":0.0005,
-    "pairwise_deseq2_fdr":0.0001,
+    "pairwise_deseq2_fdr":0.0005,
     
     "raw_cluster_min_size":1000,
     "rna_cluster_min_size":50,

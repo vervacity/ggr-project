@@ -145,7 +145,6 @@ def runall(args, prefix):
     # set up data dir
     data_dir = args.outputs["data"]["dir"]
     run_shell_cmd("mkdir -p {}".format(data_dir))
-    logging.debug("data going to {}".format(data_dir))
     out_data = args.outputs["data"]
 
     # set up results dir
@@ -153,7 +152,6 @@ def runall(args, prefix):
     results_dir = "{}/{}".format(args.outputs["results"]["dir"], results_dirname)
     args.outputs["results"][results_dirname] = {"dir": results_dir}
     run_shell_cmd("mkdir -p {}".format(results_dir))
-    logging.debug("results going to {}".format(results_dir))
     out_results = args.outputs["results"][results_dirname]
     
     # ----------------------------------------------------
@@ -213,7 +211,7 @@ def runall(args, prefix):
     # store outputs in prep for subworkflow
     args.outputs["data"] = out_data
     args.outputs["results"][results_dirname] = out_results
-    
+
     # ----------------------------------------------------
     # ANALYSIS 2 - filter for empirically ON genes
     # input: count matrix of protein coding
@@ -223,7 +221,7 @@ def runall(args, prefix):
         args,
         prefix,
         mat_key="rna.counts.pc.mat")
-
+    
     # ----------------------------------------------------
     # ANALYSIS 3 - run timeseries analysis on these genes
     # input: count matrix of expressed protein coding genes
@@ -235,8 +233,7 @@ def runall(args, prefix):
         datatype_key="rna",
         mat_key="rna.counts.pc.expressed.mat")
 
-    # TODO: maybe need to have a link to the cluster path and dir
-    
+    # TODO: maybe need to have a link to the cluster path and dir?
     cluster_key = "clusters.reproducible.hard.reordered.list"
     out_data = args.outputs["data"]
     out_results = args.outputs["results"][results_dirname]
@@ -282,36 +279,18 @@ def runall(args, prefix):
                 args.outputs["annotations"]["geneids.pc.list"],
                 go_dir)
     
-    quit()
-    
-    # ------------------------------------------------
-    # ANALYSIS 5 - visualizations
-    # input: all RNA files
-    # output: figures
-    # ------------------------------------------------ 
-    # plotting
-
-    # plot timeseries heatmaps
-    # 1) plot like waddington-ot (change from initial, use fold change?)
-    # 2) plot zscores
-    # 3) Plot mean/stdv on the trajectories (to put next to the heatmaps)
-    
-    # fig 1a) trajectories (line plot)
-    # fig 1b) heatmap (either 1 or 2 from above) marked with TFs (and key biomarkers) and GO terms
-
-
-    # TODO LATER
-    # with epigenetics:
-    # fig 1c) promoters: ATAC + histone marks <- this will be some work to get the correct promoter
-    # separately, analysis on stable and off genes at promoters to see their epigenetic context
-    # 3D - genomic positioning of these genes (circos plot, or just sorted by genomic coordinate heatmap)
-    # TODO: HOMER (on promoters?) is integrative with the epigenetic data
-
-    
-    args.outputs["data"] = outputs_data
-    args.outputs["results"] = outputs_results
+    args.outputs["data"] = out_data
+    args.outputs["results"][results_dirname] = out_results
     logger.info("MASTER_WORKFLOW: DONE")
 
+    # for figures:
+    # supplements: GO enrichment plots
+    # supplements QC
+    # main figure - promoter analyses: show ATAC, histones (this might go into supplements)
+    # transcription factor sub heatmap and line plots for key TFs (basically ordered TF cascade for known TFs)
+    
+    # eventually 3d linking to enhancers
+    
     
     return args
 
