@@ -14,9 +14,11 @@ from scipy.spatial.distance import squareform
 from multiprocessing import Pool
 
 
-def read_pwm_file(pwm_file, as_dict=False):
+def read_pwm_file(pwm_file, value_type="log_likelihood", as_dict=False):
     """Extracts motifs into PWM class format
     """
+    background_freq = 0.25
+    
     # option to set up as dict or list
     if as_dict:
         pwms = {}
@@ -35,7 +37,15 @@ def read_pwm_file(pwm_file, as_dict=False):
             while True:
                 line = fp.readline()
                 if line == '' or line[0] == '>': break
-                weights.append(map(float, line.split()))
+                position_weights = map(float, line.split())
+                
+                if value_type == "log_likelihood":
+                    # no need to change anything
+                    weights.append(position_weights)
+                elif value_type == "probability":
+                    # convert to log likelihood
+                    weights.append(
+                        np.log2(np.array(position_weights) / background_freq).tolist())
 
             pwm = PWM(np.array(weights).transpose(1,0), header)
 
@@ -102,11 +112,11 @@ class PWM(object):
         return score, offset
 
 
-    def pearson_xcor(self, pwm, ncor=False):
+    def pearson_xcor(self, pwm, use_probs=True, ic_thresh=0.4, ncor=False):
         """Calculate pearson across offsets, return best score
         and best position
         """
-        # get total offsets
+        # get total offset
         offset_total = self.weights.shape[1] + pwm.weights.shape[1] - 1
                 
         # set up values
@@ -114,13 +124,27 @@ class PWM(object):
         best_offset = 0
 
         for i in xrange(offset_total):
+
+            # get padded weights
             self_padded_weights, other_padded_weights = self.pad_by_offset(pwm, i)
-            start_idx, stop_idx = PWM(np.maximum(self_padded_weights,other_padded_weights)).chomp_points()
+
+            # use merge and chomp to get the start and stop to chomp
+            start_idx, stop_idx = self.merge(
+                pwm, offset=i, chomp=False).chomp_points(ic_thresh=ic_thresh)
+            if start_idx == stop_idx:
+                continue
+            
+            #start_idx, stop_idx = PWM(np.maximum(self_padded_weights,other_padded_weights)).chomp_points(ic_thresh=ic_thresh)
 
             self_padded_weights_chomped = self_padded_weights[:,start_idx:stop_idx]
             other_padded_weights_chomped = other_padded_weights[:,start_idx:stop_idx]
+
+            if use_probs:
+                self_padded_weights_chomped = PWM(self_padded_weights_chomped).get_probs()
+                other_padded_weights_chomped = PWM(other_padded_weights_chomped).get_probs()
             
             # take both and calculate
+            # this is a pearson on the log scale, should it be with the probs?
             cor_val, pval = pearsonr(
                 self_padded_weights_chomped.flatten(),
                 other_padded_weights_chomped.flatten())
@@ -183,7 +207,7 @@ class PWM(object):
                 break
             start_idx += 1
         if start_idx == self.weights.shape[1]:
-            start_idx = 0
+            start_idx = self.weights.shape[1]
 
         # find stop point
         stop_idx = self.weights.shape[1] - 1
@@ -248,34 +272,44 @@ class PWM(object):
             ic_thresh=0.4,
             background_freq=0.25,
             new_name=None,
+            chomp=True,
+            prob_space=True,
             normalize=False):
         """Merge in another PWM and output a new PWM
         """
         self_padded_weights, other_padded_weights = self.pad_by_offset(pwm, offset)
-
-        self_padded_probs = np.exp(self_padded_weights) / np.sum(np.exp(self_padded_weights), axis=0)
-        other_padded_probs = np.exp(other_padded_weights) / np.sum(np.exp(other_padded_weights), axis=0)
-        
-        # merge
-        # merging by first moving back to prob space and then
-        # returning to log space
-        weighted_summed_probs = weights[0] * self_padded_probs + weights[1] * other_padded_probs
         weight_sum = weights[0] + weights[1]
-        new_pwm = PWM(
-            np.log2(
-                weighted_summed_probs / (weight_sum * background_freq)),
-            name=new_name)
-
+            
+        if prob_space:
+            self_padded_probs = np.exp(self_padded_weights) / np.sum(np.exp(self_padded_weights), axis=0)
+            other_padded_probs = np.exp(other_padded_weights) / np.sum(np.exp(other_padded_weights), axis=0)
+        
+            # merge
+            # merging by first moving back to prob space and then
+            # returning to log space
+            weighted_summed_probs = weights[0] * self_padded_probs + weights[1] * other_padded_probs
+            new_pwm = PWM(
+                np.log2(
+                    weighted_summed_probs / (weight_sum * background_freq)),
+                name=new_name)
+        else:
+            # do work in the log2 space
+            weighted_summed_vals = weights[0] * self_padded_weights + weights[1] * other_padded_weights
+            new_pwm = PWM(
+                weighted_summed_vals / weight_sum,
+                name=new_name)
+            
         # chomp
-        new_pwm.chomp(ic_thresh=ic_thresh)
+        if chomp:
+            new_pwm.chomp(ic_thresh=ic_thresh)
 
         # normalize if desired
         if normalize:
             new_pwm.normalize()
 
-        import ipdb
-        ipdb.set_trace()
-            
+        #import ipdb
+        #ipdb.set_trace()
+
         return new_pwm
 
     
@@ -516,15 +550,13 @@ def hagglom_pwms(
 
         # try check
         try:
-            cor_val, offset = pwm1.pearson_xcor(pwm2, ncor=True)
-            ncor_val, offset = pwm1.pearson_xcor(pwm2, ncor=False)
+            cor_val, offset = pwm1.pearson_xcor(pwm2, ncor=False)
+            ncor_val, offset = pwm1.pearson_xcor(pwm2, ncor=True)
         except:
             import ipdb
             ipdb.set_trace()
 
         if (cor_val > cor_thresh) and (ncor_val >= ncor_thresh):
-            # TODO check ncor vals
-            
             # store new merged pwm
             name = "{};{}".format(pwm1.name, pwm2.name)
             print name, cor_val, ncor_val
@@ -542,11 +574,47 @@ def hagglom_pwms(
             hclust_pwms.append((None, None))
 
     return non_redundant_pwms
+
+
+def rename_pwms(pwm_file, out_pwm_file, out_metadata_file):
+    """This function is to sort and rename PWMs in a file
+    and put the old names in a metadata file
+    """
+    # future notes (for integration w RNA info)
+    # make the metadata with col1 model name, col2 old name, col3 ensembl ids
+    # then, use RNA to add col4, ensembl ids expressed
+    # then in R can filter for those when plotting
+    id_num = 0
+    with open(pwm_file, "r") as fp:
+        with open(out_pwm_file, "w") as pwm_out:
+            with open(out_metadata_file, "w") as metadata_out:
+                # for metadata, put in a header line
+                metadata_out.write("hclust_model_name\told_model_names\tgene_ids\n")
+                
+                for line in fp:
+                    if line.startswith(">"):
+                        # this is a header. adjust and send to both pwm and metadata
+                        new_pwm_group_name = "PWM_HCLUST_{}.UNK.0.A".format(id_num)
+                        pwm_out.write(">{}\n".format(new_pwm_group_name))
+
+                        # set up metadata
+                        old_pwm_group_name = line.strip()[1:]
+                        ensembl_ids = [pwm_name.split(".")[1] for pwm_name in old_pwm_group_name.split(";")]
+                        metadata_out.write("{}\t{}\t{}\n".format(
+                            new_pwm_group_name, old_pwm_group_name, ";".join(ensembl_ids)))
+                        
+                        id_num += 1
+                    else:
+                        # only write to pwm file
+                        pwm_out.write(line)
     
+    return None
+
 
 def reduce_pwm_redundancy(
-        pwm_file,
+        pwm_files,
         out_pwm_file,
+        out_metadata_file,
         tmp_prefix="motif",
         ic_thresh=0.4,
         cor_thresh=0.8,
@@ -556,10 +624,18 @@ def reduce_pwm_redundancy(
     output a reduced PWM file
 
     Note that RSAT stringent thresholds were ncor 0.65, cor 0.8
+    Nonstringent is ncor 0.4 and cor 0.6
+
+    Args:
+      pwm_files: list of tuples of pwm file and type
+
     """
     # read in pwm file
-    pwms = read_pwm_file(pwm_file, as_dict=False)
-    pwm_dict = read_pwm_file(pwm_file, as_dict=True)
+    pwms = []
+    pwm_dict = {}
+    for pwm_file, value_type in pwm_files:
+        pwms += read_pwm_file(pwm_file, value_type=value_type, as_dict=False)
+        pwm_dict.update(read_pwm_file(pwm_file, value_type=value_type, as_dict=True))
     num_pwms = len(pwms)
 
     # trim pwms
@@ -585,26 +661,28 @@ def reduce_pwm_redundancy(
         ncor_df = pd.DataFrame(ncor_filt_mat, index=pwms_ids, columns=pwms_ids)
         cor_df.to_csv(ncor_mat_file, sep="\t")
 
-    # TODO(dk) plot here (put in R script when stable)
+        # TODO(dk) plot here (put in R script when stable)
     
-    # read in matrix to save time
-    non_redundant_pwms = hagglom_pwms(
-        ncor_mat_file,
-        pwm_dict,
-        ic_thresh=ic_thresh,
-        cor_thresh=cor_thresh,
-        ncor_thresh=ncor_thresh)
+        # read in matrix to save time
+        non_redundant_pwms = hagglom_pwms(
+            ncor_mat_file,
+            pwm_dict,
+            ic_thresh=ic_thresh,
+            cor_thresh=cor_thresh,
+            ncor_thresh=ncor_thresh)
     
-    # save out reduced list to file
-    # TODO - save cluster groups to metadata file and make new IDs for file
-    
-    for pwm in non_redundant_pwms:
-        pwm.to_motif_file(out_pwm_file)
-        # and plot
-        # keep name simple for now
-        plot_file = "{}.pwm.plot.pdf".format(pwm.name.strip().split("_")[0])
-        pwm.plot(plot_file)
+        # save out reduced list to tmp file
+        tmp_pwm_file = "{}.hclust_pwms.tmp".format(tmp_prefix)
+        for pwm in non_redundant_pwms:
+            pwm.to_motif_file(tmp_pwm_file)
+            # and plot
+            # keep name simple for now
+            plot_file = "{}.pwm.plot.pdf".format(pwm.name.strip().split("_")[0])
+            pwm.plot(plot_file)
 
+    # TODO rename and move things to metadata file
+    rename_pwms(tmp_pwm_file, out_pwm_file, out_metadata_file)
+    
     return
 
 
@@ -683,7 +761,7 @@ def add_hocomoco_metadata(
                         except:
                             hgnc_id = model.split("_")[0]
                             ensembl_id = "UNK"
-                    new_name = "{}_H11MO.{}.{}".format(hgnc_id, ensembl_id, line.strip().split(".")[-1])
+                    new_name = "{}_H11MO.{}.{}.{}".format(hgnc_id, ensembl_id, model.split(".")[-2], model.split(".")[-1])
                     out.write(">{}\n".format(new_name))
                 else:
                     out.write(line)
@@ -696,17 +774,18 @@ pwm_file = "/mnt/lab_data/kundaje/users/dskim89/annotations/hocomoco/v11/HOCOMOC
 metadata_file = "/mnt/lab_data/kundaje/users/dskim89/annotations/hocomoco/v11/HOCOMOCOv11_core_annotation_HUMAN_mono.tsv"
 conversion_file = "/srv/scratch/shared/indra/dskim89/ggr/integrative/v0.2.4/annotations/hg19.ensembl_geneids.pc.gencode19.mappings.mat.gz"
 adjusted_pwm_file = "HOCOMOCOv11_core_pwms_HUMAN_mono.renamed.txt"
-reduced_pwm_file = "HOCOMOCOv11_core_pwms_HUMAN_mono.renamed.reduced.txt"
+reduced_pwm_file = "HOCOMOCOv11_core_HUMAN_mono.pwms.renamed.reduced.txt"
+reduced_metadata_file = "HOCOMOCOv11_core_HUMAN_mono.metadata.renamed.reduced.txt"
 
-# test
+custom_pwm_file = "/mnt/lab_data/kundaje/users/dskim89/annotations/hocomoco/pwms.custom.homer_format.txt"
+
+# testing
 add_hocomoco_metadata(pwm_file, adjusted_pwm_file, metadata_file, conversion_file)
 reduce_pwm_redundancy(
-    adjusted_pwm_file,
+    [(adjusted_pwm_file, "log_likelihood"),
+     (custom_pwm_file, "probability")],
     reduced_pwm_file,
+    reduced_metadata_file,
     num_threads=28)
-
-# TODO write a pwm file vis function
-
-# TODO write a renaming function? redundancy file - new ids?
 
 

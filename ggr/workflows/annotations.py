@@ -87,6 +87,12 @@ def runall(args, prefix):
         get_ensembl_to_geneid_mapping(
             outputs[geneids_pc_key],
             outputs[mapping_mat_key])
+
+    # -------------------------------------------------
+    # ANALYSIS 4 - set up motif file with reduction
+    # input: pwm file + metadata
+    # output: reduced pwm file
+    # -------------------------------------------------
         
     # add outputs and finish
     args.outputs["annotations"] = outputs

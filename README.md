@@ -11,6 +11,7 @@ GGR Analysis
 - DP_GP (Englehardt) - commit: eec12e74219f916aa86e253783905f7b5e30f6f4
 
 # R requirements - v3.4
+- seqLogo
 - deseq2
 - rGREAT
 - biomaRt
