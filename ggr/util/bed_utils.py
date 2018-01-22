@@ -3,6 +3,9 @@
 
 import os
 
+
+from ggr.util.utils import run_shell_cmd
+
 def merge_regions(bed_files, out_bed):
     """Given a list of bed files, make into master file
 
@@ -56,5 +59,25 @@ def id_to_bed(id_file, bed_file, sort=False, remove_extra_columns=True):
             pipe_in, id_file, remove, sort_file, bed_file)
     print convert
     os.system(convert)
+
+    return None
+
+
+def get_midpoint_and_extend(bed_file, chrom_sizes_file, extend_len, out_file):
+    """Given a bed file and extend length, get midpoints
+    of regions and extend outwards
+    """
+    slop_bed = (
+        "zcat {0} | "
+        "awk -F '\t' 'BEGIN{{OFS=\"\t\"}} "
+        "{{ midpoint=$2+int(($3-$2)/2); "
+        "$2=midpoint; $3=midpoint+1; print }}' | "
+        "bedtools slop -i stdin -g {1} -b {2} | "
+        "gzip -c > {3}").format(
+            bed_file,
+            chrom_sizes_file,
+            extend_len,
+            out_file)
+    run_shell_cmd(slop_bed)
 
     return None

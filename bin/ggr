@@ -118,10 +118,15 @@ def main():
     from ggr.workflows.annotations import runall
     args = runall(args, "hg19")
 
-    if False:
+    if True:
         # run atac workflow
         from ggr.workflows.atac import runall
         args = runall(args, "ggr.atac")
+
+    if True:
+        # run histone workflow
+        from ggr.workflows.histones import runall
+        args = runall(args, "ggr.histone")
     
     if True:
         # run rna workflow

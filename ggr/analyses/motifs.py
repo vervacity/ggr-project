@@ -769,6 +769,53 @@ def add_hocomoco_metadata(
     return None
 
 
+def add_expressed_genes_to_metadata(metadata_file, out_metadata_file, gene_list_file, conversion_file):
+    """Takes in metadata sheet and gene list and adds a column of gene ids
+    At this stage probably best to also add hgnc here too - make it easier
+    """
+    # read in gene list file
+    genes_expressed = []
+    with gzip.open(gene_list_file, "r") as fp:
+        for line in fp:
+            genes_expressed.append(line.strip().split("\t")[0])
+    genes_expressed = set(genes_expressed)
+
+    # read in conversion file (want ensembl to hgnc)
+    ensembl_to_hgnc = {}
+    with gzip.open(conversion_file, "r") as fp:
+        for line in fp:
+            if line.startswith("ensembl"):
+                continue
+            fields = line.strip().split("\t")
+            if len(fields[2]) == 0:
+                continue
+            if len(fields[1]) == 0:
+                continue
+            ensembl_to_hgnc[fields[0]] = fields[1]
+
+    # read in metadata file and mark
+    line_num = 0
+    with open(out_metadata_file, "w") as out:
+        with open(metadata_file, "r") as fp:
+            for line in fp:
+                if line_num == 0:
+                    out.write("{}\texpressed\texpressed_hgnc\n".format(line.strip()))
+                    line_num += 1
+                    continue
+                fields = line.strip().split("\t")
+                gene_ids = fields[2].split(";")
+                pwm_gene_expressed = []
+                pwm_gene_expressed_hgnc = []
+                for gene_id in gene_ids:
+                    if gene_id in genes_expressed:
+                        pwm_gene_expressed.append(gene_id)
+                        pwm_gene_expressed_hgnc.append(ensembl_to_hgnc[gene_id])
+                fields.append(";".join(pwm_gene_expressed))
+                fields.append(";".join(pwm_gene_expressed_hgnc))
+                out.write("{}\n".format("\t".join(fields)))
+                
+    return None
+
 # HOCOMOCO v11
 pwm_file = "/mnt/lab_data/kundaje/users/dskim89/annotations/hocomoco/v11/HOCOMOCOv11_core_pwms_HUMAN_mono.txt"
 metadata_file = "/mnt/lab_data/kundaje/users/dskim89/annotations/hocomoco/v11/HOCOMOCOv11_core_annotation_HUMAN_mono.tsv"
@@ -776,11 +823,15 @@ conversion_file = "/srv/scratch/shared/indra/dskim89/ggr/integrative/v0.2.4/anno
 adjusted_pwm_file = "HOCOMOCOv11_core_pwms_HUMAN_mono.renamed.txt"
 reduced_pwm_file = "HOCOMOCOv11_core_HUMAN_mono.pwms.renamed.reduced.txt"
 reduced_metadata_file = "HOCOMOCOv11_core_HUMAN_mono.metadata.renamed.reduced.txt"
+reduced_metadata_w_expr_file = "HOCOMOCOv11_core_HUMAN_mono.metadata.renamed.reduced.expression.txt"
 
 custom_pwm_file = "/mnt/lab_data/kundaje/users/dskim89/annotations/hocomoco/pwms.custom.homer_format.txt"
+gene_list_file = "/srv/scratch/shared/indra/dskim89/ggr/integrative/v0.2.2/results/rna/expression_filtering/ggr.rna.counts.pc.rlog.expressed.txt.gz"
 
 # testing
+'''
 add_hocomoco_metadata(pwm_file, adjusted_pwm_file, metadata_file, conversion_file)
+
 reduce_pwm_redundancy(
     [(adjusted_pwm_file, "log_likelihood"),
      (custom_pwm_file, "probability")],
@@ -788,4 +839,9 @@ reduce_pwm_redundancy(
     reduced_metadata_file,
     num_threads=28)
 
-
+add_expressed_genes_to_metadata(
+    reduced_metadata_file,
+    reduced_metadata_w_expr_file,
+    gene_list_file,
+    conversion_file)
+'''

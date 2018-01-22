@@ -9,6 +9,23 @@ from ggr.analyses.annotations import get_proteincoding_gene_list_from_gtf
 from ggr.analyses.annotations import get_proteincoding_tss_bed_from_gtf
 from ggr.analyses.annotations import get_ensembl_to_geneid_mapping
 
+from ggr.analyses.motifs import add_hocomoco_metadata
+from ggr.analyses.motifs import reduce_pwm_redundancy
+from ggr.analyses.motifs import add_expressed_genes_to_metadata
+
+def setup_hocomoco_motifs(args, prefix):
+    """Run workflow to set up hocomoco motif set
+    """
+    # set up logging, files, folders
+    logger = logging.getLogger(__name__)
+    
+    
+    # add
+    
+
+    return
+
+
 
 def runall(args, prefix):
     """Run all workflows to generate important annotation files

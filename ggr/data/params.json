@@ -1,13 +1,15 @@
 {
 
-    "lo_res_days":["d0", "d3", "d6"],
-    "hi_res_days":[
+    "lo_res_days": [
+	"d0", "d3", "d6"],
+    "hi_res_days": [
 	"d00", "d05", "d10", "d15", "d20", "d25",
 	"d30", "d35", "d40", "d45", "d50", "d55", "d60"],
-    "hi_res_filt_days":[
+    "hi_res_filt_days": [
 	"d00", "d05", "d10", "d15", "d20", "d25",
 	"d30", "d45", "d50", "d60"],
-    "media_timepoints":["d35", "d40", "d55"],
+    "media_timepoints": ["d35", "d40", "d55"],
+    "drop_timepoints_for_timeseries": ["d05_b1", "d05_b2"],
 
     "known_tfs_hgnc": [
 	"TP63", "KLF4", "ZNF750", "MAF", "MAFB",
@@ -21,7 +23,12 @@
     "rna_empirical_rlog_thresh": 4.0,
 
     "pairwise_deseq2_fdr":0.0005,
-    
+    "sequential_deseq2_fdr":0.25,
+
+    "cluster_min_size": {
+	"rna": 100,
+	"atac": 1000
+    },
     "raw_cluster_min_size":1000,
     "rna_cluster_min_size":50,
     "raw_cluster_reject_null_ci_interval":0.999,

@@ -732,16 +732,115 @@ def plot_clusters(
             cluster_file, cluster_mat, out_dir, prefix)
     run_shell_cmd(r_plot_clusters)
 
-    print "plot_clusters function (analyses/timeseries.py)"
-    quit()
+    # print "plot_clusters function (analyses/timeseries.py)"
     
     return None
 
 
-def reorder_clusters(cluster_file, cluster_mat, out_cluster_file):
-    """Sort clusters by hclust similarity (agglomerative clustering in sklearn)
+def flip_positions(position_list, start, middle, stop):
+    """for reorder clusers below: flip from start:stop around middle.
     """
-    from scipy.cluster.hierarchy import linkage, leaves_list, fcluster
+    tmp = position_list[start:stop]
+    position_list[start:middle] = tmp[middle:stop]
+    position_list[middle:stop] = tmp[start:middle]
+    
+    return position_list
+
+
+def get_ordered_tree_nodes(tree):
+    """Recursively go through tree to collect nodes
+    This will be in the order of leaveslist
+    """
+    nodes = []
+    # check left
+    if tree.left.count == 1:
+        nodes.append(tree.left.id)
+    else:
+        nodes += get_ordered_tree_nodes(tree.left)
+        
+    # check right
+    if tree.right.count == 1:
+        nodes.append(tree.right.id)
+    else:
+        nodes += get_ordered_tree_nodes(tree.right)
+        
+    # sum up and return
+    return nodes
+
+
+def reorder_tree(tree, cluster_means):
+    """Recursive tool to reorder tree
+    """
+    # go left
+    if tree.left.count == 1:
+        tree.left = tree.left
+        left_nodes = [tree.left.id]
+    else:
+        # adjust the tree
+        tree.left = reorder_tree(tree.left, cluster_means)
+        left_nodes = get_ordered_tree_nodes(tree.left)
+        
+    # go right
+    if tree.right.count == 1:
+        tree.right = tree.right
+        right_nodes = [tree.right.id]
+    else:
+        # adjust the tree
+        tree.right = reorder_tree(tree.right, cluster_means)
+        right_nodes = get_ordered_tree_nodes(tree.right)
+        
+    # calculate average cluster means for each set
+    left_cluster_mean = np.sum(cluster_means[left_nodes,:], axis=0)
+    right_cluster_mean = np.sum(cluster_means[right_nodes,:], axis=0)
+    
+    # extract the max
+    left_max_idx = np.argmax(left_cluster_mean)
+    right_max_idx = np.argmax(right_cluster_mean)
+
+    # if max is at the edges, calculate slope to nearest 0
+    flip = False
+    if left_max_idx != right_max_idx:
+        # good to go, carry on
+        if left_max_idx > right_max_idx:
+            flip = True
+    else:
+        # if left edge:
+        if left_max_idx == 0:
+            left_slope = left_cluster_mean[0] - left_cluster_mean[3]
+            right_slope = right_cluster_mean[0] - right_cluster_mean[3]
+            if left_slope < right_slope:
+                flip = False
+        # if right:
+        elif left_max_idx == cluster_means.shape[1] - 1:
+            left_slope = left_cluster_mean[-1] - left_cluster_mean[-3]
+            right_slope = right_cluster_mean[-1] - right_cluster_mean[-3]
+            if left_slope > right_slope:
+                flip = True
+        # if middle:
+        else:
+            left_side_max_idx = np.argmax(left_cluster_mean[[left_max_idx-1, left_max_idx+1]])
+            right_side_max_idx = np.argmax(right_cluster_mean[[right_max_idx-1, right_max_idx+1]])
+            if left_side_max_idx > right_side_max_idx:
+                flip = True
+
+
+    #import ipdb
+    #ipdb.set_trace()
+    
+    # reorder accordingly
+    if flip == True:
+        right_tmp = tree.right
+        left_tmp = tree.left
+        tree.right = left_tmp
+        tree.left = right_tmp
+    
+    return tree
+
+
+def reorder_clusters(cluster_file, cluster_mat, out_cluster_file):
+    """Sort clusters by hclust similarity (hierarchical clustering in sklearn)
+     """
+    from scipy.cluster.hierarchy import linkage, leaves_list, fcluster, to_tree
     #from scipy.spatial.distance import pdist, squareform
     from scipy.stats import zscore
     
@@ -754,21 +853,34 @@ def reorder_clusters(cluster_file, cluster_mat, out_cluster_file):
     #cluster_dist = pdist(np.array(cluster_means), "euclidean")
     hclust = linkage(means_z, method="ward")
 
-    # using leaves_list and fcluster, determine split and reverse the FIRST half
-    top_cut = fcluster(hclust, 2, criterion="maxclust")
-    ordered_leaves = leaves_list(hclust)
-    for i in xrange(ordered_leaves.shape[0]):
-        current_leaf = ordered_leaves[i]
-        if top_cut[current_leaf] == 2:
-            # found the leaf
-            split_point = i
-            break
+    # this is all the reordering code below
+    if False:
+        # using leaves_list and fcluster, determine split and reverse the FIRST half
+        top_cut = fcluster(hclust, 2, criterion="maxclust")
+        ordered_leaves = leaves_list(hclust)
+        for i in xrange(ordered_leaves.shape[0]):
+            current_leaf = ordered_leaves[i]
+            if top_cut[current_leaf] == 2:
+                # found the leaf
+                split_point = i
+                break
 
-    # take left side of dendrogram and reverse
-    #ordered_leaves[0:split_point] = np.flip(ordered_leaves[0:split_point], axis=0)
-    ordered_leaves[split_point:] = np.flip(ordered_leaves[split_point:], axis=0)
-    print ordered_leaves + 1
-    
+        # take left side of dendrogram and reverse
+        # a recursive reordering of leaves by weight?
+        ordered_leaves[0:split_point] = np.flip(ordered_leaves[0:split_point], axis=0)
+        #ordered_leaves[split_point:] = np.flip(ordered_leaves[split_point:], axis=0)
+        print ordered_leaves + 1
+    else:
+        # try a recursive reordering
+        hclust_tree = to_tree(hclust)
+        old_ordered_leaves = leaves_list(hclust)
+        
+        reordered_tree = reorder_tree(hclust_tree, np.array(cluster_means))
+        ordered_leaves = np.array(get_ordered_tree_nodes(reordered_tree))
+
+        print old_ordered_leaves
+        print ordered_leaves
+        
     # build renumbering dict
     renumbering = dict(zip((ordered_leaves+1).tolist(), range(1, len(ordered_leaves)+1)))
     print renumbering
@@ -789,6 +901,7 @@ def split_clusters(cluster_file):
     """
 
     cluster_data = pd.read_table(cluster_file)
+    cluster_data.columns = ["cluster", "id"]
     cluster_names = cluster_data["cluster"].unique().tolist()
 
     for cluster_name in cluster_names:

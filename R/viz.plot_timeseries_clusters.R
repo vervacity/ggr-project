@@ -33,7 +33,12 @@ for (i in 1:length(cluster_names)) {
     
     # remove the cluster id and rename columns
     single_cluster_data$cluster <- NULL
-    colnames(single_cluster_data) <- c("d0.0", "d0.5", "d1.0", "d1.5", "d2.0", "d2.5", "d3.0", "d4.5", "d5.0", "d6.0")
+    if (ncol(single_cluster_data) == 10) {
+        colnames(single_cluster_data) <- c("d0.0", "d0.5", "d1.0", "d1.5", "d2.0", "d2.5", "d3.0", "d4.5", "d5.0", "d6.0")
+    } else if (ncol(single_cluster_data) == 9) {
+        colnames(single_cluster_data) <- c("d0.0", "d1.0", "d1.5", "d2.0", "d2.5", "d3.0", "d4.5", "d5.0", "d6.0")
+    }
+
 
     # normalize
     # TODO produce a fold change from baseline version of this: log(mat / val) in first column

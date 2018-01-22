@@ -35,6 +35,19 @@ def filter_for_ids(mat_file, keep_ids_file, gz_out_file, opposite=False, counts=
     return None
 
 
+def remove_mat_columns(mat_file, columns, out_mat_file):
+    """Given a mat file and columns, 
+    remove these columns from the matrix and return
+    """
+    assert out_mat_file.endswith(".gz")
+    data = pd.read_table(mat_file, header=0, index_col=0)
+    data = data.drop(labels=columns, axis=1)
+
+    data.to_csv(out_mat_file, compression="gzip", sep="\t")
+
+    return None
+
+
 def get_ordered_subsample(in_file, out_file, out_nrow=2000):
     """Given an input text file, grab an ordered sample
     """
