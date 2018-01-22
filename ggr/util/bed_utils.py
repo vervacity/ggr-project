@@ -50,6 +50,7 @@ def id_to_bed(id_file, bed_file, sort=False, remove_extra_columns=True):
     convert = (
         "{0} {1} | "
         "grep -v region | "
+        "grep -v id | "
         "{2}"
         "awk -F ':' '{{ print $1\"\t\"$2 }}' | "
         "awk -F '-' '{{ print $1\"\t\"$2 }}' | "

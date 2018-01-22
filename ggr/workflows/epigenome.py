@@ -4,7 +4,18 @@ import os
 import glob
 import logging
 
+from ggr.util.utils import run_shell_cmd
 
+from ggr.util.bioinformatics import make_deeptools_heatmap
+
+from ggr.util.bed_utils import id_to_bed
+
+from ggr.analyses.epigenome import get_histone_overlaps
+
+from ggr.analyses.filtering import sort_by_clusters
+from ggr.analyses.filtering import get_ordered_subsample
+
+from ggr.analyses.timeseries import plot_clusters
 
 def run_dynamic_epigenome_workflow(
         args,
@@ -42,6 +53,8 @@ def run_dynamic_epigenome_workflow(
     # inputs: dynamic ATAC clusters, histone marks
     # outputs: chromatin states, plots
     # -----------------------------------------
+    logger.info("ANALYSIS: overlap dynamic ATAC with histones")
+    atac_dynamic_bed_key = "atac.dynamic.bed"
     histone_overlap_dir = "{}/overlap_histone".format(results_dir)
     run_shell_cmd("mkdir -p {}".format(histone_overlap_dir))
 
@@ -49,84 +62,141 @@ def run_dynamic_epigenome_workflow(
     out_results[histone_overlap_mat_key] = "{}/{}.overlaps.mat.txt.gz".format(
         histone_overlap_dir, prefix)
 
+    # set up activating histone file sets
+    histones = args.inputs["chipseq"][args.cluster]["histones"]["ordered_names"]
+    histone_files = [
+        (histone,
+         args.outputs["results"]["histones"][histone]["timeseries"]["ggr.histone.{}.enumerated.bed".format(histone)],
+         args.inputs["params"]["histones"][histone]["overlap_extend_len"])
+        for histone in histones]
+    activating_marks = histones[0:2]
+    activating_mark_files = histone_files[0:2]
     
     if not os.path.isfile(out_results[histone_overlap_mat_key]):
+        # NOTE: this currently requires bedtools 2.23.0
+        # fix this for upward compatibility
         get_histone_overlaps(
-            out_data["counts.pooled.rlog.dynamic.bed"],
-
-            
-            args.atac["counts_pooled_rlog_dynamic_bed"],
-            activating_histone_files,
-            dynamic_histone_overlap_dir,
-            args.integrative["atac_dynamic_w_histones_mat"],
-            args.annot["chromsizes"],
+            out_data[atac_dynamic_bed_key],
+            activating_mark_files,
+            histone_overlap_dir,
+            out_results[histone_overlap_mat_key],
+            args.inputs["annot"][args.cluster]["chromsizes"],
             histone_assignment=histone_assignment)
-        
-    # TODO: get atac clusters and sort by (hard) cluster
-    # Now merge in histone clusters, and sort by ATAC + histone
-    # this ordering is the FINAL ordering
-    dynamic_plots_dir = "{}/plots".format(out_dir)
-    run_shell_cmd("mkdir -p {}".format(dynamic_plots_dir))
-    dynamic_atac_plot_prefix = "{}/{}.atac.epigenome_ordered".format(
-        dynamic_plots_dir, prefix)
-    dynamic_atac_subsample_file = "{}/{}.atac.ordered.subsample.txt.gz".format(
-        dynamic_plots_dir, prefix)
 
-    if not os.path.isfile(dynamic_atac_subsample_file):
+    # -----------------------------------------
+    # ANALYSIS 1 - reorder ATAC with all clusters
+    # inputs: dynamic ATAC ids, and all clusters
+    # outputs: ordered ATAC file and lists of chromatin states
+    # -----------------------------------------
+    logger.info("ANALYSIS: reorder ATAC regions using ATAC/histone clusters")
+    atac_clusters_key = "clusters.reproducible.hard.reordered.list"
+    atac_cluster_file = args.outputs["results"]["atac"]["timeseries"]["dp_gp"][atac_clusters_key]
+    atac_cluster_col = "cluster"
+
+    histone_clusters_key = histone_overlap_mat_key
+    histone_cluster_file = out_results[histone_clusters_key]
+    histone_cluster_col = "histone_cluster"
+
+    cluster_files = [
+        (atac_cluster_file, atac_cluster_col),
+        (histone_cluster_file, histone_cluster_col)]
+
+    # reorder full list of ids
+    atac_ordered_key = "atac.epigenome_ordered.list"
+    out_results[atac_ordered_key] = "{}/{}.ordered.txt.gz".format(
+        results_dir, prefix)
+    atac_ordered_clusters_key = "atac.epigenome_ordered.mat"
+    out_results[atac_ordered_clusters_key] = "{}/{}.ordered.clusters.txt".format(
+        results_dir, prefix)
+
+    if not os.path.isfile(out_results[atac_ordered_key]):
+        sort_by_clusters(
+            cluster_files,
+            out_results[atac_ordered_clusters_key],
+            out_results[atac_ordered_key])
+
+    # and generate a subsample for plotting too
+    atac_ordered_subsample_key = "{}.subsample.list".format(
+        atac_ordered_key.split(".list")[0])
+    out_results[atac_ordered_subsample_key] = "{}.subsampled.txt".format(
+        out_results[atac_ordered_key].split(".txt")[0])
+    if not os.path.isfile(out_results[atac_ordered_subsample_key]):
+        get_ordered_subsample(
+            out_results[atac_ordered_clusters_key],
+            out_results[atac_ordered_subsample_key])
+
+    # produce a BED too
+    atac_ordered_subsample_bed_key = "{}.bed".format(
+        atac_ordered_subsample_key.split(".list")[0])
+    out_results[atac_ordered_subsample_bed_key] = "{}.bed".format(
+        out_results[atac_ordered_subsample_key].split(".txt")[0])
+    if not os.path.isfile(out_results[atac_ordered_subsample_bed_key]):
+        id_to_bed(
+            out_results[atac_ordered_subsample_key],
+            "{}.gz".format(out_results[atac_ordered_subsample_bed_key]))
+
+        # and unzip
+        run_shell_cmd("gunzip {}.gz".format(out_results[atac_ordered_subsample_bed_key]))
+        
+    # -----------------------------------------
+    # ANALYSIS 2 - plot this out
+    # inputs: dynamic ATAC ids, and all clusters
+    # outputs: ordered ATAC file and lists of chromatin states
+    # -----------------------------------------
+    logger.info("ANALYSIS: plot out the heatmaps with the ordering in the subsample")
+    mat_key = "atac.counts.pooled.rlog.dynamic.mat"
+    plot_dir = "{}/plots".format(results_dir)
     
-        order_and_plot_atac = (
-            "plot_dynamic_atac.R {0} {1} {2} {3}").format(
-                args.atac["final_hard_clusters"],
-                args.integrative["atac_dynamic_w_histones_mat"],
-                dynamic_atac_plot_prefix,
-                dynamic_atac_subsample_file)
-        print order_and_plot_atac
-        run_shell_cmd(order_and_plot_atac)
+    # plot ATAC
+    if not os.path.isdir(plot_dir):
+        run_shell_cmd("mkdir -p {}".format(plot_dir))
+        plot_clusters(
+            atac_cluster_file,
+            out_results[atac_ordered_subsample_key],
+            out_data[mat_key],
+            plot_dir,
+            prefix)
+        # TODO need to plot color bars too?
         
-    # take subsample file and make BED
-    dynamic_atac_subsample_bed = "{}.bed.gz".format(
-        dynamic_atac_subsample_file.split(".txt")[0])
-    if not os.path.isfile(dynamic_atac_subsample_bed):
-        make_bed = (
-            "zcat {0} | "
-            "grep -v region | "
-            "awk -F ':' '{{ print $1\"\t\"$2 }}' | "
-            "awk -F '-' '{{ print $1\"\t\"$2 }}' | "
-            "gzip -c > {1}").format(
-                dynamic_atac_subsample_file,
-                dynamic_atac_subsample_bed)
-        print make_bed
-        run_shell_cmd(make_bed)
+        
+        
+        # plot the histone signal profiles with deeptools
+        histone_colors = args.inputs["chipseq"][args.cluster]["histones"]["ordered_deeptools_colors"]
+        for histone_idx in range(len(histones)):
+            histone = histones[histone_idx]
+            histone_color = histone_colors[histone_idx]
+            histone_bigwigs = sorted(
+                glob.glob("{}/{}".format(
+                    args.inputs["chipseq"][args.cluster]["data_dir"],
+                    args.inputs["chipseq"][args.cluster]["histones"][histone]["pooled_bigwig_glob"])))
 
-    # and then run through deeptools for histone marks
-    histone_colors = args.chipseq["histones"]["ordered_deeptools_colors"]
-    for histone_idx in range(len(all_histones)):
-        histone = all_histones[histone_idx]
-        histone_color = histone_colors[histone_idx]
-        histone_bigwigs = sorted(
-            glob.glob("{}/{}".format(
-                args.chipseq["data_dir"],
-                args.chipseq["histones"][histone]["pooled_bigwig_glob"])))
+            out_prefix = "{}/{}.{}_overlap".format(
+                plot_dir,
+                prefix,
+                histone)
+            out_file = "{}.heatmap.profile.pdf".format(out_prefix)
+        
+            if not os.path.isfile(out_file):
+                make_deeptools_heatmap(
+                    out_results[atac_ordered_subsample_bed_key],
+                    histone_bigwigs,
+                    out_prefix,
+                    sort=False,
+                    referencepoint="center",
+                    color=histone_color)
 
-        out_prefix = "{}/{}.{}_overlap".format(
-            dynamic_plots_dir,
-            prefix,
-            histone)
-        out_file = "{}.heatmap.profile.png".format(out_prefix)
-
-        if not os.path.isfile(out_file):
-            make_deeptools_heatmap(
-                dynamic_atac_subsample_bed,
-                histone_bigwigs,
-                out_prefix,
-                sort=False,
-                referencepoint="center",
-                color=histone_color)
+    # don't forget to store outputs back
+    
             
     return args
 
 
+def run_stable_epigenome_workflow(args, prefix):
+    """
+    """
 
+
+    return args
 
 
 def runall(args, prefix):
@@ -153,17 +223,22 @@ def runall(args, prefix):
     # -----------------------------------------
     logger.info("ANALYSIS: integrate dynamic ATAC w histones")
     
-    
-
-    
-
+    args = run_dynamic_epigenome_workflow(args, "{}.dynamic".format(prefix))
 
     # -----------------------------------------
     # ANALYSIS 1 - integrate histones into stable ATAC
     # inputs: dynamic ATAC clusters, histone marks
     # outputs: chromatin states, plots
     # -----------------------------------------
-
+    
+    
+    
+    # -----------------------------------------
+    # ANALYSIS 2 - run bioinformatics tooks
+    # inputs: BED files
+    # outputs: TF enrichments, GO enrichments
+    # -----------------------------------------
+    
 
 
 

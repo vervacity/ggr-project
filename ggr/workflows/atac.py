@@ -11,7 +11,8 @@ from ggr.util.utils import parallel_copy
 
 from ggr.util.bed_utils import merge_regions
 from ggr.util.bed_utils import id_to_bed
-from ggr.util.filtering import filter_for_ids
+
+from ggr.analyses.filtering import filter_for_ids
 
 from ggr.analyses.counting import make_count_matrix
 
@@ -106,6 +107,10 @@ def runall(args, prefix):
             adjustment=adjustment,
             tmp_dir=results_dir)
 
+    
+    args.outputs["data"] = out_data
+    args.outputs["results"][results_dirname] = out_results
+        
     # -------------------------------------------
     # ANALYSIS 3 - run timeseries analysis on these regions
     # input: count matrix of regions
@@ -116,18 +121,54 @@ def runall(args, prefix):
         prefix,
         datatype_key="atac",
         mat_key=counts_key)
+    
+    # -------------------------------------------
+    # ANALYSIS 4 - get stable and dynamic BED files
+    # input: dynamic ids
+    # output: dynamic and stable BED files
+    # -------------------------------------------
+    logger.info("ANALYSIS: split dynamic and stable BEDs")
+    rlog_mat_key = "atac.counts.pooled.rlog.mat"
+    
+    dynamic_mat_key = "atac.counts.pooled.rlog.dynamic.mat"
+    dynamic_bed_key = "atac.dynamic.bed"
+    out_data[dynamic_bed_key] = "{}.bed.gz".format(
+        out_data[dynamic_mat_key].split(".mat")[0])
+    if not os.path.isfile(out_data[dynamic_bed_key]):
+        id_to_bed(
+            out_data[dynamic_mat_key],
+            out_data[dynamic_bed_key],
+            sort=True)
+    
+    stable_mat_key = "atac.counts.pooled.rlog.stable.mat"
+    out_data[stable_mat_key] = "{}.stable.mat.txt.gz".format(
+        out_data[dynamic_mat_key].split(".dynamic")[0])
+    if not os.path.isfile(out_data[stable_mat_key]):
+        filter_for_ids(
+            out_data[rlog_mat_key],
+            out_results["timeseries"]["dynamic_ids.list"],
+            out_data[stable_mat_key],
+            opposite=True)
+    
+    stable_bed_key = "atac.stable.bed"
+    out_data[stable_bed_key] = "{}.bed.gz".format(
+        out_data[stable_mat_key].split(".mat")[0])
+    if not os.path.isfile(out_data[stable_bed_key]):
+        id_to_bed(
+            out_data[stable_mat_key],
+            out_data[stable_bed_key],
+            sort=True)
 
-    # extract dynamic BED and stable BED files
-    # also cluster BED files
-
-    # also set up stable mat for ATAC pooled
+    # also BED files for each cluster
+    
 
     # bioinformatics: GREAT, HOMER
 
 
 
     # now plot everything - pdfs, to put into illustrator
-
     
+    args.outputs["data"] = out_data
+    args.outputs["results"][results_dirname] = out_results
 
     return args

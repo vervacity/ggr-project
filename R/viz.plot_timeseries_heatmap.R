@@ -22,7 +22,9 @@ prefix <- args[4]
 
 # read in files
 clusters <- read.table(cluster_file, header=TRUE)
-colnames(clusters)[2] <- "id"
+if (colnames(clusters)[2] == "gene"){
+    colnames(clusters)[2] <- "id"
+}
 data <- read.table(gzfile(mat_file), header=TRUE)
 data$id <- rownames(data)
 
@@ -60,6 +62,9 @@ for (i in 1:nrow(data_w_clusters)) {
         cluster <- cluster_ids_per_example[i]
     }
 }
+
+# clean up, just in case
+data_w_clusters$histone_cluster <- NULL
 
 data_z <- t(scale(t(data_w_clusters), center=TRUE, scale=TRUE))
 

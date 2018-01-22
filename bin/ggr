@@ -132,7 +132,12 @@ def main():
         # run rna workflow
         from ggr.workflows.rna import runall
         args = runall(args, "ggr.rna")
-    
+
+    if True:
+        # run epigenome workflow
+        from ggr.workflows.epigenome import runall
+        args = runall(args, "ggr.epigenome")
+        
     # save outputs dict to json
     with open("outputs.json", "w") as fp:
         json.dump(args.outputs, fp, sort_keys=True, indent=4)

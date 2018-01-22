@@ -66,7 +66,7 @@ def make_deeptools_heatmap(
                                                   fields[4]))
         
     # make plot
-    point_plot = '{}.heatmap.profile.png'.format(prefix)
+    point_plot = '{}.heatmap.profile.pdf'.format(prefix)
     point_sorted_file = '{}.point.sorted.bed'.format(prefix)
     if sort == False:
         sorting = '--sortRegions=no'

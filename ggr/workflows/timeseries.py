@@ -367,12 +367,12 @@ def run_timeseries_workflow(args, prefix, datatype_key="rna", mat_key="counts.ma
     for matrix_handle in matrix_handles:
 
         # set up handle
-        rlog_handle = "{}.rlog.mat".format(matrix_handle)
+        rlog_handle = "{}.rlog.mat".format(matrix_handle.split(".mat")[0])
         out_data[rlog_handle] = "{}.rlog.mat.txt.gz".format(
             out_data[matrix_handle].split('.mat')[0])
 
         # filter for dynamic ids (NOTE: set up BED file earlier)
-        dynamic_handle = "{}.dynamic.mat".format(rlog_handle)
+        dynamic_handle = "{}.dynamic.mat".format(rlog_handle.split(".mat")[0])
         dynamic_mat_handles.append(dynamic_handle)
         out_data[dynamic_handle] = "{}.dynamic.mat.txt.gz".format(
             out_data[rlog_handle].split(".mat")[0])
@@ -517,7 +517,7 @@ def run_timeseries_enumeration_workflow(
             "awk -F '\t' '{{ print $1\"\t\"$4 }}' | "
             "awk -F ':' '{{ print $1\"\t\"$2 }}' | "
             "awk -F '-' '{{ print $1\"\t\"$2 }}' | "
-            "grep -v regions | "
+            "grep -v cluster | "
             "sort -k1,1 -k2,2n | "
             "gzip -c > {1}").format(
                 out_results[clusters_key],
