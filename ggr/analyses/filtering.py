@@ -77,18 +77,20 @@ def sort_by_clusters(
     bring together and sort according to order
     """
     # pull first file as initial
-    cluster_file, cluster_col = cluster_files[0]
+    cluster_file, cluster_cols = cluster_files[0]
     data = pd.read_table(cluster_file)
-    data = data[["id", cluster_col]]
+    sort_columns = cluster_cols
+    #data = data[["id", cluster_col]]
     
     # read in the rest
-    for cluster_file, cluster_col in cluster_files[1:]:
+    for cluster_file, cluster_cols in cluster_files[1:]:
         cluster_data = pd.read_table(cluster_file)
-        cluster_data = cluster_data[["id", cluster_col]]
+        #cluster_data = cluster_data[["id", cluster_col]]
         data = data.merge(cluster_data, on="id")
-
+        sort_columns += cluster_cols
+        
     # sort and save out
-    data_sorted = data.sort_values(data.columns[1:].tolist(), ascending=True)
+    data_sorted = data.sort_values(sort_columns, ascending=True)
     data_sorted.to_csv(out_clusters_file, sep="\t", index=False)
     data_sorted.to_csv(out_list_file, columns=["id"], compression="gzip", sep="\t",
                        index=False, header=False)

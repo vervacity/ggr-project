@@ -159,7 +159,7 @@ def runall(args, prefix):
             out_data[stable_bed_key],
             sort=True)
 
-    # also BED files for each cluster
+    # also ids and BED files for each cluster
     
 
     # bioinformatics: GREAT, HOMER

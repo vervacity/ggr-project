@@ -113,6 +113,9 @@ def main():
     for dirname in toplevel_dirnames:
         args.outputs[dirname] = {
             "dir": "{}/{}".format(args.out_dir, dirname)}
+
+    # and also high level keep track of directories with clusterings
+    args.outputs["results"]["label_dirs"] = []
     
     # run annotations workflow
     from ggr.workflows.annotations import runall
@@ -137,25 +140,18 @@ def main():
         # run epigenome workflow
         from ggr.workflows.epigenome import runall
         args = runall(args, "ggr.epigenome")
-        
+
+    # TODO add in tronn worflow
+    
+    
+    
     # save outputs dict to json
     with open("outputs.json", "w") as fp:
         json.dump(args.outputs, fp, sort_keys=True, indent=4)
 
-
-    quit()
-    
-    # run histone analyses
-    from ggr.histone_analysis import run
-    args = run(args)
-
-    # run integrative analyses
-    from ggr.integrate_atac_histone import run
-    args = run(args)
-
     # deep learning: tronn
-    from ggr.deeplearning_analysis import run
-    args = run(args)
+    #from ggr.deeplearning_analysis import run
+    #args = run(args)
     
 
     return None

@@ -122,6 +122,101 @@ def get_histone_overlaps(
     return
 
 
+def cluster_by_chromatin_marks(
+        cluster_mat_file,
+        histone_names,
+        state_name,
+        mark_dir,
+        state_dir,
+        prefix,
+        min_region_num=100,
+        ignore_mark_levels=[9],
+        ignore_state_levels=[99, 999]):
+    """Take in a list of cluster files and sort by histone marks
+    """
+    assert os.path.isdir(mark_dir)
+    assert os.path.isdir(state_dir)
+
+    # read in mat file
+    clusters = pd.read_table(cluster_mat_file)
+
+    # start with high level clusters
+    atac_clusters = list(set(clusters["cluster"].tolist()))
+
+    for atac_cluster in atac_clusters:
+
+        atac_cluster_prefix = "atac-cluster_{}".format(atac_cluster)
+        atac_cluster = clusters[clusters["cluster"] == atac_cluster]
+
+        # for marks:
+        for histone in histone_names:
+            
+            # first get marks for that cluster
+            mark_levels = list(set(atac_cluster[histone].tolist()))
+
+            for mark_level in mark_levels:
+                if mark_level in ignore_mark_levels:
+                    continue
+
+                # get the ids associated
+                ids = atac_cluster[atac_cluster[histone] == mark_level]
+                if ids.shape[0] > min_region_num:
+                    # write out
+                    cluster_file = "{}/{}.{}.{}-cluster_{}.txt.gz".format(
+                        mark_dir, prefix, atac_cluster_prefix, histone, mark_level)
+                    ids.to_csv(cluster_file, columns=["id"], sep="\t", header=False, index=False, compression="gzip")
+
+        # then for states:
+        state_levels = list(set(atac_cluster[state_name].tolist()))
+        for state_level in state_levels:
+            if state_level in ignore_state_levels:
+                continue
+
+            # get the ids associated
+            ids = atac_cluster[atac_cluster[state_name] == state_level]
+            if ids.shape[0] > min_region_num:
+                # write out
+                cluster_file = "{}/{}.{}.state-cluster_{}.txt.gz".format(
+                    state_dir, prefix, atac_cluster_prefix, state_level)
+                ids.to_csv(cluster_file, columns=["id"], sep="\t", header=False, index=False, compression="gzip")
+    
+    return None
+
+
+def split_stable_atac_by_dynamic_marks(
+        overlaps_file,
+        dynamic_out_file,
+        stable_out_file):
+    """take the stable overlaps file and split out stable marks
+    from dynamic marks (near the ATAC peak)
+    """
+    histone_overlaps = pd.read_table(overlaps_file)
+
+    # first remove 999
+    histone_overlaps_marked = histone_overlaps[
+        histone_overlaps["histone_cluster"] != 999]
+
+    # extract dynamic
+    dynamic_histones = histone_overlaps_marked[~(
+        ((histone_overlaps["H3K27ac"] == 9) | (histone_overlaps["H3K27ac"] == 4)) &
+        ((histone_overlaps["H3K4me1"] == 9) | (histone_overlaps["H3K4me1"] == 4)) &
+        ((histone_overlaps["H3K27me3"] == 9) | (histone_overlaps["H3K27me3"] == 4))
+    )]
+    dynamic_histones.to_csv(dynamic_out_file, sep='\t', header=True, index=False)
+    print dynamic_histones.shape
+
+    # and extract stable
+    stable_histones = histone_overlaps_marked[(
+        ((histone_overlaps["H3K27ac"] == 9) | (histone_overlaps["H3K27ac"] == 4)) &
+        ((histone_overlaps["H3K4me1"] == 9) | (histone_overlaps["H3K4me1"] == 4)) &
+        ((histone_overlaps["H3K27me3"] == 9) | (histone_overlaps["H3K27me3"] == 4))
+    )]
+    stable_histones.to_csv(stable_out_file, sep='\t', header=True, index=False)
+
+    return
+
+
+# this is old! throw out soon
 def cluster_by_chromatin_state(
         soft_cluster_files,
         histone_overlap_mat_file,
