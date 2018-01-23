@@ -64,6 +64,7 @@ def runall(args, prefix):
             timepoint_dir)
     timepoints_files = glob.glob("{}/*.narrowPeak.gz".format(
         timepoint_dir))
+    args.outputs["results"]["label_dirs"].append(timepoint_dir)
 
     # -------------------------------------------
     # ANALYSIS 1 - generate master regions file
@@ -107,10 +108,6 @@ def runall(args, prefix):
             adjustment=adjustment,
             tmp_dir=results_dir)
 
-    
-    args.outputs["data"] = out_data
-    args.outputs["results"][results_dirname] = out_results
-        
     # -------------------------------------------
     # ANALYSIS 3 - run timeseries analysis on these regions
     # input: count matrix of regions
@@ -121,7 +118,23 @@ def runall(args, prefix):
         prefix,
         datatype_key="atac",
         mat_key=counts_key)
-    
+
+    # get BED files for each cluster and add to label_dirs
+    cluster_dir = "{}/timeseries/dp_gp/reproducible/hard/reordered".format(results_dir)
+    bed_dir = "{}/bed".format(cluster_dir)
+    if not os.path.isdir(bed_dir):
+        run_shell_cmd("mkdir -p {}".format(bed_dir))
+        id_files = glob.glob("{}/*cluster_*txt.gz".format(cluster_dir))
+        for id_file in id_files:
+            bed_file = "{}/{}.bed.gz".format(
+                bed_dir,
+                os.path.basename(id_file).split(".txt")[0])
+            id_to_bed(
+                id_file,
+                bed_file,
+                sort=True)
+    args.outputs["results"]["label_dirs"].append(bed_dir)
+            
     # -------------------------------------------
     # ANALYSIS 4 - get stable and dynamic BED files
     # input: dynamic ids
@@ -159,16 +172,10 @@ def runall(args, prefix):
             out_data[stable_bed_key],
             sort=True)
 
-    # also ids and BED files for each cluster
-    
-
     # bioinformatics: GREAT, HOMER
-
+    
 
 
     # now plot everything - pdfs, to put into illustrator
-    
-    args.outputs["data"] = out_data
-    args.outputs["results"][results_dirname] = out_results
 
     return args

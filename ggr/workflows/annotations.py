@@ -111,8 +111,6 @@ def runall(args, prefix):
     # output: reduced pwm file
     # -------------------------------------------------
         
-    # add outputs and finish
-    args.outputs["annotations"] = outputs
     logger.info("DONE")
     
     return args

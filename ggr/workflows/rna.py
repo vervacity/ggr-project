@@ -120,11 +120,6 @@ def run_expressed_threshold_workflow(args, prefix, mat_key="rna.counts.pc.mat"):
             out_results[geneids_expressed_key],
             out_data[expressed_key])
 
-
-    # store outputs
-    args.outputs["data"] = out_data
-    args.outputs["results"]["rna"][results_dirname] = out_results
-    
     return args
 
 
@@ -208,10 +203,6 @@ def runall(args, prefix):
                 args.outputs["annotations"]["geneids.pc.list"],
                 out_data[pc_handle])
 
-    # store outputs in prep for subworkflow
-    args.outputs["data"] = out_data
-    args.outputs["results"][results_dirname] = out_results
-
     # ----------------------------------------------------
     # ANALYSIS 2 - filter for empirically ON genes
     # input: count matrix of protein coding
@@ -279,8 +270,6 @@ def runall(args, prefix):
                 args.outputs["annotations"]["geneids.pc.list"],
                 go_dir)
     
-    args.outputs["data"] = out_data
-    args.outputs["results"][results_dirname] = out_results
     logger.info("MASTER_WORKFLOW: DONE")
 
     # for figures:
