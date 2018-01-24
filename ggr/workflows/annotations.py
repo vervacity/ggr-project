@@ -11,20 +11,68 @@ from ggr.analyses.annotations import get_ensembl_to_geneid_mapping
 
 from ggr.analyses.motifs import add_hocomoco_metadata
 from ggr.analyses.motifs import reduce_pwm_redundancy
-from ggr.analyses.motifs import add_expressed_genes_to_metadata
 
-def setup_hocomoco_motifs(args, prefix):
+
+def setup_hocomoco_motifs_workflow(args, prefix):
     """Run workflow to set up hocomoco motif set
     """
     # set up logging, files, folders
     logger = logging.getLogger(__name__)
-    
-    
-    # add
-    
 
-    return
+    inputs = args.inputs["annot"][args.cluster]
+    outputs = args.outputs["annotations"]
+    out_dir = outputs["dir"]
 
+    # assertions
+    assert inputs.get("hocomoco_pwms") is not None
+    assert inputs.get("hocomoco_metadata") is not None
+    assert inputs.get("custom_pwms") is not None
+    assert outputs.get("geneids.mappings.mat") is not None
+
+    # -------------------------------------------------
+    # ANALYSIS 0 - add metadata to get ensembl ids into PWM names
+    # input: pwm file and metadata file
+    # output: new pwm file with ensembl ids in name
+    # -------------------------------------------------
+    renamed_pwms_key = "pwms.renamed"
+    outputs[renamed_pwms_key] = "{}/{}.renamed.txt".format(
+        out_dir,
+        os.path.basename(inputs["hocomoco_pwms"]).split(".txt")[0])
+    if not os.path.isfile(outputs[renamed_pwms_key]):
+        add_hocomoco_metadata(
+            inputs["hocomoco_pwms"],
+            outputs[renamed_pwms_key],
+            inputs["hocomoco_metadata"],
+            outputs["geneids.mappings.mat"])
+        
+    # -------------------------------------------------
+    # ANALYSIS 1 - reduce redundancy using a hclust method (see RSAT matrix paper)
+    # input: pwm file 
+    # output: new pwm file with new metadata file
+    # -------------------------------------------------
+    pwm_dir = "{}/pwms".format(out_dir)
+    run_shell_cmd("mkdir -p {}".format(pwm_dir))
+    
+    nonredundant_pwms_key = "{}.nonredundant".format(renamed_pwms_key)
+    outputs[nonredundant_pwms_key] = "{}.nonredundant.txt".format(
+        outputs[renamed_pwms_key].split(".txt")[0])
+
+    nonredundant_pwms_metadata_key = "pwms.metadata.nonredundant".format(renamed_pwms_key)
+    outputs[nonredundant_pwms_metadata_key] = "{}/{}.nonredundant.txt".format(
+        out_dir, 
+        os.path.basename(inputs["hocomoco_metadata"]).split(".tsv")[0])
+    if not os.path.isfile(outputs[nonredundant_pwms_metadata_key]):
+        reduce_pwm_redundancy(
+            [(outputs[renamed_pwms_key], "log_likelihood"),
+             (inputs["custom_pwms"], "probability")],
+            outputs[nonredundant_pwms_key],
+            outputs[nonredundant_pwms_metadata_key],
+            tmp_prefix="{}/hocomoco".format(pwm_dir),
+            num_threads=28)
+
+    # later add in RNA expression information
+    
+    return args
 
 
 def runall(args, prefix):
@@ -110,7 +158,9 @@ def runall(args, prefix):
     # input: pwm file + metadata
     # output: reduced pwm file
     # -------------------------------------------------
-        
+    logger.info("ANALYSIS: generate a nonredundant PWM file")
+    args = setup_hocomoco_motifs_workflow(args, prefix)
+
     logger.info("DONE")
     
     return args

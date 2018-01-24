@@ -5,7 +5,8 @@
 	"gencode_proteincoding_gtf":"/mnt/data/annotations/by_release/hg19.GRCh37/GENCODE_ann/gencode.v19.annotation.protein_coding.gtf",
 	"fantom5_transcriptionfactor_csv":"/mnt/lab_data/kundaje/users/dskim89/annotations/fantom5_transcriptionfactors_hg19.csv",
 	"hocomoco_pwms":"/mnt/lab_data/kundaje/users/dskim89/annotations/hocomoco/v11/HOCOMOCOv11_core_pwms_HUMAN_mono.txt",
-	"hocomoco_metadata":"/mnt/lab_data/kundaje/users/dskim89/annotations/hocomoco/v11/HOCOMOCOv11_core_annotation_HUMAN_mono.tsv"
+	"hocomoco_metadata":"/mnt/lab_data/kundaje/users/dskim89/annotations/hocomoco/v11/HOCOMOCOv11_core_annotation_HUMAN_mono.tsv",
+	"custom_pwms":"/mnt/lab_data/kundaje/users/dskim89/annotations/hocomoco/pwms.custom.homer_format.txt"
     },
     "sherlock":{
 	"chromsizes":"/oak/stanford/groups/khavari/users/dskim89/annotations/hg19.GRCh37/ucsc/hg19.chrom.sizes",

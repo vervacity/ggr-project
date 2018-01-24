@@ -677,8 +677,10 @@ def reduce_pwm_redundancy(
             pwm.to_motif_file(tmp_pwm_file)
             # and plot
             # keep name simple for now
-            plot_file = "{}.pwm.plot.pdf".format(pwm.name.strip().split("_")[0])
-            pwm.plot(plot_file)
+            plot_file = "{}.{}.pwm.plot.pdf".format(
+                tmp_prefix, pwm.name.strip().split("_")[0])
+            tmp_dir = os.path.dirname(tmp_prefix)
+            pwm.plot(plot_file, tmp_dir=tmp_dir)
 
     # TODO rename and move things to metadata file
     rename_pwms(tmp_pwm_file, out_pwm_file, out_metadata_file)
