@@ -2,13 +2,17 @@
 
     "lo_res_days": [
 	"d0", "d3", "d6"],
+    
     "hi_res_days": [
 	"d00", "d05", "d10", "d15", "d20", "d25",
 	"d30", "d35", "d40", "d45", "d50", "d55", "d60"],
+    
     "hi_res_filt_days": [
 	"d00", "d05", "d10", "d15", "d20", "d25",
 	"d30", "d45", "d50", "d60"],
+    
     "media_timepoints": ["d35", "d40", "d55"],
+    
     "drop_timepoints_for_timeseries": ["d05_b1", "d05_b2"],
 
     "known_tfs_hgnc": [
@@ -51,15 +55,6 @@
     "histone_fdr":0.25,
     "histone_master_region_method":"atac_midpoint",
     "histone_overlap_assignment":"nearest",
-    "chrom_state_cluster_min_size":500,
-
-    "label_dir_handles":[
-	"atac_timepoints_bed_dir",
-	"atac_dp-gp_final_bed_dir",
-	"epigenome_dynamic_mark_bed_dir",
-	"epigenome_dynamic_state_bed_dir",
-	"epigenome_stable_mark_bed_dir",
-	"epigenome_stable_state_bed_dir"
-    ]
+    "chrom_state_cluster_min_size":500
     
 }
