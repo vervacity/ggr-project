@@ -5,7 +5,7 @@ import glob
 import logging
 
 from ggr.util.utils import run_shell_cmd
-from ggr.util.filtering import filter_for_ids
+from ggr.analyses.filtering import filter_for_ids
 
 from ggr.analyses.rna import make_rsem_matrix
 from ggr.analyses.rna import threshold_empirically_off_genes
