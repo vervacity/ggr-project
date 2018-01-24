@@ -7,7 +7,7 @@ import logging
 
 from ggr.util.utils import run_shell_cmd
 
-from ggr.util.bioinformatics import make_deeptools_heatmap
+from ggr.analyses.bioinformatics import make_deeptools_heatmap
 
 from ggr.util.bed_utils import id_to_bed
 
