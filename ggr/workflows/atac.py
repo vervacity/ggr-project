@@ -172,10 +172,14 @@ def runall(args, prefix):
             out_data[stable_bed_key],
             sort=True)
 
-    # bioinformatics: GREAT, HOMER
+    # -------------------------------------------
+    # ANALYSIS 5 - bioinformatics
+    # input: bed dir
+    # output: HOMER and GREAT results
+    # -------------------------------------------
+    logger.info("ANALYSIS: run HOMER/GREAT on clusters")
     
 
-
-    # now plot everything - pdfs, to put into illustrator
+    
 
     return args

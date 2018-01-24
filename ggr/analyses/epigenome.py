@@ -7,6 +7,7 @@ import pandas as pd
 
 from ggr.util.utils import run_shell_cmd
 
+from ggr.analyses.bioinformatics import run_homer
 
 def get_nearest_mark(intersect_bed_file, out_file, histone_assignment):
     """Assumes that you did an intersect 
@@ -214,6 +215,49 @@ def split_stable_atac_by_dynamic_marks(
     stable_histones.to_csv(stable_out_file, sep='\t', header=True, index=False)
 
     return
+
+
+def run_bioinformatics_on_bed(bed_dir, background_bed, regex, out_dir):
+    """Given a directory of BED files, run HOMER/GREAT
+    """
+    # get the files
+    bed_files = glob.glob("{}/*{}".format(bed_dir, regex))
+
+    # run GREAT
+    great_dir = "{}/great".format(out_dir)
+    run_shell_cmd("mkdir -p {}".format(great_dir))
+    for bed_file in bed_files:
+        prefix = os.path.basename(bed_file).split(regex)[0]
+        if not os.path.isdir("{}/{}".format(great_dir, prefix)):
+            run_shell_cmd("mkdir -p {}/{}".format(great_dir, prefix))
+            # TODO put in background set
+            run_great = "run_rgreat.R {0} {1}/{2}".format(
+                bed_file,
+                great_dir,
+                prefix)
+
+    # run HOMER
+    homer_dir = "{}/homer".format(out_dir)
+    run_shell_cmd("mkdir -p {}".format(homer_dir))
+    for bed_file in bed_files:
+        prefix = os.path.basename(bed_file).split(regex)[0]
+        if not os.path.isdir("{}/{}".format(homer_dir, prefix)):
+            run_shell_cmd("mkdir -p {}/{}".format(homer_dir, prefix))
+            run_homer(
+                bed_file,
+                background_bed,
+                "{}/{}".format(homer_dir, prefix))
+
+    return None
+
+
+
+
+
+
+
+
+
 
 
 # this is old! throw out soon
