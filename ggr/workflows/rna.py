@@ -12,6 +12,8 @@ from ggr.analyses.rna import threshold_empirically_off_genes
 from ggr.analyses.rna import filter_clusters_for_tfs
 from ggr.analyses.rna import run_rdavid
 
+from ggr.analyses.motifs import add_expressed_genes_to_metadata
+
 from ggr.workflows.timeseries import run_timeseries_workflow
 
 
@@ -212,6 +214,18 @@ def runall(args, prefix):
         args,
         prefix,
         mat_key="rna.counts.pc.mat")
+
+    # now that we have this, add this info to motifs
+    pwm_metadata_key = "pwms.metadata.nonredundant"
+    pwm_metadata_plus_expr_key = "{}.expressed".format(pwm_metadata_key)
+    args.outputs["annotations"][pwm_metadata_plus_expr_key] = "{}.expressed.txt".format(
+        args.outputs["annotations"][pwm_metadata_key].split(".txt")[0])
+    if not os.path.isfile(args.outputs["annotations"][pwm_metadata_plus_expr_key]):
+        add_expressed_genes_to_metadata(
+            args.outputs["annotations"][pwm_metadata_key],
+            args.outputs["annotations"][pwm_metadata_plus_expr_key],
+            out_data["rna.counts.pc.expressed.mat"],
+            args.outputs["annotations"]["geneids.mappings.mat"])
     
     # ----------------------------------------------------
     # ANALYSIS 3 - run timeseries analysis on these genes
