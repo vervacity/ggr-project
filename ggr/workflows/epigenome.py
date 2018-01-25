@@ -8,6 +8,7 @@ import logging
 from ggr.util.utils import run_shell_cmd
 
 from ggr.analyses.bioinformatics import make_deeptools_heatmap
+from ggr.analyses.bioinformatics import run_bioinformatics_on_bed
 
 from ggr.util.bed_utils import id_to_bed
 
@@ -185,8 +186,11 @@ def run_dynamic_epigenome_workflow(
                 state_dir, os.path.basename(state_file).split('.txt')[0])
             id_to_bed(state_file, state_bed_file, sort=True)
 
-    args.outputs["results"]["label_dirs"].append(mark_dir)
-    args.outputs["results"]["label_dirs"].append(state_dir)
+    mark_bed_dir = "{}/clusters/by_mark/bed".format(results_dir)
+    state_bed_dir = "{}/clusters/by_state/bed".format(results_dir)
+            
+    args.outputs["results"]["label_dirs"].append(mark_bed_dir)
+    args.outputs["results"]["label_dirs"].append(state_bed_dir)
         
     # -----------------------------------------
     # ANALYSIS 3 - plot this out
@@ -239,23 +243,25 @@ def run_dynamic_epigenome_workflow(
     # inputs: BED dirs
     # outputs: HOMER/GREAT results
     # -----------------------------------------
-    bioinformatics_bed_dirs = [mark_dir, state_dir]
+    logger.info("ANALYSIS: run HOMER and GREAT")
+    bioinformatics_bed_dirs = [mark_bed_dir, state_bed_dir]
     for bioinformatics_bed_dir in bioinformatics_bed_dirs:
 
         if not os.path.isdir("{}/homer".format(bioinformatics_bed_dir)):
-        
+            
             bed_files = glob.glob("{}/*.bed.gz".format(bioinformatics_bed_dir))
             
             # make a background bed file: stable + this info?
             background_bed_file = "{}/{}.atac.background.bed.gz".format(
                 bioinformatics_bed_dir, prefix)
-            make_background = "zcat {} {} | sort -k1,1 -k2,2n | gzip -c > {}".format(
-                " ".join(bed_files),
-                out_data["atac.stable.bed"],
-                background_bed_file)
-            run_shell_cmd
-
-            quit()
+            make_background = (
+                "zcat {0} {1} | "
+                "sort -k1,1 -k2,2n | "
+                "gzip -c > {2}").format(
+                    " ".join(bed_files),
+                    out_data["atac.stable.bed"],
+                    background_bed_file)
+            run_shell_cmd(make_background)
             
             # run files
             for bed_file in bed_files:
@@ -264,8 +270,6 @@ def run_dynamic_epigenome_workflow(
                     background_bed_file,
                     bioinformatics_bed_dir)
 
-    quit()
-    
     return args
 
 
@@ -400,6 +404,8 @@ def run_stable_epigenome_workflow(
     logger.info("ANALYSIS: separate out cluster files")
     mark_dir = "{}/clusters/by_mark".format(results_dir)
     state_dir = "{}/clusters/by_state".format(results_dir)
+    mark_bed_dir = "{}/clusters/by_mark/bed".format(results_dir)
+    state_bed_dir = "{}/clusters/by_state/bed".format(results_dir)
     if not os.path.isdir(state_dir):
         run_shell_cmd("mkdir -p {0}/ids {0}/bed {1}/ids {1}/bed".format(
             mark_dir, state_dir))
@@ -425,8 +431,8 @@ def run_stable_epigenome_workflow(
                 state_dir, os.path.basename(state_file).split('.txt')[0])
             id_to_bed(state_file, state_bed_file, sort=True)
 
-    args.outputs["results"]["label_dirs"].append(mark_dir)
-    args.outputs["results"]["label_dirs"].append(state_dir)
+    args.outputs["results"]["label_dirs"].append(mark_bed_dir)
+    args.outputs["results"]["label_dirs"].append(state_bed_dir)
 
     # -----------------------------------------
     # ANALYSIS 3 - separate out dynamic and non-dynamic chromatin mark data,
@@ -534,6 +540,38 @@ def run_stable_epigenome_workflow(
                         referencepoint="center",
                         color=histone_color)
 
+    # -----------------------------------------
+    # ANALYSIS 5 - bioinformatics
+    # inputs: BED dirs
+    # outputs: HOMER/GREAT results
+    # -----------------------------------------
+    logger.info("ANALYSIS: run HOMER and GREAT")
+    bioinformatics_bed_dirs = [mark_bed_dir, state_bed_dir]
+    for bioinformatics_bed_dir in bioinformatics_bed_dirs:
+
+        if not os.path.isdir("{}/homer".format(bioinformatics_bed_dir)):
+            
+            bed_files = glob.glob("{}/*.bed.gz".format(bioinformatics_bed_dir))
+            
+            # make a background bed file: stable + this info?
+            background_bed_file = "{}/{}.atac.background.bed.gz".format(
+                bioinformatics_bed_dir, prefix)
+            make_background = (
+                "zcat {0} {1} | "
+                "sort -k1,1 -k2,2n | "
+                "gzip -c > {2}").format(
+                    " ".join(bed_files),
+                    out_data["atac.stable.bed"],
+                    background_bed_file)
+            run_shell_cmd(make_background)
+            
+            # run files
+            for bed_file in bed_files:
+                run_bioinformatics_on_bed(
+                    bed_file,
+                    background_bed_file,
+                    bioinformatics_bed_dir)
+
     return args
 
 
@@ -571,18 +609,6 @@ def runall(args, prefix):
     logger.info("ANALYSIS: integrate stable ATAC w histones")
     args = run_stable_epigenome_workflow(
         args, "{}.stable".format(prefix))
-    
-    
-    # -----------------------------------------
-    # ANALYSIS 2 - run bioinformatics tooks
-    # inputs: BED files
-    # outputs: TF enrichments (HOMER), GO enrichments (GREAT)
-    # -----------------------------------------
-    logger.info("ANALYSIS: running bioinformatics on chromatin mark/state files")
-    
-    
-
-
     
 
     return args

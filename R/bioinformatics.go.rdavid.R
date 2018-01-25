@@ -11,11 +11,11 @@ gene_list_file <- args[1]
 background_list_file <- args[2]
 out_dir <- args[3]
 
+# read in gene list and background gene list
 gene_list <- read.table(gzfile(gene_list_file), stringsAsFactors=FALSE)$V1
 background_list <- read.table(gzfile(background_list_file), stringsAsFactors=FALSE)$V1
 
 prefix <- sub('\\.txt.gz$', "", basename(gene_list_file))
-
 padj_cutoff <- 0.1
 
 # open david
@@ -46,6 +46,5 @@ for (i in 1:length(annotation_categories)) {
     getFunctionalAnnotationChartFile(object=david, fileName=out_file, threshold=padj_cutoff)
 
     # TODO - make plots?
-    
     
 }

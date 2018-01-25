@@ -1,13 +1,11 @@
 #!/usr/bin/env Rscript
 
 # Description: wrapper for rGREAT
-# Args:
-#   bed_file: input bed file
-#   prefix: prefix to append to GREAT outputs
 
 library(rGREAT)
 library(qvalue)
 
+# args
 args <- commandArgs(trailingOnly=TRUE)
 bed_file <- args[1]
 background_bed_file <- args[2]
@@ -21,13 +19,15 @@ colnames(bed) <- c('chr', 'start', 'stop')
 background_bed <- read.table(gzfile(background_bed_file), header=FALSE, row.names=NULL)
 colnames(background_bed) <- c("chr", "start", "stop")
 
-# create GREAT job and get enrichments
+# create GREAT job
 job <- submitGreatJob(bed, species='hg19', version="3.0.0")
 print(job)
-tb <- getEnrichmentTables(job) # this is where you would get other tables if you wanted them
 
+# get enrichments
+tb <- getEnrichmentTables(job) # this is where you would get other tables if you wanted them
 print(names(tb))
 
+# threshold and save out
 for (name in names(tb)) {
     table_file_name <- paste(prefix,
                              gsub(" ", "_", name),
