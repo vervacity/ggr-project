@@ -18,6 +18,7 @@ from ggr.analyses.counting import make_count_matrix
 
 from ggr.workflows.timeseries import run_timeseries_workflow
 
+from ggr.analyses.bioinformatics import run_bioinformatics_on_bed
 
 def runall(args, prefix):
     """all workflows for atac-seq data
@@ -121,19 +122,19 @@ def runall(args, prefix):
 
     # get BED files for each cluster and add to label_dirs
     cluster_dir = "{}/timeseries/dp_gp/reproducible/hard/reordered".format(results_dir)
-    bed_dir = "{}/bed".format(cluster_dir)
-    if not os.path.isdir(bed_dir):
-        run_shell_cmd("mkdir -p {}".format(bed_dir))
+    cluster_bed_dir = "{}/bed".format(cluster_dir)
+    if not os.path.isdir(cluster_bed_dir):
+        run_shell_cmd("mkdir -p {}".format(cluster_bed_dir))
         id_files = glob.glob("{}/*cluster_*txt.gz".format(cluster_dir))
         for id_file in id_files:
             bed_file = "{}/{}.bed.gz".format(
-                bed_dir,
+                cluster_bed_dir,
                 os.path.basename(id_file).split(".txt")[0])
             id_to_bed(
                 id_file,
                 bed_file,
                 sort=True)
-    args.outputs["results"]["label_dirs"].append(bed_dir)
+    args.outputs["results"]["label_dirs"].append(cluster_bed_dir)
             
     # -------------------------------------------
     # ANALYSIS 4 - get stable and dynamic BED files
@@ -178,8 +179,13 @@ def runall(args, prefix):
     # output: HOMER and GREAT results
     # -------------------------------------------
     logger.info("ANALYSIS: run HOMER/GREAT on clusters")
-    
-
-    
+    bed_files = glob.glob("{}/*bed.gz".format(cluster_bed_dir))
+    background_bed_file = out_data[master_regions_key]
+    if not os.path.isdir("{}/homer".format(cluster_bed_dir)):
+        for bed_file in bed_files:
+            run_bioinformatics_on_bed(
+                bed_file,
+                background_bed_file,
+                cluster_bed_dir)
 
     return args

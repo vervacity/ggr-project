@@ -115,44 +115,35 @@ def main():
             "dir": "{}/{}".format(args.out_dir, dirname)}
 
     # and also high level keep track of directories with clusterings
+    # to put into deep learning model
     args.outputs["results"]["label_dirs"] = []
     
     # run annotations workflow
     from ggr.workflows.annotations import runall
     args = runall(args, "hg19")
 
-    if True:
-        # run atac workflow
-        from ggr.workflows.atac import runall
-        args = runall(args, "ggr.atac")
-
-    if True:
-        # run histone workflow
-        from ggr.workflows.histones import runall
-        args = runall(args, "ggr.histone")
+    # run atac workflow
+    from ggr.workflows.atac import runall
+    args = runall(args, "ggr.atac")
     
-    if True:
-        # run rna workflow
-        from ggr.workflows.rna import runall
-        args = runall(args, "ggr.rna")
+    # run histone workflow
+    from ggr.workflows.histones import runall
+    args = runall(args, "ggr.histone")
 
-    if True:
-        # run epigenome workflow
-        from ggr.workflows.epigenome import runall
-        args = runall(args, "ggr.epigenome")
+    # run rna workflow
+    from ggr.workflows.rna import runall
+    args = runall(args, "ggr.rna")
+
+    # run epigenome workflow
+    from ggr.workflows.epigenome import runall
+    args = runall(args, "ggr.epigenome")
 
     # TODO add in tronn worflow
-    
     
     
     # save outputs dict to json
     with open("outputs.json", "w") as fp:
         json.dump(args.outputs, fp, sort_keys=True, indent=4)
-
-    # deep learning: tronn
-    #from ggr.deeplearning_analysis import run
-    #args = run(args)
-    
 
     return None
 

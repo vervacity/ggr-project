@@ -3,24 +3,81 @@
 
 import os
 
+from ggr.util.utils import run_shell_cmd
+
 def run_homer(
-        positives_bed,
-        background_bed,
+        bed_file,
+        background_bed_file,
         out_dir,
-        parallel=12):
+        parallel=24):
     """Generic wrapper to run homer on a set of regions (vs background)
     """
-    run_homer = ("findMotifsGenome.pl <(zcat {0}) hg19 {1} "
-                 "-bg <(zcat {2}) "
-                 "-p {3} "
-                 "-nomotif").format(positives_bed,
-                                    out_dir,
-                                    background_bed,
-                                    parallel)
-    print run_homer
-    os.system('GREPDB="{}"; /bin/bash -c "$GREPDB"'.format(run_homer))
+    assert bed_file.endswith(".gz")
+    assert background_bed_file.endswith(".gz")
+    
+    run_homer_cmd = (
+        "findMotifsGenome.pl <(zcat {0}) hg19 {2} "
+        "-bg <(zcat {1}) "
+        "-p {3} "
+        "-nomotif").format(
+            bed_file,
+            background_bed_file,
+            out_dir,
+            parallel)
+    
+    print run_homer_cmd
+    os.system('GREPDB="{}"; /bin/bash -c "$GREPDB"'.format(run_homer_cmd))
 
     return None
+
+
+def run_great(
+        bed_file,
+        background_bed_file,
+        out_dir):
+    """Generic wrapper to run GREAT from R (rGREAT package)
+    """
+    assert bed_file.endswith(".gz")
+    assert background_bed_file.endswith(".gz")
+    
+    prefix = os.path.basename(bed_file).split(".bed")[0].split(".narrowPeak")[0]
+    
+    run_rgreat = (
+        "bioinformatics.go.rgreat.R {0} {1} {2}").format(
+            bed_file,
+            background_bed_file,
+            "{}/{}".format(out_dir, prefix))
+    run_shell_cmd(run_rgreat)
+    
+    return None
+
+
+def run_bioinformatics_on_bed(bed_file, background_bed_file, out_dir):
+    """Given a bed file and background bed file, 
+    run HOMER/GREAT
+    """
+    assert bed_file.endswith(".gz")
+    assert background_bed_file.endswith(".gz")
+    
+    prefix = os.path.basename(bed_file).split(".bed")[0].split(".narrowPeak")[0]
+    
+    # run homer
+    homer_dir = "{}/homer/{}".format(out_dir, prefix)
+    run_shell_cmd("mkdir -p {}".format(homer_dir))
+    run_homer(
+        bed_file,
+        background_bed_file,
+        homer_dir)
+
+    # run GREAT
+    great_dir = "{}/great/{}".format(out_dir, prefix)
+    run_shell_cmd("mkdir -p {}".format(great_dir))
+    run_great(
+        bed_file,
+        background_bed_file,
+        great_dir)
+
+    return homer_dir, great_dir
 
 
 def make_deeptools_heatmap(

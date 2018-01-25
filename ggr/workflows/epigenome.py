@@ -234,10 +234,38 @@ def run_dynamic_epigenome_workflow(
                     referencepoint="center",
                     color=histone_color)
 
-    # don't forget to store outputs back
-    args.outputs["data"] = out_data    
-    args.outputs["results"]["epigenome"][results_dirname] = out_results
+    # -----------------------------------------
+    # ANALYSIS 4 - bioinformatics
+    # inputs: BED dirs
+    # outputs: HOMER/GREAT results
+    # -----------------------------------------
+    bioinformatics_bed_dirs = [mark_dir, state_dir]
+    for bioinformatics_bed_dir in bioinformatics_bed_dirs:
+
+        if not os.path.isdir("{}/homer".format(bioinformatics_bed_dir)):
+        
+            bed_files = glob.glob("{}/*.bed.gz".format(bioinformatics_bed_dir))
             
+            # make a background bed file: stable + this info?
+            background_bed_file = "{}/{}.atac.background.bed.gz".format(
+                bioinformatics_bed_dir, prefix)
+            make_background = "zcat {} {} | sort -k1,1 -k2,2n | gzip -c > {}".format(
+                " ".join(bed_files),
+                out_data["atac.stable.bed"],
+                background_bed_file)
+            run_shell_cmd
+
+            quit()
+            
+            # run files
+            for bed_file in bed_files:
+                run_bioinformatics_on_bed(
+                    bed_file,
+                    background_bed_file,
+                    bioinformatics_bed_dir)
+
+    quit()
+    
     return args
 
 

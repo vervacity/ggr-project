@@ -10,22 +10,30 @@ library(qvalue)
 
 args <- commandArgs(trailingOnly=TRUE)
 bed_file <- args[1]
-prefix <- args[2]
+background_bed_file <- args[2]
+prefix <- args[3]
 
 # setup bed file
 bed <- read.table(gzfile(bed_file), header=FALSE, row.names=NULL)
 colnames(bed) <- c('chr', 'start', 'stop')
+
+# setup background file
+background_bed <- read.table(gzfile(background_bed_file), header=FALSE, row.names=NULL)
+colnames(background_bed) <- c("chr", "start", "stop")
 
 # create GREAT job and get enrichments
 job <- submitGreatJob(bed, species='hg19', version="3.0.0")
 print(job)
 tb <- getEnrichmentTables(job) # this is where you would get other tables if you wanted them
 
+print(names(tb))
+
 for (name in names(tb)) {
     table_file_name <- paste(prefix,
                              gsub(" ", "_", name),
                              "txt",
                              sep=".")
+    print(table_file_name)
     
     enrichment_table <- tb[[name]]
     #q_obj <- qvalue(p=enrichment_table$Hyper_Raw_PValue)
