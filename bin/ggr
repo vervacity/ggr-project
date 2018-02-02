@@ -138,8 +138,9 @@ def main():
     from ggr.workflows.epigenome import runall
     args = runall(args, "ggr.epigenome")
 
-    # TODO add in tronn worflow
-    
+    # run deep learning workflow
+    from ggr.workflows.learning import runall
+    args = runall(args, "ggr.tronn")
     
     # save outputs dict to json
     with open("outputs.json", "w") as fp:
