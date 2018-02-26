@@ -551,7 +551,7 @@ def run_dpgp(mat_file, prefix, out_dir, tmp_dir):
 
     # TODO change header if need be
     cluster = (
-        "DP_GP_cluster.py -i {} -o {} -p pdf --plot --fast").format(
+        "DP_GP_cluster.py -i {} -o {} -p pdf --plot").format(
             input_mat_file,
             "{0}/{1}".format(out_dir, prefix))
     run_shell_cmd(cluster)

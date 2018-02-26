@@ -64,8 +64,20 @@ def runall(args, prefix):
     # input: tronn datasets
     # output: model checkpoint
     # -------------------------------------------
-    train_dir = "{}/train/{}".format(results_dir, prefix)
-    
-                    
+    train_dir = "{}/models/{}".format(results_dir, prefix)
+    if not os.path.isdir(train_dir):
+        # train
+        train = (
+            "tronn train "
+            "--data_dir {0}/h5 "
+            "--cvfold {1} "
+            "--model basset "
+            "--transfer_model_checkpoint {2} "
+            "-o {3}/{4} --prefix {4}").format(
+                dataset_dir,
+                0,
+                "",
+                train_dir,
+                prefix)
                     
     return args
