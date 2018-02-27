@@ -194,6 +194,9 @@ def filter_null_and_small_clusters(
     cluster_means, cluster_covariances, cluster_sizes, cluster_names = get_cluster_sufficient_stats(
             cluster_file, mat_file)
 
+    # set up size cutoff
+    size_cutoff = size_cutoff * np.sum(cluster_sizes)
+    
     # calculate what the chi2 cutoffs are based on the means and confidence intervals
     pdf_cutoff = chi2.pdf(1-ci, cluster_means[0].shape[0])
     indices_to_delete = []
@@ -533,25 +536,41 @@ def get_corr_mat(mat_a, mat_b):
     return corr_mat
 
 
-def run_dpgp(mat_file, prefix, out_dir, tmp_dir):
+def run_dpgp(mat_file, prefix, out_dir, tmp_dir, subsample=False, subsample_num=5000):
     """Run DP-GP while managing files correctly
     """
     run_shell_cmd("mkdir -p {}".format(out_dir))
     run_shell_cmd("mkdir -p {}".format(tmp_dir))
 
     # unzip file if needed
+    input_mat_file = "{}/{}.dpgp.tmp".format(
+        tmp_dir, os.path.basename(mat_file).split(".txt")[0])
     if mat_file.endswith(".gz"):
-        input_mat_file = "{}/{}.dpgp.tmp".format(
-            tmp_dir, os.path.basename(mat_file).split(".txt")[0])
         unzip_mat = "zcat {0} > {1}".format(
             mat_file, input_mat_file)
         run_shell_cmd(unzip_mat)
     else:
-        input_mat_file = mat_file
+        unzip_mat = "cat {0} > {1}".format(
+            mat_file, input_mat_file)
+        run_shell_cmd(unzip_mat)
 
-    # TODO change header if need be
+    # if subsample
+    if subsample:
+        subsampled_file = "{}.subsampled.tmp".format(input_mat_file.split(".tmp")[0])
+        # keep header
+        echo_header = "cat {0} | awk 'NR < 2' > {1}".format(
+            input_mat_file, subsampled_file)
+        os.system(echo_header)
+        # subsample
+        run_subsample = "cat {0} | awk 'NR > 1' | shuf -n {1} >> {2}".format(
+            input_mat_file, subsample_num, subsampled_file)
+        os.system(run_subsample)
+        os.system("rm {}".format(input_mat_file))
+        input_mat_file = subsampled_file
+        
+    # TODO change header if need be?
     cluster = (
-        "DP_GP_cluster.py -i {} -o {} -p pdf --plot").format(
+        "DP_GP_cluster.py -i {} -o {} --fast -p pdf --plot").format(
             input_mat_file,
             "{0}/{1}".format(out_dir, prefix))
     run_shell_cmd(cluster)

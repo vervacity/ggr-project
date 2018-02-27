@@ -38,6 +38,9 @@ count_data <- as.matrix(read.table(
     header=TRUE,
     row.names=1))
 
+# keep track of up/down numbers for each comparison
+differential_summary <- data.frame()
+
 # run pairwise comparisons for all
 for (idx1 in seq(1, ncol(count_data)-1, 2)) {
     for (idx2 in seq(1, ncol(count_data)-1, 2)) {
@@ -119,10 +122,26 @@ for (idx1 in seq(1, ncol(count_data)-1, 2)) {
                 paste(prefix, '.', t_compare, '_over_', t_baseline, '_sigResultsDown.txt.gz', sep='')),
             quote=FALSE, row.names=FALSE, col.names=FALSE,
             sep='\t')
+
+        # save to differential summary
+        compare_summary <- data.frame(
+            compare=paste(t_baseline, "_to_", t_compare, sep=""),
+            up=length(up_names),
+            down=length(down_names))
+        differential_summary <- rbind(differential_summary, compare_summary)
+        print(differential_summary)
         
     }
 }
 
+# save out the differential summary
+differential_summary_file <- paste(
+    dirname(prefix), "/differential_summary.txt.gz", sep="")
+write.table(
+    differential_summary,
+    file=gzfile(differential_summary_file),
+    quote=FALSE, row.names=FALSE, col.names=TRUE,
+    sep="\t")
 
 # now merge sigResults to get list of full regions that are significant
 merge_sigresults <- paste("zcat ",
@@ -136,3 +155,4 @@ merge_sigresults <- paste("zcat ",
                           out_file,
                           sep="")
 system(merge_sigresults)
+

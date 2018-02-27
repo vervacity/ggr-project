@@ -155,7 +155,8 @@ def run_reproducibility_dpgp_workflow(
             out_data[pooled_mat_key],
             "{}.pooled".format(prefix), 
             dpgp_pooled_dir, 
-            results_dir)
+            results_dir,
+            subsample=True)
 
     # subsample and plot
     out_data, out_results = run_cluster_plotting_subworkflow(
@@ -189,7 +190,7 @@ def run_reproducibility_dpgp_workflow(
     clusters_nullfilt_handle = "clusters.null_filt.list"
     out_results[clusters_nullfilt_handle] = "{0}/{1}.nullfilt.clustering.txt".format(
         nullfilt_dir, prefix)
-    min_cluster_size = args.inputs["params"]["cluster_min_size"][datatype_key]
+    min_cluster_size = args.inputs["params"]["cluster_min_fract"][datatype_key]
     if not os.path.isfile(out_results[clusters_nullfilt_handle]):
         filter_null_and_small_clusters(
             out_results[clusters_raw_reordered_handle],
@@ -291,6 +292,24 @@ def run_timeseries_workflow(args, prefix, datatype_key="rna", mat_key="counts.ma
     out_results = args.outputs["results"][datatype_key][results_dirname]
 
     # ------------------------------------------------
+    # ANALYSIS - run sequential DESeq to produce figure
+    # input: count matrix
+    # output: figure of dynamic changes across time
+    # ------------------------------------------------
+    logger.info("ANALYSIS: run sequential deseq2 for plotting")
+    run_shell_cmd("mkdir -p {}/deseq2.sequential".format(results_dir))
+    # out results?
+    out_results["dynamic_ids.uncorrected_fdr.list"] = "{}/deseq2.sequential/{}.dynamic.ids.txt.gz".format(
+        results_dir, prefix)
+    if not os.path.isfile(out_results["dynamic_ids.uncorrected_fdr.list"]):
+        run_timeseries_deseq2 = "timeseries.pairwise_deseq2.R {0} {1} {2} {3} sequential".format(
+            out_data[mat_key],
+            "{0}/deseq2.sequential/{1}".format(results_dir, prefix),
+            args.inputs["params"]['atac.sequential_deseq2_fdr'],
+            out_results['dynamic_ids.uncorrected_fdr.list'])
+        run_shell_cmd(run_timeseries_deseq2)
+        
+    # ------------------------------------------------
     # ANALYSIS 0 - run pairwise DESeq to get dynamic IDs
     # input: count matrix
     # output: dynamic id set 
@@ -306,7 +325,7 @@ def run_timeseries_workflow(args, prefix, datatype_key="rna", mat_key="counts.ma
             args.inputs["params"]['pairwise_deseq2_fdr'],
             out_results['dynamic_ids.list'])
         run_shell_cmd(run_timeseries_deseq2)
-        
+
     # ------------------------------------------------
     # ANALYSIS 1 - split into replicates and pooled
     # input: count matrix

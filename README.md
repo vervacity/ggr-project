@@ -6,7 +6,7 @@ GGR Analysis
 - GPy - 1.8.4 (for DP GP)
 
 # Bioinformatics requirements
-- bedtools/2.25.0
+- bedtools/2.25.0 <- IMPORTANT there is a key dependency here, to be removed...
 - homer
 - DP_GP (Englehardt) - commit: eec12e74219f916aa86e253783905f7b5e30f6f4
 

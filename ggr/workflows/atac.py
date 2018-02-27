@@ -57,14 +57,16 @@ def runall(args, prefix):
             inputs['idr_peak_glob'])))
     timepoint_dir = "{}/peaks.timepoints".format(results_dir)
     out_results["timepoint_region_dir"] = timepoint_dir
-    timepoints_files = glob.glob("{}/*.narrowPeak.gz".format(
-        timepoint_dir))
+    timepoints_files = sorted(
+        glob.glob("{}/*.narrowPeak.gz".format(
+            timepoint_dir)))
     if len(timepoints_files) != len(atac_peak_files):
         parallel_copy(
             atac_peak_files,
             timepoint_dir)
-    timepoints_files = glob.glob("{}/*.narrowPeak.gz".format(
-        timepoint_dir))
+    timepoints_files = sorted(
+        glob.glob("{}/*.narrowPeak.gz".format(
+            timepoint_dir)))
     args.outputs["results"]["label_dirs"].append(timepoint_dir)
 
     # -------------------------------------------

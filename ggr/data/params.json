@@ -27,13 +27,16 @@
     "rna_empirical_rlog_thresh": 4.0,
 
     "pairwise_deseq2_fdr":0.0005,
+    "atac.sequential_deseq2_fdr": 0.05,
     "sequential_deseq2_fdr":0.25,
 
-    "cluster_min_size": {
-	"rna": 100,
-	"atac": 1000
+    "cluster_min_fract": {
+	"rna": 0.02,
+	"atac": 0.02
     },
+    
     "raw_cluster_min_size":1000,
+    "raw_cluster_min_fract":0.02,
     "rna_cluster_min_size":50,
     "raw_cluster_reject_null_ci_interval":0.999,
     "rep_to_cluster_ci_interval":0.95,

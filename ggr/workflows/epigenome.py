@@ -5,6 +5,9 @@ import gzip
 import glob
 import logging
 
+import numpy as np
+import pandas as pd
+
 from ggr.util.utils import run_shell_cmd
 
 from ggr.analyses.bioinformatics import make_deeptools_heatmap
@@ -20,6 +23,307 @@ from ggr.analyses.filtering import sort_by_clusters
 from ggr.analyses.filtering import get_ordered_subsample
 
 from ggr.analyses.timeseries import plot_clusters
+
+
+def count_region_nums(file_list, assay, out_file, method="genome_coverage"):
+    """count regions and add to file
+    """
+    if method == "region_count":
+        method = "wc -l"
+    elif method == "genome_coverage":
+        method = "awk -F '\t' '{{ sum += $3-$2 }} END {{ print sum }}'"
+    elif method == "genome_fraction":
+        method = "awk -F '\t' '{{ sum += $3-$2 }} END {{ print sum/3095693983.0  }}'"
+    
+    for filename in file_list:
+
+        if "ATAC" in assay:
+            awk_cmd = ("awk '{{ print \"{0}\t{1}\t\"$1 }}'").format(
+                float(os.path.basename(filename).split(".")[0].split("-")[1].split("d")[1]) / 10,
+                assay)
+        else:
+            awk_cmd = "awk '{{ print \"{0}\t{1}\t\"$1 }}'".format(
+                float(os.path.basename(filename).split(".")[0].split("-")[1].split("d")[1]),
+                assay)
+        
+        get_nums = (
+            "zcat {0} | "
+            "sort -k1,1 -k2,2n | "
+            "bedtools merge -i stdin | "
+            "{1} | "
+            "{2} >> "
+            "{3} ").format(
+                filename,
+                method,
+                awk_cmd,
+                out_file)
+        print get_nums
+        os.system(get_nums)
+
+    return None
+
+
+def get_epigenome_static_metrics_workflow(args, prefix):
+    """Per timepoint file (ATAC), determine global stats
+    """
+    # logging and folder set up
+    logger = logging.getLogger(__name__)
+    logger.info("WORKFLOW: get static metrics across GGR epigenome")
+
+    # setup data and results
+    data_dir = args.outputs["data"]["dir"]
+    out_data = args.outputs["data"]
+
+    results_dirname = "static"
+    results_dir = "{}/{}".format(
+        args.outputs["results"]["epigenome"]["dir"],
+        results_dirname)
+    args.outputs["results"]["epigenome"][results_dirname] = {
+        "dir": results_dir}
+    run_shell_cmd("mkdir -p {}".format(results_dir))
+    out_results = args.outputs["results"]["epigenome"][results_dirname]
+    
+    # set up output file
+    region_nums_key = "epigenome.region_nums"
+    out_results[region_nums_key] = "{0}/{1}.region_nums_per_timepoint.txt".format(
+        results_dir, prefix)
+
+    if not os.path.isfile(out_results[region_nums_key]):
+        # header
+        print_header = "echo \"timepoint\ttype\tcount\" > {0}".format(
+            out_results[region_nums_key])
+        run_shell_cmd(print_header)
+        
+        # get total counts for ATAC
+        atac_timepoint_files = sorted(
+            glob.glob("{}/*.narrowPeak.gz".format(
+                args.outputs["results"]["atac"]["timepoint_region_dir"])))
+        for timepoint_string in args.inputs["params"]["media_timepoints"]:
+            atac_timepoint_files = [
+                filename for filename in atac_timepoint_files
+                if timepoint_string not in filename]
+        count_region_nums(
+            atac_timepoint_files,
+            "ATAC-seq",
+            out_results[region_nums_key])
+        
+        # get counts for histones
+        histone_inputs = args.inputs["chipseq"][args.cluster]
+        histones = histone_inputs["histones"]["ordered_names"]
+        
+        for histone in histones:
+            histone_overlap_files = sorted(
+                glob.glob("{0}/{1}".format(
+                    histone_inputs["data_dir"],
+                    histone_inputs["histones"][histone]["overlap_glob"])))
+            count_region_nums(
+                histone_overlap_files,
+                "{} ChIP-seq".format(histone),
+                out_results[region_nums_key])
+            
+        # get counts for CTCF
+        tf_inputs = args.inputs["chipseq"][args.cluster]
+        tfs = tf_inputs["tfs"].keys()
+        for tf in tfs:
+            peak_files = sorted(
+                glob.glob("{0}/{1}".format(
+                    tf_inputs["data_dir"],
+                    tf_inputs["tfs"][tf]["idr_peak_glob"])))
+            count_region_nums(
+                peak_files,
+                "{} ChIP-seq".format(tf),
+                out_results[region_nums_key])
+
+        # and plot
+        plot_file = "{}.pdf".format(out_results[region_nums_key].split(".txt")[0])
+        plot_counts = "plot.region_nums.R {} {}".format(
+            out_results[region_nums_key], plot_file)
+        run_shell_cmd(plot_counts)
+    
+    return args
+
+def get_timepoint_dynamics(deseq_files, region_id_file, assay, out_file):
+    """Read in deseq files and calculate signal summary stats
+    """
+
+    # for each datatype, collect the dynamic regions
+    # then collect positive and negative signal changes separately
+    # from deseq2 file, (basemean) * 2**(log2foldchange)
+    # then convert that back into log2 space?
+
+    # need list of dynamic ids
+    # collect the correct deseq result files (resultsAll)
+    # for each deseq2 file, keep only the dynamic regions
+    # calculate the positive changes, sum
+    # calculate the negative changes, sum
+    # append to a dataframe
+    # save this out
+
+    region_ids = pd.read_table(region_id_file, header=None).iloc[:,0].tolist()
+
+    with open(out_file, "a") as out:
+        for deseq_file in deseq_files:
+            # get name and results
+
+            if "ATAC" in assay:
+                prefix = os.path.basename(deseq_file).split(".")[2].split("_results")[0]
+                prefix = list(prefix)
+                prefix.insert(2, ".")
+                prefix.insert(12, ".")
+                prefix = "".join(prefix)
+            elif "H3" in assay:
+                prefix = os.path.basename(deseq_file).split(".")[3].split("_results")[0]
+            else:
+                prefix = os.path.basename(deseq_file).split(".")[2].split("_results")[0]
+
+            prefix = "{}_to_{}".format(
+                prefix.split("_over_")[1],
+                prefix.split("_over_")[0])
+                
+            deseq_results = pd.read_table(deseq_file, index_col=0)
+            
+            # filter
+            deseq_results = deseq_results.loc[region_ids,:]
+        
+            # calculate
+            pos_changes = deseq_results[deseq_results["log2FoldChange"] > 0.0]
+            final_signal = np.sum(pos_changes["baseMean"] * 2**pos_changes["log2FoldChange"])
+            initial_signal = np.sum(pos_changes["baseMean"])
+            pos_FC = final_signal / initial_signal
+            posLog2FC = np.log2(pos_FC)
+            
+            neg_changes = deseq_results[deseq_results["log2FoldChange"] < 0.0]
+            final_signal = np.sum(neg_changes["baseMean"] * 2**neg_changes["log2FoldChange"])
+            initial_signal = np.sum(neg_changes["baseMean"])
+            neg_FC = final_signal / initial_signal
+            negLog2FC = np.log2(neg_FC)
+            
+            # save out
+            out.write("{}\t{}\t{}\t{}\n".format(prefix, assay, posLog2FC, negLog2FC))
+    
+    return None
+
+
+
+def get_epigenome_dynamic_metrics_workflow(args, prefix):
+    """Get the differential positive and negative signals for 
+    each epigenomic dataset
+    """
+    # logging and folder set up
+    logger = logging.getLogger(__name__)
+    logger.info("WORKFLOW: get static metrics across GGR epigenome")
+
+    # setup data and results
+    data_dir = args.outputs["data"]["dir"]
+    out_data = args.outputs["data"]
+
+    results_dirname = "dynamic"
+    results_dir = "{}/{}".format(
+        args.outputs["results"]["epigenome"]["dir"],
+        results_dirname)
+    # TODO figure out if this is ok
+    args.outputs["results"]["epigenome"][results_dirname] = {
+        "dir": results_dir}
+    run_shell_cmd("mkdir -p {}".format(results_dir))
+    out_results = args.outputs["results"]["epigenome"][results_dirname]
+    
+    # set up output file
+    region_nums_key = "epigenome.timepoint_dynamics"
+    out_results[region_nums_key] = "{0}/{1}.region_dynamics_per_timepoint.txt".format(
+        results_dir, prefix)
+
+    # for each datatype, collect the dynamic regions
+    # then collect positive and negative signal changes separately
+    # from deseq2 file, (basemean) * 2**(log2foldchange)
+    # then convert that back into log2 space?
+
+    # need list of dynamic ids
+    # collect the correct deseq result files (resultsAll)
+    # for each deseq2 file, keep only the dynamic regions
+    # calculate the positive changes, sum
+    # calculate the negative changes, sum
+    # append to a dataframe
+    # save this out
+
+    if not os.path.isfile(out_results[region_nums_key]):
+        # header
+        print_header = "echo \"timepoint\ttype\tposLog2FC\tnegLog2FC\" > {0}".format(
+            out_results[region_nums_key])
+        run_shell_cmd(print_header)
+
+        # get dynamic regions handle
+        dynamic_regions_file = args.outputs["results"]["atac"]["timeseries"]["dynamic_ids.list"]
+        
+        # get ATAC deseq files and extract signal
+        days = args.inputs["params"]["hi_res_filt_days"]
+        atac_deseq2_files_all = sorted(
+            glob.glob("{}/deseq2/*resultsAll.txt.gz".format(
+                args.outputs["results"]["atac"]["timeseries"]["dir"])))
+        timepoint_comparisons = [
+            "{}_over_{}".format(days[i+1], days[i])
+            for i in xrange(len(days)-1)]
+        atac_deseq2_files = []
+        for timepoint_string in timepoint_comparisons:
+            atac_deseq2_files += [
+                filename for filename in atac_deseq2_files_all
+                if timepoint_string in filename]
+        get_timepoint_dynamics(
+            atac_deseq2_files,
+            dynamic_regions_file,
+            "ATAC-seq",
+            out_results[region_nums_key])
+
+        # set up for lo res groups
+        days = args.inputs["params"]["lo_res_days"]
+        timepoint_comparisons = [
+            "{}_over_{}".format(days[i+1], days[i])
+            for i in xrange(len(days)-1)]
+        
+        # get counts for histones
+        histone_inputs = args.inputs["chipseq"][args.cluster]
+        histones = histone_inputs["histones"]["ordered_names"]
+        
+        for histone in histones:
+
+            # get dynamic regions handle
+            dynamic_regions_file = args.outputs["results"]["histones"][histone]["timeseries"]["ggr.histone.{}.dynamic.ids.list".format(histone)]
+
+            # get histone deseq files
+            histone_deseq2_files_all = sorted(
+            glob.glob("{}/deseq2/*resultsAll.txt.gz".format(
+                args.outputs["results"]["histones"][histone]["timeseries"]["dir"])))
+            histone_deseq2_files = []
+            for timepoint_string in timepoint_comparisons:
+                histone_deseq2_files += [
+                    filename for filename in histone_deseq2_files_all
+                    if timepoint_string in filename]
+            get_timepoint_dynamics(
+                histone_deseq2_files,
+                dynamic_regions_file,
+                "{} ChIP-seq".format(histone),
+                out_results[region_nums_key])
+            
+        # get counts for CTCF
+        tf_inputs = args.inputs["chipseq"][args.cluster]
+        tfs = tf_inputs["tfs"].keys()
+
+        # for now don't analyze, need to run deseq on tfs
+        tfs = []
+        
+        for tf in tfs:
+
+            # get dynamic regions handle
+
+            # get tf deseq files
+            pass
+
+        # and plot
+        plot_file = "{}.pdf".format(out_results[region_nums_key].split(".txt")[0])
+        plot_counts = "plot.region_dynamics.R {} {}".format(
+            out_results[region_nums_key], plot_file)
+        run_shell_cmd(plot_counts)
+
+    return args
 
 
 def make_fake_cluster_file(id_list_file, out_file):
@@ -592,6 +896,24 @@ def runall(args, prefix):
     run_shell_cmd("mkdir -p {}".format(results_dir))
     out_results = args.outputs["results"][results_dirname]
 
+    # -----------------------------------------
+    # ANALYSIS - per timepoint, total num of regions and overlap with histones
+    # inputs - peak files
+    # outputs - plot of region counts
+    # -----------------------------------------
+    logger.info("ANALYSIS: get region counts for epigenome datasets")
+    args = get_epigenome_static_metrics_workflow(
+        args, "{}.static".format(prefix))
+
+    # -----------------------------------------
+    # ANALYSIS - per timepoint, dynamics of regions
+    # inputs - deseq2 files
+    # outputs - plot of region dynamics per timepoint
+    # -----------------------------------------
+    logger.info("ANALYSIS: get region dynamics for epigenome datasets")
+    args = get_epigenome_dynamic_metrics_workflow(
+        args, "{}.dynamic".format(prefix))
+    
     # -----------------------------------------
     # ANALYSIS 0 - integrate histones into dynamic ATAC
     # inputs: dynamic ATAC clusters, histone marks
