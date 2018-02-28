@@ -65,6 +65,9 @@ for (i in 1:nrow(data_w_clusters)) {
 
 # clean up, just in case
 data_w_clusters$histone_cluster <- NULL
+data_w_clusters$H3K27ac <- NULL
+data_w_clusters$H3K4me1 <- NULL
+data_w_clusters$H3K27me3 <- NULL
 
 data_z <- t(scale(t(data_w_clusters), center=TRUE, scale=TRUE))
 

@@ -750,8 +750,6 @@ def plot_clusters(
         "{0} {1} {2} {3}").format(
             cluster_file, cluster_mat, out_dir, prefix)
     run_shell_cmd(r_plot_clusters)
-
-    # print "plot_clusters function (analyses/timeseries.py)"
     
     return None
 

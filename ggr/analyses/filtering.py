@@ -90,6 +90,8 @@ def sort_by_clusters(
         sort_columns += cluster_cols
         
     # sort and save out
+    # TODO first shuffle here i think?
+    
     data_sorted = data.sort_values(sort_columns, ascending=True)
     data_sorted.to_csv(out_clusters_file, sep="\t", index=False)
     data_sorted.to_csv(out_list_file, columns=["id"], compression="gzip", sep="\t",

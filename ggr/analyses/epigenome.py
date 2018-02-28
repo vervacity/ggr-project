@@ -251,7 +251,72 @@ def run_bioinformatics_on_bed(bed_dir, background_bed, regex, out_dir):
     return None
 
 
+def choose_best_summit(intersect_output_file, out_file):
+    """Given the results of an intersect (with -wao option)
+    reduce to the best summit, and output a summit file
+    """
+    with open(intersect_output_file, "r") as fp:
+        with open(out_file, "w") as out:
 
+            current_region = ""
+            current_qval = 0.0
+            current_summit_pos = 0
+            for line in fp:
+                # compare to current region
+                fields = line.strip().split("\t")
+                region = "{}-{}-{}".format(fields[0], fields[1], fields[2])
+                
+                # if same region, check if pval stronger. if so, change summit
+                if region == current_region:
+                    qval = float(fields[12])
+                    if qval > current_qval:
+                        current_qval = qval
+                        current_summit_pos = int(fields[13])
+                else:
+                    if current_region != "":
+                        # write out current region
+                        region_fields = current_region.split("-")
+                        start = int(region_fields[1])
+                        stop = int(region_fields[2])
+                        out.write("{}\t{}\t{}\n".format(
+                            region_fields[0],
+                            start + current_summit_pos,
+                            start + current_summit_pos + 1))
+
+                    # save in new region
+                    current_region = region
+                    current_qval = float(fields[12])
+                    current_summit_pos = int(fields[13])
+
+            # finally write out the last bit
+            region_fields = current_region.split("-")
+            start = int(region_fields[1])
+            stop = int(region_fields[2])
+            out.write("{}\t{}\t{}\n".format(
+                region_fields[0],
+                start + current_summit_pos,
+                start + current_summit_pos + 1))
+                    
+    return None
+
+
+def get_best_summit(master_bed, peak_files, out_file):
+    """From the peak files, choose the best summit per master bed file
+    """
+    print master_bed
+    
+    # intersect across all relevant peak files
+    intersect = "bedtools intersect -wao -a {0} -b {1} > summit_overlap.tmp".format(
+        master_bed, " ".join(peak_files))
+    run_shell_cmd(intersect)
+
+    # and then reduce to best summit
+    choose_best_summit("summit_overlap.tmp", out_file)
+
+    # rm tmp file
+    run_shell_cmd("rm summit_overlap.tmp")
+    
+    return
 
 
 

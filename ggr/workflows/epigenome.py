@@ -18,6 +18,7 @@ from ggr.util.bed_utils import id_to_bed
 from ggr.analyses.epigenome import get_histone_overlaps
 from ggr.analyses.epigenome import cluster_by_chromatin_marks
 from ggr.analyses.epigenome import split_stable_atac_by_dynamic_marks
+from ggr.analyses.epigenome import get_best_summit
 
 from ggr.analyses.filtering import sort_by_clusters
 from ggr.analyses.filtering import get_ordered_subsample
@@ -145,26 +146,12 @@ def get_epigenome_static_metrics_workflow(args, prefix):
 def get_timepoint_dynamics(deseq_files, region_id_file, assay, out_file):
     """Read in deseq files and calculate signal summary stats
     """
-
-    # for each datatype, collect the dynamic regions
-    # then collect positive and negative signal changes separately
-    # from deseq2 file, (basemean) * 2**(log2foldchange)
-    # then convert that back into log2 space?
-
-    # need list of dynamic ids
-    # collect the correct deseq result files (resultsAll)
-    # for each deseq2 file, keep only the dynamic regions
-    # calculate the positive changes, sum
-    # calculate the negative changes, sum
-    # append to a dataframe
-    # save this out
-
     region_ids = pd.read_table(region_id_file, header=None).iloc[:,0].tolist()
 
     with open(out_file, "a") as out:
         for deseq_file in deseq_files:
-            # get name and results
-
+            
+            # get prefix
             if "ATAC" in assay:
                 prefix = os.path.basename(deseq_file).split(".")[2].split("_results")[0]
                 prefix = list(prefix)
@@ -176,16 +163,18 @@ def get_timepoint_dynamics(deseq_files, region_id_file, assay, out_file):
             else:
                 prefix = os.path.basename(deseq_file).split(".")[2].split("_results")[0]
 
+            # adjust prefix
             prefix = "{}_to_{}".format(
                 prefix.split("_over_")[1],
                 prefix.split("_over_")[0])
-                
+
+            # get deseq info
             deseq_results = pd.read_table(deseq_file, index_col=0)
             
             # filter
             deseq_results = deseq_results.loc[region_ids,:]
         
-            # calculate
+            # calculate. convert into normal signal info, then get fold change, and then return to log2 space
             pos_changes = deseq_results[deseq_results["log2FoldChange"] > 0.0]
             final_signal = np.sum(pos_changes["baseMean"] * 2**pos_changes["log2FoldChange"])
             initial_signal = np.sum(pos_changes["baseMean"])
@@ -231,19 +220,6 @@ def get_epigenome_dynamic_metrics_workflow(args, prefix):
     region_nums_key = "epigenome.timepoint_dynamics"
     out_results[region_nums_key] = "{0}/{1}.region_dynamics_per_timepoint.txt".format(
         results_dir, prefix)
-
-    # for each datatype, collect the dynamic regions
-    # then collect positive and negative signal changes separately
-    # from deseq2 file, (basemean) * 2**(log2foldchange)
-    # then convert that back into log2 space?
-
-    # need list of dynamic ids
-    # collect the correct deseq result files (resultsAll)
-    # for each deseq2 file, keep only the dynamic regions
-    # calculate the positive changes, sum
-    # calculate the negative changes, sum
-    # append to a dataframe
-    # save this out
 
     if not os.path.isfile(out_results[region_nums_key]):
         # header
@@ -452,7 +428,8 @@ def run_dynamic_epigenome_workflow(
     if not os.path.isfile(out_results[atac_ordered_subsample_bed_key]):
         id_to_bed(
             out_results[atac_ordered_subsample_key],
-            "{}.gz".format(out_results[atac_ordered_subsample_bed_key]))
+            "{}.gz".format(out_results[atac_ordered_subsample_bed_key]),
+            col=2)
 
         # and unzip
         run_shell_cmd("gunzip {}.gz".format(out_results[atac_ordered_subsample_bed_key]))
@@ -504,8 +481,29 @@ def run_dynamic_epigenome_workflow(
     logger.info("ANALYSIS: plot out the heatmaps with the ordering in the subsample")
     mat_key = "atac.counts.pooled.rlog.dynamic.mat"
     plot_dir = "{}/plots".format(results_dir)
+
+    # TODO - want to generate a file that has the strongest ATAC
+    # summit across time, for each region. use that summit
+    # to center on for the histone marks.
+    # make this an analysis
+    # build this on the ordered subsample
+    ordered_subsample_summits_key = "{}.summits".format(atac_ordered_subsample_bed_key)
+    out_results[ordered_subsample_summits_key] = "{}.summits.bed".format(
+        out_results[atac_ordered_subsample_bed_key].split(".bed")[0])
+    if not os.path.isfile(out_results[ordered_subsample_summits_key]):
+
+        # get atac timeseries files
+        timeseries_dir = args.outputs["results"]["atac"]["timepoint_region_dir"]
+        atac_timeseries_files = sorted(
+            glob.glob("{}/*narrowPeak.gz".format(timeseries_dir)))
+        
+        # get best summits
+        get_best_summit(
+            out_results[atac_ordered_subsample_bed_key],
+            atac_timeseries_files,
+            out_results[ordered_subsample_summits_key])
     
-    # plot ATAC
+    # plot ATAC with the summits
     if not os.path.isdir(plot_dir):
         run_shell_cmd("mkdir -p {}".format(plot_dir))
         plot_clusters(
@@ -535,12 +533,14 @@ def run_dynamic_epigenome_workflow(
         
             if not os.path.isfile(out_file):
                 make_deeptools_heatmap(
-                    out_results[atac_ordered_subsample_bed_key],
+                    out_results[ordered_subsample_summits_key],
                     histone_bigwigs,
                     out_prefix,
                     sort=False,
                     referencepoint="center",
                     color=histone_color)
+
+    quit()
 
     # -----------------------------------------
     # ANALYSIS 4 - bioinformatics

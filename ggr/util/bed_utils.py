@@ -24,7 +24,7 @@ def merge_regions(bed_files, out_bed):
     return None
 
 
-def id_to_bed(id_file, bed_file, sort=False, remove_extra_columns=True):
+def id_to_bed(id_file, bed_file, col=1, sort=False, remove_extra_columns=True):
     """Convert id of form chr:start-stop into BED
     
     Args:
@@ -43,7 +43,7 @@ def id_to_bed(id_file, bed_file, sort=False, remove_extra_columns=True):
         sort_file = ""
 
     if remove_extra_columns:
-        remove = "awk -F '\t' '{{ print $1 }}' | "
+        remove = "awk -F '\t' '{{ print ${0} }}' | ".format(col)
     else:
         remove = ""
         
