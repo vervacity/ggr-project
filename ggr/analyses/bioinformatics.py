@@ -88,25 +88,26 @@ def make_deeptools_heatmap(
         kval=4,
         referencepoint='TSS',
         extend_dist=2000, # 1000
+        bin_total=100,
         color="Blues"):
-    '''
-    Uses deeptools to make a profile heatmap
-    '''
-
-    # TODO(dk) try sorting using a BED with groups.
+    """Uses deeptools to make a profile heatmap
+    """
+    # set up bin size
+    bin_size = extend_dist * 2 / bin_total
     
-    # do the same with TSS
+    # compute matrix - extract from bigwigs
     point_matrix = '{}.point.mat.gz'.format(prefix)
     deeptools_compute_matrix = (
         "computeMatrix reference-point "
         "--referencePoint {0} "
-        "-b {1} -a {1} "
-        "-R {2} "
-        "-S {3} "
+        "-b {1} -a {1} -bs {2} "
+        "-R {3} "
+        "-S {4} "
         #"--skipZeros "
-        "-o {4} ").format(
+        "-o {5} ").format(
             referencepoint,
             extend_dist,
+            bin_size,
             point_file,
             ' '.join(bigwig_files),
             point_matrix)

@@ -92,11 +92,10 @@ cluster_colors <- cluster_palette[cluster_ids_per_example]
 #mylhei = c(0.5,12,1.5)
 
 mylmat = rbind(c(0,0,3,0),c(4,1,2,0),c(0,0,5,0))
-mylwid = c(2,0.5,6,2)
-mylhei = c(0.5,12,1.5)
+mylwid = c(0.25,0.1,1,0.25)
+mylhei = c(0.25,4,0.5)
 
-pdf(plot_file, height=18, width=6)
-#pdf(plot_file, height=18, width=6, units="in", res=200)
+pdf(plot_file, height=9, width=3)
 heatmap.2(
     as.matrix(data_z),
     Rowv=FALSE,
@@ -115,7 +114,7 @@ heatmap.2(
     srtCol=45,
     cexCol=3.0,
     labRow="",
-    margins=c(3,0),
+    margins=c(2,0),
     col=my_palette,
     lmat=mylmat,
     lwid=mylwid,

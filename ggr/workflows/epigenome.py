@@ -504,22 +504,26 @@ def run_dynamic_epigenome_workflow(
             out_results[ordered_subsample_summits_key])
     
     # plot ATAC with the summits
-    if not os.path.isdir(plot_dir):
-        run_shell_cmd("mkdir -p {}".format(plot_dir))
-        plot_clusters(
-            atac_cluster_file,
-            out_results[atac_ordered_subsample_key],
-            out_data[mat_key],
-            plot_dir,
-            prefix)
+    #if not os.path.isdir(plot_dir):
+    if True:
+        if False:
+            run_shell_cmd("mkdir -p {}".format(plot_dir))
+            plot_clusters(
+                atac_cluster_file,
+                out_results[atac_ordered_subsample_key],
+                out_data[mat_key],
+                plot_dir,
+                prefix)
         
         # TODO need to plot color bars too?
         
         # plot the histone signal profiles with deeptools
         histone_colors = args.inputs["chipseq"][args.cluster]["histones"]["ordered_deeptools_colors"]
+        histone_r_colors = args.inputs["chipseq"][args.cluster]["histones"]["ordered_r_colors"]
         for histone_idx in range(len(histones)):
             histone = histones[histone_idx]
             histone_color = histone_colors[histone_idx]
+            histone_r_color = histone_r_colors[histone_idx]
             histone_bigwigs = sorted(
                 glob.glob("{}/{}".format(
                     args.inputs["chipseq"][args.cluster]["data_dir"],
@@ -538,8 +542,22 @@ def run_dynamic_epigenome_workflow(
                     out_prefix,
                     sort=False,
                     referencepoint="center",
+                    extend_dist=1500,
+                    bin_total=100,
                     color=histone_color)
 
+            # and then make own heatmap file in R with matrix output
+            out_mat_file = "{}.point.mat.gz".format(out_prefix)
+            out_r_file = "{}.replot.pdf".format(out_file.split(".pdf")[0])
+            if not os.path.isfile(out_r_file):
+                replot = (
+                    "plot.profile_heatmaps.R {0} {1} {2} "
+                    "1,100 101,200 201,300").format(
+                        out_mat_file,
+                        out_r_file,
+                        histone_r_color)
+                run_shell_cmd(replot)
+            
     quit()
 
     # -----------------------------------------
