@@ -8,6 +8,8 @@ library(reshape2)
 library(grid)
 library(gridGraphics)
 
+library(extrafont)
+
 # read in args
 args <- commandArgs(trailingOnly=TRUE)
 filename <- args[1]
@@ -42,7 +44,25 @@ p <- ggplot(data_melted, aes(x=timepoint, y=value, fill=variable)) +
         strip.text.x = element_blank())
 
 ggsave(out_plot, height=3, width=10)
+embed_fonts(out_plot)
+
 quit()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 make_barplot <- function(data_melted) {
@@ -60,10 +80,6 @@ grab_grob <- function(fn) {
     grid.grab()
 }
 
-
-
-
-
 gl <- lapply(1:length(assays), function(i) {
                  data_tmp <- data_melted[data_melted$variable == assays[i],]
                  ggplot(data_tmp, aes(x=timepoint, y=value, fill=variable)) +
@@ -80,6 +96,10 @@ pdf(out_plot)
 grid.arrange(grobs=gl, nrow=length(assays), ncol=1)
 
 dev.off()
+
+
+
+
 
 quit()
 

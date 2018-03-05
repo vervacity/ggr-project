@@ -8,6 +8,8 @@ library(reshape2)
 library(grid)
 library(gridGraphics)
 
+library(extrafont)
+
 # read in args
 args <- commandArgs(trailingOnly=TRUE)
 filename <- args[1]
@@ -50,6 +52,13 @@ p <- ggplot() +
         strip.text.x=element_blank())
 
 ggsave(out_plot, height=3, width=10)
+embed_fonts(out_plot)
+
+
+
+
+
+
 quit()
 
 
