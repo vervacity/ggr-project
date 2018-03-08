@@ -56,6 +56,7 @@ def id_to_bed(id_file, bed_file, col=1, sort=False, remove_extra_columns=True):
         "awk -F '-' '{{ print $1\"\t\"$2 }}' | "
         "awk -F '(' '{{ print $1 }}' | "
         "{3}"
+        "awk 'NF' | "
         "gzip -c > {4}").format(
             pipe_in, id_file, remove, sort_file, bed_file)
     print convert

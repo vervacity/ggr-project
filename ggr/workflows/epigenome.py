@@ -452,7 +452,7 @@ def run_dynamic_epigenome_workflow(
             "{}/ids".format(mark_dir),
             "{}/ids".format(state_dir),
             prefix,
-            min_region_num=100)
+            min_region_num=args.inputs["params"]["chrom_state_cluster_min_size"])
 
         # and now convert files to beds and keep bed dir
         mark_files = glob.glob("{}/ids/*.txt.gz".format(mark_dir))
@@ -558,8 +558,6 @@ def run_dynamic_epigenome_workflow(
                         histone_r_color)
                 run_shell_cmd(replot)
             
-    quit()
-
     # -----------------------------------------
     # ANALYSIS 4 - bioinformatics
     # inputs: BED dirs
@@ -738,7 +736,7 @@ def run_stable_epigenome_workflow(
             "{}/ids".format(mark_dir),
             "{}/ids".format(state_dir),
             prefix,
-            min_region_num=100)
+            min_region_num=args.inputs["params"]["chrom_state_cluster_min_size"])
 
         # and now convert files to beds
         mark_files = glob.glob("{}/ids/*.txt.gz".format(mark_dir))
@@ -949,6 +947,8 @@ def runall(args, prefix):
     logger.info("ANALYSIS: integrate stable ATAC w histones")
     args = run_stable_epigenome_workflow(
         args, "{}.stable".format(prefix))
+
+    # TODO: look at the histone marks that are outside of ATAC regions
     
 
     return args
