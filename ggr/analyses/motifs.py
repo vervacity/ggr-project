@@ -558,7 +558,8 @@ def hagglom_pwms(
 
         if (cor_val > cor_thresh) and (ncor_val >= ncor_thresh):
             # store new merged pwm
-            name = "{};{}".format(pwm1.name, pwm2.name)
+            # save in (approximately) alphabetical order
+            name = ";".join(sorted([pwm1.name, pwm2.name]))
             print name, cor_val, ncor_val
             new_pwm = pwm1.merge(
                 pwm2,
@@ -593,13 +594,16 @@ def rename_pwms(pwm_file, out_pwm_file, out_metadata_file):
                 
                 for line in fp:
                     if line.startswith(">"):
+                        old_pwm_group_name = line.strip()[1:]
+                        
                         # this is a header. adjust and send to both pwm and metadata
-                        new_pwm_group_name = "PWM_HCLUST_{}.UNK.0.A".format(id_num)
+                        new_pwm_group_name = "HCLUST-{}_{}.UNK.0.A".format(
+                            id_num, old_pwm_group_name.split("_")[0].upper())
                         pwm_out.write(">{}\n".format(new_pwm_group_name))
 
                         # set up metadata
-                        old_pwm_group_name = line.strip()[1:]
-                        ensembl_ids = [pwm_name.split(".")[1] for pwm_name in old_pwm_group_name.split(";")]
+                        ensembl_ids = [pwm_name.split(".")[1]
+                                       for pwm_name in old_pwm_group_name.split(";")]
                         metadata_out.write("{}\t{}\t{}\n".format(
                             new_pwm_group_name, old_pwm_group_name, ";".join(ensembl_ids)))
                         

@@ -504,16 +504,14 @@ def run_dynamic_epigenome_workflow(
             out_results[ordered_subsample_summits_key])
     
     # plot ATAC with the summits
-    #if not os.path.isdir(plot_dir):
-    if True:
-        if False:
-            run_shell_cmd("mkdir -p {}".format(plot_dir))
-            plot_clusters(
-                atac_cluster_file,
-                out_results[atac_ordered_subsample_key],
-                out_data[mat_key],
-                plot_dir,
-                prefix)
+    if not os.path.isdir(plot_dir):
+        run_shell_cmd("mkdir -p {}".format(plot_dir))
+        plot_clusters(
+            atac_cluster_file,
+            out_results[atac_ordered_subsample_key],
+            out_data[mat_key],
+            plot_dir,
+            prefix)
         
         # TODO need to plot color bars too?
         
@@ -547,13 +545,15 @@ def run_dynamic_epigenome_workflow(
                     color=histone_color)
 
             # and then make own heatmap file in R with matrix output
+            row_sep_file = "{}/{}.row_seps.txt".format(plot_dir, prefix)
             out_mat_file = "{}.point.mat.gz".format(out_prefix)
             out_r_file = "{}.replot.pdf".format(out_file.split(".pdf")[0])
             if not os.path.isfile(out_r_file):
                 replot = (
-                    "plot.profile_heatmaps.R {0} {1} {2} "
+                    "plot.profile_heatmaps.R {0} {1} {2} {3} "
                     "1,100 101,200 201,300").format(
                         out_mat_file,
+                        row_sep_file,
                         out_r_file,
                         histone_r_color)
                 run_shell_cmd(replot)
@@ -604,7 +604,6 @@ def run_stable_epigenome_workflow(
     logger.info("WORKFLOW: get stable epigenome")
 
     # assertions
-    
     
     # setup data and results
     data_dir = args.outputs["data"]["dir"]
@@ -827,28 +826,58 @@ def run_stable_epigenome_workflow(
     logger.info("ANALYSIS: plot out the heatmaps with the ordering in the subsamples")
     plot_dir = "{}/plots".format(results_dir)
     
-    # plot ATAC
-    if not os.path.isdir(plot_dir):
+    # plot ATAC and histone marks
+    #if not os.path.isdir(plot_dir):
+    if True:
         run_shell_cmd("mkdir -p {}".format(plot_dir))
 
         for subsample_bed_key in subsample_bed_keys:
+
+            # plot the ATAC alongside, using summits
+            ordered_subsample_summits_key = "{}.summits".format(subsample_bed_key)
+            out_results[ordered_subsample_summits_key] = "{}.summits.bed".format(
+                out_results[subsample_bed_key].split(".bed")[0])
+            if not os.path.isfile(out_results[ordered_subsample_summits_key]):
+                
+                # get atac timeseries files
+                timeseries_dir = args.outputs["results"]["atac"]["timepoint_region_dir"]
+                atac_timeseries_files = sorted(
+                    glob.glob("{}/*narrowPeak.gz".format(timeseries_dir)))
         
+                # get best summits
+                get_best_summit(
+                    out_results[subsample_bed_key],
+                    atac_timeseries_files,
+                    out_results[ordered_subsample_summits_key])
+    
+            # plot ATAC with the summits
+            if False:
+                plot_clusters(
+                    out_results[atac_fake_clusters_key],
+                    out_results[atac_ordered_subsample_key],
+                    out_data[atac_stable_mat_key],
+                    plot_dir,
+                    prefix)
+            
             # TODO need to plot color bars?
             
             # plot the histone signal profiles with deeptools
             histone_colors = args.inputs["chipseq"][args.cluster]["histones"]["ordered_deeptools_colors"]
+            histone_r_colors = args.inputs["chipseq"][args.cluster]["histones"]["ordered_r_colors"]
             for histone_idx in range(len(histones)):
                 histone = histones[histone_idx]
                 histone_color = histone_colors[histone_idx]
+                histone_r_color = histone_r_colors[histone_idx]
                 histone_bigwigs = sorted(
                     glob.glob("{}/{}".format(
                         args.inputs["chipseq"][args.cluster]["data_dir"],
                         args.inputs["chipseq"][args.cluster]["histones"][histone]["pooled_bigwig_glob"])))
 
-                out_prefix = "{}/{}.{}_overlap".format(
+                out_prefix = "{}/{}.{}_overlap.{}".format(
                     plot_dir,
                     prefix,
-                    histone)
+                    histone,
+                    subsample_bed_key.split(".")[-4])
                 out_file = "{}.heatmap.profile.pdf".format(out_prefix)
                 
                 if not os.path.isfile(out_file):
@@ -860,6 +889,24 @@ def run_stable_epigenome_workflow(
                         referencepoint="center",
                         color=histone_color)
 
+                
+                # and then make own heatmap file in R with matrix output
+                row_sep_file = "{}/{}.row_seps.txt".format(plot_dir, prefix)
+                out_mat_file = "{}.point.mat.gz".format(out_prefix)
+                out_r_file = "{}.replot.pdf".format(out_file.split(".pdf")[0])
+                #if not os.path.isfile(out_r_file):
+                if True:
+                    replot = (
+                        "plot.profile_heatmaps.R {0} {1} {2} {3} "
+                        "1,100 101,200 201,300").format(
+                            out_mat_file,
+                            row_sep_file,
+                            out_r_file,
+                            histone_r_color)
+                    run_shell_cmd(replot)
+
+    quit()
+    
     # -----------------------------------------
     # ANALYSIS 5 - bioinformatics
     # inputs: BED dirs

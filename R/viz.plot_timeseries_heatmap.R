@@ -50,7 +50,7 @@ for (i in 1:length(cluster_names)) {
     cluster_sizes <- c(cluster_sizes, nrow(single_cluster))
 }
 
-# determine row sep points
+# determine row sep points and save out
 rowsep <- c()
 cluster <- 1
 cluster_ids_per_example <- data_w_clusters$cluster
@@ -62,6 +62,8 @@ for (i in 1:nrow(data_w_clusters)) {
         cluster <- cluster_ids_per_example[i]
     }
 }
+row_sep_file <- paste(out_dir, "/", prefix, ".row_seps.txt", sep="")
+write.table(rowsep, row_sep_file, row.names=FALSE, col.names=FALSE)
 
 # clean up, just in case
 data_w_clusters$histone_cluster <- NULL
@@ -92,10 +94,10 @@ cluster_colors <- cluster_palette[cluster_ids_per_example]
 #mylhei = c(0.5,12,1.5)
 
 mylmat = rbind(c(0,0,3,0),c(4,1,2,0),c(0,0,5,0))
-mylwid = c(0.25,0.1,1,0.25)
+mylwid = c(0.05,0.1,1,0.05)
 mylhei = c(0.25,4,0.5)
 
-pdf(plot_file, height=9, width=3)
+pdf(plot_file, height=7, width=2, family="ArialMT")
 heatmap.2(
     as.matrix(data_z),
     Rowv=FALSE,
@@ -107,14 +109,14 @@ heatmap.2(
     key.title=NA,
     key.xlab=NA,
     key.par=list(pin=c(4,0.1),
-        mar=c(6.1,0,5.1,0),
-        mgp=c(3,2,0),
-        cex.axis=2.0,
+        mar=c(2.1,0,2.1,0),
+        mgp=c(3,1,0),
+        cex.axis=1.0,
         font.axis=2),
     srtCol=45,
-    cexCol=3.0,
+    cexCol=1.25,
     labRow="",
-    margins=c(2,0),
+    margins=c(1,0),
     col=my_palette,
     lmat=mylmat,
     lwid=mylwid,
@@ -123,6 +125,8 @@ heatmap.2(
     sepcolor="black",
     RowSideColors=cluster_colors)
 dev.off()
+
+quit()
 
 # ====================
 # dendro, adjust in illustrator

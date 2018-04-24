@@ -12,9 +12,10 @@ library(gridExtra)
 # args
 args <- commandArgs(trailingOnly=TRUE)
 deeptools_matrix_file <- args[1]
-out_file <- args[2]
-rcolorbrewer_palette <- args[3]
-start_stop_sets <- args[4:length(args)]
+row_sep_file <- args[2]
+out_file <- args[3]
+rcolorbrewer_palette <- args[4]
+start_stop_sets <- args[5:length(args)]
 
 # read in data
 data <- read.table(gzfile(deeptools_matrix_file), skip=1, header=FALSE)
@@ -23,6 +24,9 @@ data <- read.table(gzfile(deeptools_matrix_file), skip=1, header=FALSE)
 mad_factor <- 200
 color_granularity <- 50
 
+# figure out row sep
+rowsep <- read.table(row_sep_file, header=FALSE)$V1
+
 # cleanup
 data$V1 <- NULL
 data$V2 <- NULL
@@ -30,6 +34,7 @@ data$V3 <- NULL
 data$V4 <- NULL
 data$V5 <- NULL
 data$V6 <- NULL
+data$id <- NULL
 
 # breaks: use median absolute deviation (MAD), do this across all data
 # minimum threshold at 2, which is pval 0.01
@@ -73,11 +78,17 @@ add_borders <- function(i) {
 
 # heatmap fn
 plot_profile_heatmap <- function(plot_data, i) {
+
+    label <- c("d0", "d3", "d6")
     
     # set up sizing
+    #mylmat = rbind(c(0,3,0),c(2,1,0),c(0,4,0))
+    #mylwid = c(0.25,1,0.25)
+    #mylhei = c(0.125,2,0.25)
+
     mylmat = rbind(c(0,3,0),c(2,1,0),c(0,4,0))
-    mylwid = c(0.25,1,0.25)
-    mylhei = c(0.125,2,0.25)
+    mylwid = c(0.05,1,0.05)
+    mylhei = c(0.25,4,0.5)
 
     # heatmap
     heatmap.2(
@@ -87,25 +98,32 @@ plot_profile_heatmap <- function(plot_data, i) {
         dendrogram="none",
         trace="none",
         density.info="none",
-        labCol=rep("", ncol(plot_data)),
+        labCol=c(
+            rep("", floor(ncol(plot_data)/2)),
+            label[i],
+            rep("", ceiling(ncol(plot_data)/2)-1)),
         labRow=rep("", nrow(plot_data)),
         keysize=0.1,
         key.title=NA,
         key.xlab=NA,
         key.par=list(pin=c(4,0.1),
-            mar=c(4.1,0,0.1,0),
-            mgp=c(3,2,0),
+            mar=c(2.1,0,2.1,0),
+            mgp=c(3,1,0),
             cex.axis=1.0,
-            font.axis=1),
-        margins=c(2,0),
+            font.axis=2),
+        srtCol=45,
+        cexCol=1.25,
+        margins=c(1,0),
         lmat=mylmat,
         lwid=mylwid,
         lhei=mylhei,
         col=my_palette,
         breaks=my_breaks,
+        rowsep=rowsep,
+        sepcolor="black",
         add.expr=add_borders(i),
-        useRaster=FALSE,
-        par(xpd=FALSE))
+        useRaster=TRUE,
+        par(xpd=FALSE)) # xpd - where plotting shows up
 
 }
 
@@ -137,7 +155,7 @@ grob_list <- lapply(
     })
 
 # plot joint heatmap
-pdf(file=out_file, height=9, width=4, onefile=FALSE, family="ArialMT")
+pdf(file=out_file, height=7, width=2, onefile=FALSE, family="ArialMT")
 grid.newpage()
 grid.arrange(grobs=grob_list, nrow=1, ncol=length(start_stop_sets), clip=TRUE)
 dev.off()
