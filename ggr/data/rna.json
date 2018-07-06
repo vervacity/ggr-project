@@ -4,7 +4,7 @@
 	"rsem_glob":"*/Quant.genes.results"
     },
     "sherlock":{
-	"data_dir":"/oak/stanford/groups/khavari/users/dskim89/ggr/data/freeze.2017-11-08/bds/processed.atac.2016-10-09.bioreps_peaks_signals",
-	"rsem_glob":"NONE"
+	"data_dir":"/oak/stanford/groups/khavari/users/dskim89/ggr/data/freeze.2017-11-08/bds/processed.rna.2016-07-30.passeq_quants",
+	"rsem_glob":"*/Quant.genes.results"
     }
 }

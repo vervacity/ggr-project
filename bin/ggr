@@ -24,6 +24,9 @@ def parse_args():
     parser.add_argument(
         "--cluster", type=str, default="kundaje",
         help = "Cluster where analysis is running (sets up files correctly)")
+    parser.add_argument(
+        "--threads", type=int, default=12,
+        help="number of threads for parallel processes")
     #add_data_file_parser(parser)
     
     args = parser.parse_args()

@@ -63,7 +63,8 @@ def runall(args, prefix):
     if len(timepoints_files) != len(atac_peak_files):
         parallel_copy(
             atac_peak_files,
-            timepoint_dir)
+            timepoint_dir,
+            num_threads=args.threads)
     timepoints_files = sorted(
         glob.glob("{}/*.narrowPeak.gz".format(
             timepoint_dir)))
@@ -109,7 +110,8 @@ def runall(args, prefix):
             out_data[counts_key],
             "ATAC",
             adjustment=adjustment,
-            tmp_dir=results_dir)
+            tmp_dir=results_dir,
+            parallel=args.threads)
 
     # -------------------------------------------
     # ANALYSIS 3 - run timeseries analysis on these regions

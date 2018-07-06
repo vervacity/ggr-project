@@ -24,6 +24,8 @@ def run_shell_cmd(cmd):
     """
     logger = logging.getLogger(__name__)
     logger.debug(cmd)
+    #subprocess.call('/bin/bash -c "$GREPDB"', shell=True)
+    #os.system('GREPDB="{}"; /bin/bash -c "$GREPDB"'.format(cmd))
     os.system(cmd)
 
     if False:

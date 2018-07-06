@@ -35,13 +35,17 @@ def filter_for_ids(mat_file, keep_ids_file, gz_out_file, opposite=False, counts=
     return None
 
 
-def remove_mat_columns(mat_file, columns, out_mat_file):
+def remove_mat_columns(mat_file, columns, out_mat_file, remove_zero_rows=True):
     """Given a mat file and columns, 
     remove these columns from the matrix and return
     """
     assert out_mat_file.endswith(".gz")
     data = pd.read_table(mat_file, header=0, index_col=0)
     data = data.drop(labels=columns, axis=1)
+
+    # also remove rows that are now zero because of dropped columns
+    if remove_zero_rows:
+        data = data.loc[~(data==0).all(axis=1)]
 
     data.to_csv(out_mat_file, compression="gzip", sep="\t")
 

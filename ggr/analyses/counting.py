@@ -86,7 +86,7 @@ def make_midpoints_file(bedpe_file, out_file, cluster="sherlock"):
     return None
 
 
-def adjust_reads_from_dir(reads_files, out_dir, adjustment="ends"):
+def adjust_reads_from_dir(reads_files, out_dir, adjustment="ends", parallel=12):
     """Use to do reads adjustments (get ends or midpoints)
     by giving an input and output directory
 
@@ -127,7 +127,7 @@ def adjust_reads_from_dir(reads_files, out_dir, adjustment="ends"):
                 [reads_file, out_file]])
 
     # run queue
-    run_in_parallel(adjust_queue)
+    run_in_parallel(adjust_queue, parallel=parallel)
     
     return None
 
@@ -168,7 +168,8 @@ def get_counts_in_regions_from_dir(
         master_regions_file,
         out_dir,
         unique_string="",
-        count_type="cuts"):
+        count_type="cuts",
+        parallel=12):
     """given a directory with tagAlign files, get overlap
     with master regions and save out to output folder
     Use unique string if multiple assays in same folder and 
@@ -201,7 +202,7 @@ def get_counts_in_regions_from_dir(
                 get_counts_from_tagalign,
                 [master_regions_file, reads_file, count_file]])
 
-    run_in_parallel(count_queue)
+    run_in_parallel(count_queue, parallel=parallel)
 
     return None
 
@@ -250,7 +251,8 @@ def make_count_matrix(
         out_mat_file,
         assay_name,
         adjustment="midpoints",
-        tmp_dir="."):
+        tmp_dir=".",
+        parallel=12):
     """Given ChIP-seq (paired ended) or ATAC, get count matrix
     Note that if ChIP-seq, it MUST be paired ended, with BEDPE
     files. If ATAC, must have tagAlign files.
@@ -269,7 +271,8 @@ def make_count_matrix(
     adjust_reads_from_dir(
         bedpe_file_list,
         adjust_dir,
-        adjustment=adjustment)
+        adjustment=adjustment,
+        parallel=parallel)
 
     # then overlap the fragment midpoints with the master regions
     counts_dir = "{}/counts".format(tmp_dir)
@@ -279,7 +282,8 @@ def make_count_matrix(
         master_regions_file,
         counts_dir,
         unique_string=assay_name,
-        count_type=adjustment)
+        count_type=adjustment,
+        parallel=parallel)
 
     # finally merge all into matrix
     make_counts_mat_from_dir(counts_dir, out_mat_file)

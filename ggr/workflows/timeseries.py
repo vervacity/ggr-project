@@ -372,7 +372,7 @@ def run_timeseries_workflow(args, prefix, datatype_key="rna", mat_key="counts.ma
     logger.info("ANALYSIS: normalizing count files...")
     pooled_rlog_mat_file = "{}.rlog.mat.txt.gz".format(out_data[pooled_handle].split(".mat")[0])
     if not os.path.isfile(pooled_rlog_mat_file):
-        run_rlogs = "normalize.rlog_master_and_transfer.R {0} {1} {2} {3}".format(
+        run_rlogs = "normalize.rlog.master_and_transfer.R {0} {1} {2} {3}".format(
             out_data[mat_key], *[out_data[handle] for handle in matrix_handles])
         run_shell_cmd(run_rlogs)
 
@@ -561,7 +561,7 @@ def run_timeseries_enumeration_workflow(
     out_data[pooled_rlog_mat_key] = "{}.rlog.mat.txt.gz".format(
         out_data[pooled_mat_key].split(".mat")[0])
     if not os.path.isfile(out_data[pooled_rlog_mat_key]):
-        run_rlogs = "normalize.rlog_master_and_transfer.R {0} {1}".format(
+        run_rlogs = "normalize.rlog.master_and_transfer.R {0} {1}".format(
             out_data[mat_key],
             out_data[pooled_mat_key])
         run_shell_cmd(run_rlogs)
