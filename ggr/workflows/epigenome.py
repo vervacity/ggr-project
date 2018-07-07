@@ -827,8 +827,7 @@ def run_stable_epigenome_workflow(
     plot_dir = "{}/plots".format(results_dir)
     
     # plot ATAC and histone marks
-    #if not os.path.isdir(plot_dir):
-    if True:
+    if not os.path.isdir(plot_dir):
         run_shell_cmd("mkdir -p {}".format(plot_dir))
 
         for subsample_bed_key in subsample_bed_keys:
@@ -894,8 +893,7 @@ def run_stable_epigenome_workflow(
                 row_sep_file = "{}/{}.row_seps.txt".format(plot_dir, prefix)
                 out_mat_file = "{}.point.mat.gz".format(out_prefix)
                 out_r_file = "{}.replot.pdf".format(out_file.split(".pdf")[0])
-                #if not os.path.isfile(out_r_file):
-                if True:
+                if not os.path.isfile(out_r_file):
                     replot = (
                         "plot.profile_heatmaps.R {0} {1} {2} {3} "
                         "1,100 101,200 201,300").format(
@@ -904,8 +902,6 @@ def run_stable_epigenome_workflow(
                             out_r_file,
                             histone_r_color)
                     run_shell_cmd(replot)
-
-    quit()
     
     # -----------------------------------------
     # ANALYSIS 5 - bioinformatics

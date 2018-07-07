@@ -10,6 +10,7 @@ from ggr.analyses.filtering import filter_for_ids
 from ggr.analyses.rna import make_rsem_matrix
 from ggr.analyses.rna import threshold_empirically_off_genes
 from ggr.analyses.rna import filter_clusters_for_tfs
+from ggr.analyses.rna import filter_clusters_for_tss
 from ggr.analyses.rna import run_rdavid
 
 from ggr.analyses.motifs import add_expressed_genes_to_metadata
@@ -262,7 +263,19 @@ def runall(args, prefix):
             args.outputs["annotations"]["geneids.mappings.mat"],
             filter_list)
     out_results["timeseries"]["dp_gp"] = cluster_results
-        
+
+
+    # TODO get BED files of TSS positions for each cluster
+    cluster_tss_dir = "{}/reproducible/hard/reordered/tss".format(
+        out_results["timeseries"]["dp_gp"]["dir"])
+    cluster_tss_prefix = "{}/{}.hard.reordered".format(cluster_tss_dir, prefix)
+    if not os.path.isdir(cluster_tss_dir):
+        run_shell_cmd("mkdir {}".format(cluster_tss_dir))
+        filter_clusters_for_tss(
+            cluster_results[cluster_key],
+            cluster_tss_prefix,
+            args.outputs["annotations"]["tss.pc.bed"])
+
     # ------------------------------------------------
     # ANALYSIS 5 - Gene Ontology enrichments
     # input: gene clusters

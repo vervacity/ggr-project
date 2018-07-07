@@ -80,6 +80,36 @@ def filter_clusters_for_tfs(
     return None
 
 
+def filter_clusters_for_tss(
+        cluster_file,
+        out_prefix,
+        tss_bed_file):
+    """given cluster file, build TSS files for each cluster
+    """
+    # read in TSS file to dict
+    geneid_to_tss = {}
+    with gzip.open(tss_bed_file, "r") as fp:
+        for line in fp:
+            fields = line.strip().split()
+            geneid_to_tss[fields[3]] = line
+    
+    # open files and write out
+    with open(cluster_file, "r") as fp:
+        for line in fp:
+            if line.startswith("cluster"):
+                continue
+            
+            fields = line.strip().split()
+            cluster_file = "{}.cluster-{}.bed.gz".format(out_prefix, fields[0])
+            try:
+                with gzip.open(cluster_file, "a") as out:
+                    out.write(geneid_to_tss[fields[1]])
+            except:
+                print "did not find {}".format(fields[1])
+    
+    return None
+
+
 def run_rdavid(gene_list, background_gene_list, out_dir):
     """Run DAVID using R
     """
