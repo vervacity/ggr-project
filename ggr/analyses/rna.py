@@ -2,6 +2,7 @@
 
 
 import os
+import glob
 import gzip
 import pandas as pd
 import numpy as np
@@ -100,14 +101,70 @@ def filter_clusters_for_tss(
                 continue
             
             fields = line.strip().split()
-            cluster_file = "{}.cluster-{}.bed.gz".format(out_prefix, fields[0])
+            cluster_file = "{}.cluster-{}.tmp.bed.gz".format(out_prefix, fields[0])
             try:
                 with gzip.open(cluster_file, "a") as out:
                     out.write(geneid_to_tss[fields[1]])
             except:
                 print "did not find {}".format(fields[1])
+
+    # sort 
+    cluster_tmp_files = glob.glob("{}*tmp.bed.gz".format(out_prefix))
+    for cluster_tmp_file in cluster_tmp_files:
+        cluster_file = "{}.bed.gz".format(cluster_tmp_file.split(".tmp")[0])
+        sort_file = "zcat {} | sort -k1,1 -k2,2n | gzip -c > {}".format(
+            cluster_tmp_file,
+            cluster_file)
+        run_shell_cmd(sort_file)
+
+    # delete tmp files
+    run_shell_cmd("rm {}*tmp*".format(out_prefix))
     
     return None
+
+
+def get_neighborhood(
+        bed_file,
+        other_bed_file,
+        out_bed_file,
+        extend_len,
+        chromsizes):
+    """given a bed file and extend distance, call back regions
+    from other bed file that are in that neighborhood
+    """
+    neighborhood = (
+        "bedtools slop -i {0} -g {1} -b {2} | "
+        "bedtools intersect -u -a {3} -b stdin | "
+        "gzip -c > {4}").format(
+            bed_file,
+            chromsizes,
+            extend_len,
+            other_bed_file,
+            out_bed_file)
+    run_shell_cmd(neighborhood)
+
+    return None
+
+
+def get_nearest_regions(
+        bed_file,
+        other_bed_file,
+        out_bed_file,
+        opt_string=""):
+    """use bedtools closest to get nearest region
+    """
+    closest = (
+        "bedtools closest {0} -a {1} -b {2} | "
+        "awk -F '\t' '{{ print $7\"\t\"$8\"\t\"$9\"\t\"$4\"\t\"$10\"\t\"$6 }}' | "
+        "gzip -c > {3}").format(
+            opt_string,
+            bed_file,
+            other_bed_file,
+            out_bed_file)
+    run_shell_cmd(closest)
+
+    return None
+
 
 
 def run_rdavid(gene_list, background_gene_list, out_dir):
