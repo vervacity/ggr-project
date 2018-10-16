@@ -10,6 +10,9 @@ from ggr.analyses.filtering import filter_for_ids
 from ggr.analyses.rna import make_rsem_matrix
 from ggr.analyses.rna import threshold_empirically_off_genes
 from ggr.analyses.rna import filter_clusters_for_tfs
+from ggr.analyses.rna import filter_clusters_for_tss
+from ggr.analyses.rna import get_nearest_regions
+from ggr.analyses.rna import get_neighborhood
 from ggr.analyses.rna import run_rdavid
 
 from ggr.analyses.motifs import add_expressed_genes_to_metadata
@@ -262,7 +265,51 @@ def runall(args, prefix):
             args.outputs["annotations"]["geneids.mappings.mat"],
             filter_list)
     out_results["timeseries"]["dp_gp"] = cluster_results
-        
+
+    # get BED files of TSS positions for each cluster
+    cluster_tss_dir = "{}/reproducible/hard/reordered/tss".format(
+        out_results["timeseries"]["dp_gp"]["dir"])
+    cluster_tss_prefix = "{}/{}.hard.reordered".format(cluster_tss_dir, prefix)
+    if not os.path.isdir(cluster_tss_dir):
+        run_shell_cmd("mkdir {}".format(cluster_tss_dir))
+        filter_clusters_for_tss(
+            cluster_results[cluster_key],
+            cluster_tss_prefix,
+            args.outputs["annotations"]["tss.pc.bed"])
+
+    # for these BED files get single nearest upstream accessible region (ie promoter)
+    cluster_tss_nearest_dir = "{}/reproducible/hard/reordered/tss_nearest".format(
+        out_results["timeseries"]["dp_gp"]["dir"])
+    if not os.path.isdir(cluster_tss_nearest_dir):
+        run_shell_cmd("mkdir {}".format(cluster_tss_nearest_dir))
+        tss_files = glob.glob("{}/*.bed.gz".format(cluster_tss_dir))
+        for tss_file in tss_files:
+            out_file = "{}/{}.nearest.bed.gz".format(
+                cluster_tss_nearest_dir,
+                os.path.basename(tss_file).split(".bed")[0])
+            get_nearest_regions(
+                tss_file,
+                out_data["atac.master.bed"],
+                out_file,
+                "-D a")
+
+    # for these BED files get neighborhood of accessible regions
+    cluster_tss_neighborhood_dir = "{}/reproducible/hard/reordered/tss_neighborhood".format(
+        out_results["timeseries"]["dp_gp"]["dir"])
+    if not os.path.isdir(cluster_tss_neighborhood_dir):
+        run_shell_cmd("mkdir {}".format(cluster_tss_neighborhood_dir))
+        tss_files = glob.glob("{}/*.bed.gz".format(cluster_tss_dir))
+        for tss_file in tss_files:
+            out_file = "{}/{}.neighborhood.bed.gz".format(
+                cluster_tss_neighborhood_dir,
+                os.path.basename(tss_file).split(".bed")[0])
+            get_neighborhood(
+                tss_file,
+                out_data["atac.master.bed"],
+                out_file,
+                10000, # estimate from AJR
+                args.inputs["annot"][args.cluster]["chromsizes"])
+
     # ------------------------------------------------
     # ANALYSIS 5 - Gene Ontology enrichments
     # input: gene clusters

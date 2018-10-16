@@ -48,6 +48,7 @@ def get_proteincoding_tss_bed_from_gtf(gtf_file, out_file):
         "cat {0} | "
         "grep -P '\tgene\t' | "
         "grep 'protein_coding' | "
+        "grep -v 'level 3' | "
         "awk -F '[\t|\"]' "
         "'{{ print $1\"\t\"$4\"\t\"$5\"\t\"$10\"\t0\t\"$7 }}' | "
         "awk -F '\t' 'BEGIN{{ OFS=\"\t\" }} "
