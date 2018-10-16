@@ -905,7 +905,6 @@ def run_stable_epigenome_workflow(
                             histone_r_color)
                     run_shell_cmd(replot)
 
-    quit()
     
     # -----------------------------------------
     # ANALYSIS 5 - bioinformatics

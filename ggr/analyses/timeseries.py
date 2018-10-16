@@ -562,9 +562,13 @@ def run_dpgp(mat_file, prefix, out_dir, tmp_dir, subsample=False, subsample_num=
             input_mat_file, subsampled_file)
         os.system(echo_header)
         # subsample
-        run_subsample = "cat {0} | awk 'NR > 1' | shuf -n {1} >> {2}".format(
+        run_subsample = (
+            "cat {0} | "
+            "awk 'NR > 1' | "
+            "shuf -n {1} --random-source={0} >> {2}").format(
             input_mat_file, subsample_num, subsampled_file)
-        os.system(run_subsample)
+        os.system('GREPDB="{}"; /bin/bash -c "$GREPDB"'.format(run_subsample))
+        #os.system(run_subsample)
         os.system("rm {}".format(input_mat_file))
         input_mat_file = subsampled_file
         

@@ -3,7 +3,7 @@ GGR Analysis
 
 # Python requirements
 - Anaconda - v5+
-- GPy - 1.8.4 (for DP_GP)
+- GPy - 1.8.4 (for DP_GP) (pip install)
 
 # Bioinformatics requirements
 - bedtools/2.25.0+
