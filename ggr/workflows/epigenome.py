@@ -902,11 +902,7 @@ def run_stable_epigenome_workflow(
                             out_r_file,
                             histone_r_color)
                     run_shell_cmd(replot)
-<<<<<<< HEAD
 
-=======
->>>>>>> afae7595e389c5624099d49214e13134d397ec2b
-    
     # -----------------------------------------
     # ANALYSIS 5 - bioinformatics
     # inputs: BED dirs
