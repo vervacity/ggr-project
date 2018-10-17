@@ -129,8 +129,9 @@ plot_profile_heatmap <- function(plot_data, i) {
 
 # grab grob fn
 grab_grob <- function(fn) {
-    grid.echo(fn)
-    grid.grab()
+    #grid.echo(fn)
+    grid.grabExpr(grid.echo(fn))
+    #grid.grab()
 }
 
 # get grobs
