@@ -36,12 +36,15 @@ def runall(args, prefix):
         
         datasets = []
         label_strings = []
+
+        # TODO need full paths
         
         # atac labels
         atac_labels = sorted(
             glob.glob("{}/{}".format(
                 args.inputs["atac"][args.cluster]["data_dir"],
                 args.inputs["atac"][args.cluster]["idr_peak_glob"])))
+        atac_labels = [os.path.abspath(filename) for filename in atac_labels]
         print len(atac_labels)
         label_strings.append("{}_LABELS={}".format(
             "ATAC", ",".join(atac_labels)))
@@ -49,6 +52,7 @@ def runall(args, prefix):
         # trajectory labels
         traj_labels = sorted(
             glob.glob("./results/atac/timeseries/dp_gp/reproducible/hard/reordered/bed/*bed.gz"))
+        traj_labels = [os.path.abspath(filename) for filename in traj_labels]
         print len(traj_labels)
         label_strings.append("{}_LABELS={}".format(
             "TRAJ", ",".join(traj_labels)))
@@ -60,6 +64,7 @@ def runall(args, prefix):
                 glob.glob("{}/{}".format(
                     args.inputs["chipseq"][args.cluster]["data_dir"],
                     args.inputs["chipseq"][args.cluster]["histones"][histone]["overlap_glob"])))
+            histone_labels = [os.path.abspath(filename) for filename in histone_labels]
             print len(histone_labels)
             label_strings.append("{}_LABELS={}::method=histone_overlap".format(
                 histone, ",".join(histone_labels)))
@@ -71,6 +76,7 @@ def runall(args, prefix):
                 glob.glob("{}/{}".format(
                     args.inputs["chipseq"][args.cluster]["data_dir"],
                     args.inputs["chipseq"][args.cluster]["tfs"][tf]["idr_peak_glob"])))
+            tf_labels = [os.path.abspath(filename) for filename in tf_labels]
             print len(tf_labels)
             label_strings.append("{}_LABELS={}".format(
                 tf, ",".join(tf_labels)))
@@ -82,6 +88,7 @@ def runall(args, prefix):
                 glob.glob("{}/{}".format(
                     args.inputs["chipseq"][args.cluster]["tfs"]["other"]["data_dir"],
                     args.inputs["chipseq"][args.cluster]["tfs"]["other"][tf]["narrowPeak_glob"])))
+            tf_labels = [os.path.abspath(filename) for filename in tf_labels]
             print len(tf_labels)
             label_strings.append("{}_LABELS={}".format(
                 tf, ",".join(tf_labels)))
@@ -89,24 +96,28 @@ def runall(args, prefix):
         # chrom labels
         chrom_labels = sorted(
             glob.glob("./results/epigenome/dynamic/clusters/by_mark/bed/*bed.gz"))
+        chrom_labels = [os.path.abspath(filename) for filename in chrom_labels]
         print len(chrom_labels)
         label_strings.append("{}_LABELS={}".format(
             "DYNAMIC_MARK", ",".join(chrom_labels)))
 
         chrom_labels = sorted(
             glob.glob("./results/epigenome/dynamic/clusters/by_state/bed/*bed.gz"))
+        chrom_labels = [os.path.abspath(filename) for filename in chrom_labels]
         print len(chrom_labels)
         label_strings.append("{}_LABELS={}".format(
             "DYNAMIC_STATE", ",".join(chrom_labels)))
 
         chrom_labels = sorted(
             glob.glob("./results/epigenome/stable/clusters/by_mark/bed/*bed.gz"))
+        chrom_labels = [os.path.abspath(filename) for filename in chrom_labels]
         print len(chrom_labels)
         label_strings.append("{}_LABELS={}".format(
             "STABLE_MARK", ",".join(chrom_labels)))
 
         chrom_labels = sorted(
             glob.glob("./results/epigenome/stable/clusters/by_state/bed/*bed.gz"))
+        chrom_labels = [os.path.abspath(filename) for filename in chrom_labels]
         print len(chrom_labels)
         label_strings.append("{}_LABELS={}".format(
             "STABLE_STATE", ",".join(chrom_labels)))
@@ -119,6 +130,7 @@ def runall(args, prefix):
             glob.glob("{}/{}".format(
                 args.inputs["atac"][args.cluster]["data_dir"],
                 args.inputs["atac"][args.cluster]["bigwig_pooled_glob"])))
+        atac_signals = [os.path.abspath(filename) for filename in atac_signals]
         print len(atac_signals)
         signal_strings.append("{}_SIGNALS={}".format(
             "ATAC", ",".join(atac_signals)))
@@ -130,6 +142,7 @@ def runall(args, prefix):
                 glob.glob("{}/{}".format(
                     args.inputs["chipseq"][args.cluster]["data_dir"],
                     args.inputs["chipseq"][args.cluster]["histones"][histone]["pooled_bigwig_glob"])))
+            histone_signals = [os.path.abspath(filename) for filename in histone_signals]
             signal_strings.append("{}_SIGNALS={}::window=1000".format(
                 histone, ",".join(histone_signals)))
 
@@ -140,6 +153,7 @@ def runall(args, prefix):
                 glob.glob("{}/{}".format(
                     args.inputs["chipseq"][args.cluster]["data_dir"],
                     args.inputs["chipseq"][args.cluster]["tfs"][tf]["pooled_bigwig_glob"])))
+            tf_signals = [os.path.abspath(filename) for filename in tf_signals]
             signal_strings.append("{}_SIGNALS={}".format(
                 tf, ",".join(tf_signals)))
 
