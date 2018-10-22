@@ -28,11 +28,28 @@
 	    }
 	},
 	"tfs":{
+	    "ordered_names":["CTCF"],
 	    "CTCF":{
 		"bedpe_glob":"*CTCF*/*/rep*/*.bedpe.gz",
 		"idr_peak_glob":"*CTCF*/*/idr/true_reps/*/*filt.narrowPeak.gz",
 		"pooled_bigwig_glob":"*CTCF*/signal/macs2/pooled_rep/*pval*bw",
 		"bigwig_glob":"*CTCF*/signal/macs2/rep*/*pval*bw"
+	    },
+	    "other":{
+		"data_dir":"/mnt/lab_data/kundaje/projects/skin/data/peaks/tf",
+		"ordered_names":["TP63", "POL2", "ZNF750", "KLF4"],
+		"TP63":{
+		    "narrowPeak_glob":"*TP63*narrowPeak.gz"
+		},
+		"POL2":{
+		    "narrowPeak_glob":"*PolII*narrowPeak.gz"
+		},
+		"ZNF750":{
+		    "narrowPeak_glob":"*ZNF750*narrowPeak.gz"
+		},
+		"KLF4":{
+		    "narrowPeak_glob":"*KLF4*narrowPeak.gz"
+		}
 	    }
 	}
     },
@@ -70,6 +87,22 @@
 		"idr_peak_glob":"*CTCF*/*/idr/true_reps/*/*filt.narrowPeak.gz",
 		"pooled_bigwig_glob":"*CTCF*/signal/macs2/pooled_rep/*pval*bw",
 		"bigwig_glob":"*CTCF*/signal/macs2/rep*/*pval*bw"
+	    },
+	    "other":{
+		"data_dir":"/oak/stanford/groups/akundaje/lab_data/kundaje/projects/skin/data/peaks/tf",
+		"ordered_names":["TP63", "POL2", "ZNF750", "KLF4"],
+		"TP63":{
+		    "narrowPeak_glob":"*TP63*narrowPeak.gz"
+		},
+		"POL2":{
+		    "narrowPeak_glob":"*PolII*narrowPeak.gz"
+		},
+		"ZNF750":{
+		    "narrowPeak_glob":"*ZNF750*narrowPeak.gz"
+		},
+		"KLF4":{
+		    "narrowPeak_glob":"*KLF4*narrowPeak.gz"
+		}
 	    }
 	}
     }

@@ -33,51 +33,135 @@ def runall(args, prefix):
     # -------------------------------------------
     dataset_dir = "{}/datasets/{}".format(results_dir, prefix)
     if not os.path.isdir(dataset_dir):
-    
-        label_files = []
-        for label_dir in args.outputs["results"]["label_dirs"]:
+        
+        datasets = []
+        label_strings = []
+        
+        # atac labels
+        atac_labels = sorted(
+            glob.glob("{}/{}".format(
+                args.inputs["atac"][args.cluster]["data_dir"],
+                args.inputs["atac"][args.cluster]["idr_peak_glob"])))
+        print len(atac_labels)
+        label_strings.append("{}_LABELS={}".format(
+            "ATAC", ",".join(atac_labels)))
+        
+        # trajectory labels
+        traj_labels = sorted(
+            glob.glob("./results/atac/timeseries/dp_gp/reproducible/hard/reordered/bed/*bed.gz"))
+        print len(traj_labels)
+        label_strings.append("{}_LABELS={}".format(
+            "TRAJ", ",".join(traj_labels)))
 
-            logger.info("label directory: {}".format(label_dir))
-            label_dir_files = sorted(glob.glob("{}/*.bed.gz".format(label_dir)))
-            label_dir_files += sorted(glob.glob("{}/*.narrowPeak.gz".format(label_dir)))
-            label_dir_files = [filename for filename in label_dir_files if "background" not in filename]
-            logger.info("total files: {}".format(len(label_dir_files)))
-            label_files += label_dir_files
+        # histone labels
+        histones = args.inputs["chipseq"][args.cluster]["histones"]["ordered_names"]
+        for histone in histones:
+            histone_labels = sorted(
+                glob.glob("{}/{}".format(
+                    args.inputs["chipseq"][args.cluster]["data_dir"],
+                    args.inputs["chipseq"][args.cluster]["histones"][histone]["overlap_glob"])))
+            print len(histone_labels)
+            label_strings.append("{}_LABELS={}::method=histone_overlap".format(
+                histone, ",".join(histone_labels)))
 
-        label_files_string = " ".join(label_files)
-        logger.info("total label sets: {}".format(len(label_files)))
+        # TF labels
+        tfs = args.inputs["chipseq"][args.cluster]["tfs"]["ordered_names"]
+        for tf in tfs:
+            tf_labels = sorted(
+                glob.glob("{}/{}".format(
+                    args.inputs["chipseq"][args.cluster]["data_dir"],
+                    args.inputs["chipseq"][args.cluster]["tfs"][tf]["idr_peak_glob"])))
+            print len(tf_labels)
+            label_strings.append("{}_LABELS={}".format(
+                tf, ",".join(tf_labels)))
+
+        # add other tf labels (external to GGR)
+        tfs = args.inputs["chipseq"][args.cluster]["tfs"]["other"]["ordered_names"]
+        for tf in tfs:
+            tf_labels = sorted(
+                glob.glob("{}/{}".format(
+                    args.inputs["chipseq"][args.cluster]["tfs"]["other"]["data_dir"],
+                    args.inputs["chipseq"][args.cluster]["tfs"]["other"][tf]["narrowPeak_glob"])))
+            print len(tf_labels)
+            label_strings.append("{}_LABELS={}".format(
+                tf, ",".join(tf_labels)))
+        
+        # chrom labels
+        chrom_labels = sorted(
+            glob.glob("./results/epigenome/dynamic/clusters/by_mark/bed/*bed.gz"))
+        print len(chrom_labels)
+        label_strings.append("{}_LABELS={}".format(
+            "DYNAMIC_MARK", ",".join(chrom_labels)))
+
+        chrom_labels = sorted(
+            glob.glob("./results/epigenome/dynamic/clusters/by_state/bed/*bed.gz"))
+        print len(chrom_labels)
+        label_strings.append("{}_LABELS={}".format(
+            "DYNAMIC_STATE", ",".join(chrom_labels)))
+
+        chrom_labels = sorted(
+            glob.glob("./results/epigenome/stable/clusters/by_mark/bed/*bed.gz"))
+        print len(chrom_labels)
+        label_strings.append("{}_LABELS={}".format(
+            "STABLE_MARK", ",".join(chrom_labels)))
+
+        chrom_labels = sorted(
+            glob.glob("./results/epigenome/stable/clusters/by_state/bed/*bed.gz"))
+        print len(chrom_labels)
+        label_strings.append("{}_LABELS={}".format(
+            "STABLE_STATE", ",".join(chrom_labels)))
+
+        
+        signal_strings = []
+        
+        # atac signals
+        atac_signals = sorted(
+            glob.glob("{}/{}".format(
+                args.inputs["atac"][args.cluster]["data_dir"],
+                args.inputs["atac"][args.cluster]["bigwig_pooled_glob"])))
+        print len(atac_signals)
+        signal_strings.append("{}_SIGNALS={}".format(
+            "ATAC", ",".join(atac_signals)))
+
+        # histone signals
+        histones = args.inputs["chipseq"][args.cluster]["histones"]["ordered_names"]
+        for histone in histones:
+            histone_signals = sorted(
+                glob.glob("{}/{}".format(
+                    args.inputs["chipseq"][args.cluster]["data_dir"],
+                    args.inputs["chipseq"][args.cluster]["histones"][histone]["pooled_bigwig_glob"])))
+            signal_strings.append("{}_SIGNALS={}::window=1000".format(
+                histone, ",".join(histone_signals)))
+
+        # tf signals
+        tfs = args.inputs["chipseq"][args.cluster]["tfs"]["ordered_names"]
+        for tf in tfs:
+            tf_signals = sorted(
+                glob.glob("{}/{}".format(
+                    args.inputs["chipseq"][args.cluster]["data_dir"],
+                    args.inputs["chipseq"][args.cluster]["tfs"][tf]["pooled_bigwig_glob"])))
+            signal_strings.append("{}_SIGNALS={}".format(
+                tf, ",".join(tf_signals)))
 
         # run tronn preprocess
         preprocess = (
-            "tronn preprocess "
-            "--labels {0} "
-            "--parallel 24 "
-            "-o {1}/datasets/{2} --prefix {2}").format(
-                label_files_string,
-                results_dir,
-                prefix)
-        run_shell_cmd("echo {} > {}/preprocess.tmp".format(preprocess, results_dir))
-        run_shell_cmd("source preprocess.tmp")
+            "tronn preprocess \\\n"
+            "--annotations {0} \\\n"
+            "--labels \\\n \t{1} \\\n"
+            "--signals \\\n \t{2} \\\n"
+            "-o ./datasets/{3} \\\n"
+            "--prefix {3} \\\n"
+            "--master_label_keys ATAC_LABELS \\\n"
+            "--genomewide \\\n"
+            "--parallel {4}").format(
+                "/mnt/lab_data/kundaje/users/dskim89/annotations/kundaje_server_annotations.json",
+                " \\\n\t".join(label_strings),
+                " \\\n\t".join(signal_strings),
+                prefix,
+                args.threads)
 
-    # -------------------------------------------
-    # ANALYSIS 1 - train tronn model
-    # input: tronn datasets
-    # output: model checkpoint
-    # -------------------------------------------
-    train_dir = "{}/models/{}".format(results_dir, prefix)
-    if not os.path.isdir(train_dir):
-        # train
-        train = (
-            "tronn train "
-            "--data_dir {0}/h5 "
-            "--cvfold {1} "
-            "--model basset "
-            "--transfer_model_checkpoint {2} "
-            "-o {3}/{4} --prefix {4}").format(
-                dataset_dir,
-                0,
-                "",
-                train_dir,
-                prefix)
+        run_shell_cmd("echo '{}' > {}/preprocess.tmp".format(preprocess, results_dir))
+        #run_shell_cmd("source preprocess.tmp")
+
                     
     return args
