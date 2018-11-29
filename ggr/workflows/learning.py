@@ -168,7 +168,7 @@ def runall(args, prefix):
             "--master_label_keys ATAC_LABELS \\\n"
             "--genomewide \\\n"
             "--parallel {4}").format(
-                "/mnt/lab_data/kundaje/users/dskim89/annotations/kundaje_server_annotations.json",
+                args.inputs["annot"][args.cluster]["tronn_preprocess_annot"],
                 " \\\n\t".join(label_strings),
                 " \\\n\t".join(signal_strings),
                 prefix,
