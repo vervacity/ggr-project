@@ -82,6 +82,7 @@
 	    }
 	},
 	"tfs":{
+	    "ordered_names":["CTCF"],
 	    "CTCF":{
 		"bedpe_glob":"*CTCF*/*/rep*/*.bedpe.gz",
 		"idr_peak_glob":"*CTCF*/*/idr/true_reps/*/*filt.narrowPeak.gz",
