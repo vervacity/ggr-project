@@ -161,6 +161,21 @@ def runall(args, prefix):
     logger.info("ANALYSIS: generate a nonredundant PWM file")
     args = setup_hocomoco_motifs_workflow(args, prefix)
 
+    # -------------------------------------------------
+    # ANALYSIS 5 - make dataset plot
+    # input: dataset matrix
+    # output: dataset summary plot
+    # -------------------------------------------------
+    logger.info("ANALYSIS: plot datasets")
+    plot_file = "{}/dataset_summary.pdf".format(out_dir)
+    if not os.path.isfile(plot_file):
+        # plot
+        plot_cmd = "plot.dataset_matrix.R {} {}".format(
+            args.dataset_summary, plot_file)
+        print plot_cmd
+        os.system(plot_cmd)
+    quit()
+    
     logger.info("DONE")
     
     return args

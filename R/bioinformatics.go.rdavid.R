@@ -23,6 +23,12 @@ david<-DAVIDWebService(
     email="danielskim@stanford.edu",
     url="https://david.ncifcrf.gov/webservice/services/DAVIDWebService.DAVIDWebServiceHttpSoap12Endpoint/")
 
+#david <- DAVIDWebService$new(email="danielskim@stanford.edu")
+
+print(getTimeOut(david))
+setTimeOut(david, 50000)
+print(getTimeOut(david))
+
 # add lists
 result <- addList(david, background_list,
                   idType="ENSEMBL_GENE_ID",
@@ -34,7 +40,8 @@ result <- addList(david, gene_list,
                   listType="Gene")
 
 # TODO figure out what column is actually being thresholded
-annotation_categories <- c("GOTERM_BP_ALL", "GOTERM_MF_ALL", "GOTERM_CC_ALL")
+#annotation_categories <- c("GOTERM_BP_ALL", "GOTERM_MF_ALL", "GOTERM_CC_ALL")
+annotation_categories <- c("GOTERM_BP_ALL")
 for (i in 1:length(annotation_categories)) {
 
     # choose annotations and get clusters

@@ -1,53 +1,69 @@
+#!/usr/bin/env Rscript
 
 
 # description - plot out the datasets
-
 library(ggplot2)
+library(reshape2)
 library(extrafont)
+
+# load GGR style guide
+load_style_guide <- system("which ggr_style_guide.R", intern=TRUE)
+source(load_style_guide)
 
 # args
 args <- commandArgs(trailingOnly=TRUE)
 dataset_file <- args[1]
+plot_file <- args[2]
 
 # read in file
 data <- read.table(dataset_file, sep="\t", header=TRUE)
-data$timepoint_val <- as.numeric(sub("d", "", data$timepoint))
+day_labels <- gsub("day.", "day ", colnames(data))[2:length(colnames(data))]
 
-# test colors
-library(RColorBrewer)
-total_timepoints <- length(unique(data$timepoint_val))
-my_palette <- colorRampPalette(brewer.pal(9, "Reds"))(total_timepoints+4)[5:(total_timepoints+4)]
+# adjustments
+data <- data[data[,1] != "RAMPAGE",]
+data <- data[data[,1] != "RNA-seq (polyA+)",]
+data <- data[data[,1] != "RNA-seq (Ribo-Zero)",]
+data$day.3.5 <- NULL
+data$day.4.0 <- NULL
+data$day.5.5 <- NULL
 
-# order in the order seen in the matrix
-data$assay <- factor(data$assay, levels=rev(unique(data$assay)), ordered=TRUE)
+# melt and adjust
+data_melted <- melt(data)
+colnames(data_melted) <- c("assay", "day", "harvested")
+data_melted$assay <- factor(data_melted$assay, levels=rev(unique(data[,1])), ordered=TRUE)
+data_melted$day <- gsub("day.", "", data_melted$day)
 
-# adjust timepoints
-data$timepoint <- sub("d", "", data$timepoint)
+# get colors
+palette <- get_ggr_timepoint_colors()
 
-# TODO consider plotting lines with specific hex colors
+# plotting
+p <- ggplot()
 
-# plot out as sets
-p <- ggplot() + geom_line(
-    data=data,
-    aes_string(
-        group="assay",
-        x="timepoint",
-        y="assay"),
+# plot lines
+p <- p + geom_line(
+    data=data_melted,
+    aes(
+        group=assay,
+        x=day,
+        y=assay),
     size=1)
+
+# plot circles
 p <- p + geom_point(
-    data=data,
-    aes_string(
-        group="timepoint",
-        x="timepoint",
-        y="assay",
-        colour="timepoint"),
+    data=subset(data_melted, harvested==1),
+    aes(
+        group=day,
+        x=day,
+        y=assay,
+        colour=as.factor(day)),
     shape=21,
     fill="white",
-    #colour="black",
     size=3,
     stroke=1) +
-    scale_colour_manual(values=my_palette)
-p <- p + #scale_x_discrete(breaks=0:max(data$timepoint_val), labels=0:max(data$timepoint_val)) +
+    scale_color_manual(values=palette)
+
+# cleanup
+p <- p + 
     ylab(NULL) + 
     xlab("Timepoint (days)") + 
     theme_bw() + 
@@ -59,8 +75,6 @@ p <- p + #scale_x_discrete(breaks=0:max(data$timepoint_val), labels=0:max(data$t
         panel.grid.minor=element_blank(),
         legend.position="none")
 
-#scale_x_discrete(breaks=0:max(data$timepoint_val), labels=0:max(data$timepoint_val)) +
-
-
-ggsave("testing.pdf", height=1.75, width=4)
-embed_fonts("testing.pdf")
+# save
+ggsave(plot_file, height=1.75, width=4)
+embed_fonts(plot_file)

@@ -27,30 +27,10 @@ def parse_args():
     parser.add_argument(
         "--threads", type=int, default=12,
         help="number of threads for parallel processes")
-    #add_data_file_parser(parser)
     
     args = parser.parse_args()
     
     return args
-
-
-def add_data_file_parser(parser):
-    """Load all json files in so that we have handles on all data
-    """
-    logging.info("Loading jsons...")
-    json_files = glob.glob(
-        pkg_resources.resource_filename('ggr', 'data/*.json'))
-    data_files = {}
-    
-    for json_file in json_files:
-        key_name = os.path.basename(json_file).split('.json')[0]
-        logging.info(json_file)
-        with open(json_file, 'r') as fp:
-            parser.add_argument(
-                "--{}".format(key_name),
-                type=dict, default=json.load(fp),
-                help="Support data files")
-    return
 
 
 def setup_folders(args):
@@ -102,6 +82,10 @@ def main():
         with open(json_file, 'r') as fp:
             args.inputs[key_name] = json.load(fp)
 
+    # load the dataset summary file
+    args.dataset_summary = pkg_resources.resource_filename(
+        "ggr", "data/ggr_datasets.txt")
+            
     # make output dict to track files
     args.outputs = {}
     
