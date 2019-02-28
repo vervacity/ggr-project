@@ -46,7 +46,7 @@ p <- p + geom_line(
         group=assay,
         x=day,
         y=assay),
-    size=1)
+    size=0.5)
 
 # plot circles
 p <- p + geom_point(
@@ -58,8 +58,8 @@ p <- p + geom_point(
         colour=as.factor(day)),
     shape=21,
     fill="white",
-    size=3,
-    stroke=1) +
+    size=1.5,
+    stroke=0.5) +
     scale_color_manual(values=palette)
 
 # cleanup
@@ -68,13 +68,13 @@ p <- p +
     xlab("Timepoint (days)") + 
     theme_bw() + 
     theme(
-        text=element_text(family="ArialMT", size=10),
+        text=element_text(family="ArialMT", size=4),
         axis.text.x=element_text(angle=30, hjust=1, colour="black"),
         axis.text.y=element_text(colour="black"),
-        axis.title.x=element_text(size=8),
+        axis.title.x=element_text(),
         panel.grid.minor=element_blank(),
         legend.position="none")
 
 # save
-ggsave(plot_file, height=1.75, width=4)
+ggsave(plot_file, height=1.25, width=2)
 embed_fonts(plot_file)
