@@ -307,8 +307,17 @@ def runall(args, prefix):
                 tss_file,
                 out_data["atac.master.bed"],
                 out_file,
-                10000, # estimate from AJR
+                500000, # 1 Mb locus
                 args.inputs["annot"][args.cluster]["chromsizes"])
+        # also make global neighborhood of dynamic regions
+        neighborhood_all = (
+            "zcat {0}/*neighborhood.bed.gz | "
+            "sort -k1,1 -k2,2n | "
+            "bedtools merge -i stdin | "
+            " gzip -c > {0}/{1}.hard.reordered.neighborhood.all.gz").format(
+                cluster_tss_neighborhood_dir,
+                prefix)
+        run_shell_cmd(neighborhood_all)
 
     # ------------------------------------------------
     # ANALYSIS 5 - Gene Ontology enrichments

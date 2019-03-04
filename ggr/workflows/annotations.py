@@ -174,7 +174,6 @@ def runall(args, prefix):
             args.dataset_summary, plot_file)
         print plot_cmd
         os.system(plot_cmd)
-    quit()
     
     logger.info("DONE")
     
