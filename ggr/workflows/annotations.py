@@ -174,6 +174,25 @@ def runall(args, prefix):
             args.dataset_summary, plot_file)
         print plot_cmd
         os.system(plot_cmd)
+
+    # -------------------------------------------------
+    # ANALYSIS 6 - make interesting loci bed file
+    # input: None
+    # output: bed file
+    # -------------------------------------------------
+    logger.info("ANALYSIS: make interesting regions bed file")
+    interesting_bed_file = "{}/interesting_loci.bed.gz".format(out_dir)
+    if not os.path.isfile(interesting_bed_file):
+        # EDC
+        os.system("echo 'chr1\t151896923\t153687874' | gzip -c >> {}".format(interesting_bed_file))
+        # TP63
+        os.system("echo 'chr3\t189039644\t190039644' | gzip -c >> {}".format(interesting_bed_file))
+        # MYC
+        os.system("echo 'chr8\t128250000\t129250000' | gzip -c >> {}".format(interesting_bed_file))
+        # KRT locus chr12
+        os.system("echo 'chr12\t52490656\t53412661' | gzip -c >> {}".format(interesting_bed_file))
+        # KRT locus chr17
+        os.system("echo 'chr17\t38756691\t39834792' | gzip -c >> {}".format(interesting_bed_file))
     
     logger.info("DONE")
     
