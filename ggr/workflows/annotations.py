@@ -193,7 +193,18 @@ def runall(args, prefix):
         os.system("echo 'chr12\t52490656\t53412661' | gzip -c >> {}".format(interesting_bed_file))
         # KRT locus chr17
         os.system("echo 'chr17\t38756691\t39834792' | gzip -c >> {}".format(interesting_bed_file))
-    
+        # CEBPA/G
+        os.system("echo 'chr19\t33306665\t34306665' | gzip -c >> {}".format(interesting_bed_file))
+        # CEBPB
+        os.system("echo 'chr20\t48307410\t49307410' | gzip -c >> {}".format(interesting_bed_file))
+        # CEBPD
+        os.system("echo 'chr8\t48150442\t49150442' | gzip -c >> {}".format(interesting_bed_file))
+        # CEBPE
+        os.system("echo 'chr14\t23087544\t24087544' | gzip -c >> {}".format(interesting_bed_file))
+        # CEBPZ
+        os.system("echo 'chr2\t36958919\t37958919' | gzip -c >> {}".format(interesting_bed_file))
+        
+        
     logger.info("DONE")
     
     return args

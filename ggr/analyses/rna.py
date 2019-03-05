@@ -166,6 +166,64 @@ def get_nearest_regions(
     return None
 
 
+def get_highly_expressed_genes(
+        rna_mat_file,
+        gene_list_file,
+        out_file,
+        percentile=90):
+    """select genes that are most highly expressed and return gene list
+    """
+    # read in
+    data = pd.read_table(rna_mat_file, index_col=0)
+    gene_list = pd.read_table(gene_list_file, index_col=0)
+    
+    # filter
+    data = data[data.index.isin(gene_list["id"])]
+
+    # and then reduce
+    data["max"] = data.max(axis=1)
+    
+    # and select top
+    k = int(((100 - percentile) / 100.) * data.shape[0])
+    data = data.nlargest(k, "max")
+
+    # and save out gene list
+    data.to_csv(out_file, columns=[], header=False)
+    
+    return None
+
+
+def convert_gene_list_to_tss(gene_list, tss_file, out_file):
+    """given a gene list, get TSS
+    """
+    # read in TSS file to dict
+    geneid_to_tss = {}
+    with gzip.open(tss_file, "r") as fp:
+        for line in fp:
+            fields = line.strip().split()
+            geneid_to_tss[fields[3]] = line
+            
+    # open files and write out
+    tmp_file = "{}.tmp.bed.gz".format(out_file.split(".bed")[0])
+    with open(gene_list, "r") as fp:
+        for line in fp:
+            fields = line.strip().split()
+            try:
+                with gzip.open(tmp_file, "a") as out:
+                    out.write(geneid_to_tss[fields[0]])
+            except:
+                print "did not find {}".format(fields[0])
+            
+    # sort
+    sort_file = "zcat {} | sort -k1,1 -k2,2n | gzip -c > {}".format(
+        tmp_file, out_file)
+    run_shell_cmd(sort_file)
+
+    # delete tmp files
+    run_shell_cmd("rm {}".format(tmp_file))
+
+    return None
+
 
 def run_rdavid(gene_list, background_gene_list, out_dir):
     """Run DAVID using R

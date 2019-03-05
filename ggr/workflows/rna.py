@@ -13,6 +13,8 @@ from ggr.analyses.rna import filter_clusters_for_tfs
 from ggr.analyses.rna import filter_clusters_for_tss
 from ggr.analyses.rna import get_nearest_regions
 from ggr.analyses.rna import get_neighborhood
+from ggr.analyses.rna import get_highly_expressed_genes
+from ggr.analyses.rna import convert_gene_list_to_tss
 from ggr.analyses.rna import run_rdavid
 
 from ggr.analyses.motifs import add_expressed_genes_to_metadata
@@ -318,6 +320,35 @@ def runall(args, prefix):
                 cluster_tss_neighborhood_dir,
                 prefix)
         run_shell_cmd(neighborhood_all)
+
+    # also get top decile of dynamic genes (decile based on MAX expression)
+    # and pull those TSSs for use in downstream experimental results
+    highly_expressed_dynamic_dir = "{}/reproducible/hard/reordered/highly_expressed".format(
+        out_results["timeseries"]["dp_gp"]["dir"])
+    if not os.path.isdir(highly_expressed_dynamic_dir):
+        run_shell_cmd("mkdir {}".format(highly_expressed_dynamic_dir))
+        # first pull a list of most highly expressed
+        highly_expressed_genes_file = "{}/highly_expressed.genes.mat.txt".format(
+            highly_expressed_dynamic_dir)
+        highly_expressed_tss_file = "{}.tss.bed.gz".format(highly_expressed_genes_file.split(".mat")[0])
+        highly_expressed_tss_acc_file = "{}.acc.bed.gz".format(highly_expressed_tss_file.split(".bed")[0])
+        get_highly_expressed_genes(
+            "{}/matrices/ggr.rna.counts.pc.expressed.timeseries_adj.pooled.rlog.dynamic.mat.txt.gz".format(
+                out_results["timeseries"]["dir"]),
+            out_results["timeseries"]["dp_gp"]["clusters.reproducible.hard.reordered.list"],
+            highly_expressed_genes_file,
+            percentile=90)
+        # then get TSS file
+        convert_gene_list_to_tss(
+            highly_expressed_genes_file,
+            args.outputs["annotations"]["tss.pc.bed"],
+            highly_expressed_tss_file)
+        # and then get nearest ATAC peak
+        get_nearest_regions(
+            highly_expressed_tss_file,
+            out_data["atac.master.bed"],
+            highly_expressed_tss_acc_file,
+            "-D a")
 
     # ------------------------------------------------
     # ANALYSIS 5 - Gene Ontology enrichments
