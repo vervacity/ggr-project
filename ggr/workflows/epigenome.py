@@ -850,15 +850,14 @@ def run_stable_epigenome_workflow(
                     out_results[ordered_subsample_summits_key])
     
             # plot ATAC with the summits
-            if False:
+            if True:
                 plot_clusters(
                     out_results[atac_fake_clusters_key],
                     out_results[atac_ordered_subsample_key],
                     out_data[atac_stable_mat_key],
                     plot_dir,
-                    prefix)
-            
-            # TODO need to plot color bars?
+                    prefix,
+                    plot_individual=False)
             
             # plot the histone signal profiles with deeptools
             histone_colors = args.inputs["chipseq"][args.cluster]["histones"]["ordered_deeptools_colors"]

@@ -734,7 +734,8 @@ def plot_clusters(
         cluster_subsample_file,
         cluster_mat,
         out_dir,
-        prefix):
+        prefix,
+        plot_individual=True):
     """plots clusters given in the cluster file using the
     data in cluster mat
     """
@@ -749,11 +750,12 @@ def plot_clusters(
     run_shell_cmd(r_plot_heatmap)
 
     # individual clusters
-    r_plot_clusters = (
-        "viz.plot_timeseries_clusters.R "
-        "{0} {1} {2} {3}").format(
-            cluster_file, cluster_mat, out_dir, prefix)
-    run_shell_cmd(r_plot_clusters)
+    if plot_individual:
+        r_plot_clusters = (
+            "viz.plot_timeseries_clusters.R "
+            "{0} {1} {2} {3}").format(
+                cluster_file, cluster_mat, out_dir, prefix)
+        run_shell_cmd(r_plot_clusters)
     
     return None
 

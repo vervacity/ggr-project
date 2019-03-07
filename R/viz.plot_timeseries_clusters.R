@@ -3,7 +3,7 @@
 # Description: plot nice trajectories
 
 library(ggplot2)
-library(reshape)
+library(reshape2)
 
 # args
 args <- commandArgs(trailingOnly=TRUE)
