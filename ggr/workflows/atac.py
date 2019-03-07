@@ -82,6 +82,20 @@ def runall(args, prefix):
     if not os.path.isfile(out_data[master_regions_key]):
         merge_regions(timepoints_files, out_data[master_regions_key])
 
+    # generate negatives (opposite)
+    negatives_bed = "{}/{}.idr.negatives.bed.gz".format(
+        data_dir, prefix)
+    if not os.path.isfile(negatives_bed):
+        os.system("cat {} | sort -k1,1 -k2,2n > hg19.chromsizes".format(
+            args.inputs["annot"][args.cluster]["chromsizes"]))
+        complement = (
+            "bedtools complement -i {} -g {} | gzip -c > {}").format(
+                out_data[master_regions_key],
+                "hg19.chromsizes",
+                negatives_bed)
+        run_shell_cmd(complement)
+        os.system("rm hg19.chromsizes")
+        
     # -------------------------------------------
     # ANALYSIS 2 - get read counts in these regions
     # input: master regions, read files (BED/tagAlign format)
