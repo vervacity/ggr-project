@@ -6,6 +6,7 @@
 library(gplots)
 library(RColorBrewer)
 library(fastcluster)
+library(reshape2)
 
 # do i need these?
 #library(cluster)
@@ -71,7 +72,18 @@ data_w_clusters$H3K27ac <- NULL
 data_w_clusters$H3K4me1 <- NULL
 data_w_clusters$H3K27me3 <- NULL
 
-data_z <- t(scale(t(data_w_clusters), center=TRUE, scale=TRUE))
+# TODO here's where to ajust the color scaling
+if (TRUE) {
+    # already rlog space, so subtract to get FC
+    data_z <- data_w_clusters - data_w_clusters[,1]
+} else {
+    data_z <- t(scale(t(data_w_clusters), center=TRUE, scale=TRUE))
+}
+
+# percentile clip
+thresholds <- quantile(melt(data_z)$value, c(0.01, 0.99))
+data_z[data_z < thresholds[1]] <- thresholds[1]
+data_z[data_z > thresholds[2]] <- thresholds[2]
 
 # subsample for plotting
 max_n <- 2000
