@@ -81,7 +81,11 @@ if (TRUE) {
 }
 
 # percentile clip
-thresholds <- quantile(melt(data_z)$value, c(0.01, 0.99))
+if (grepl("atac", prefix)) {
+    thresholds <- quantile(melt(data_z)$value, c(0.01, 0.99))
+} else {
+    thresholds <- quantile(melt(data_z)$value, c(0.05, 0.95))
+}
 data_z[data_z < thresholds[1]] <- thresholds[1]
 data_z[data_z > thresholds[2]] <- thresholds[2]
 

@@ -12,6 +12,20 @@ mat_file <- args[2]
 out_dir <- args[3]
 prefix <- args[4]
 
+ci_top <- function(vals) {
+    val_mean <- mean(vals)
+    val_se <- sd(vals) # / sqrt(length(vals))
+    return(val_mean+2*val_se)
+}
+
+ci_bottom <- function(vals) {
+    val_mean <- mean(vals)
+    val_se <- sd(vals) #/ sqrt(length(vals))
+    return(val_mean-2*val_se)
+}
+
+
+
 # read in files
 clusters <- read.table(cluster_file, header=TRUE)
 colnames(clusters)[2] <- "id"
@@ -56,7 +70,7 @@ for (i in 1:length(cluster_names)) {
     #if (!file.exists(plot_file)) {
 
         # TODO - consider lighter gray SE? to overlay
-        ggplot(data_melted, aes(x=timepoint, y=value, group=id)) + geom_smooth(colour="gray72", fill="gray72", se=TRUE, level=0.68) + #geom_line(colour="gray44") +
+        ggplot(data_melted, aes(x=timepoint, y=value, group=id)) + geom_smooth(colour="gray72", fill="gray72", n=5, se=TRUE, level=0.68) + #geom_line(colour="gray44") +
             theme_classic(base_size=14) + 
             #theme_bw() +
             theme(
@@ -79,7 +93,9 @@ for (i in 1:length(cluster_names)) {
             geom_hline(aes(yintercept=0)) +
                                         #+ 
             stat_summary(aes(y=value, group=1), fun.y=mean, colour="black", geom="line", group=1)
-                
+            #stat_summary(aes(y=value, group=1), fun.y=ci_top, colour="gray72", geom="line", group=1) +
+            #stat_summary(aes(y=value, group=1), fun.y=ci_bottom, colour="gray72", geom="line", group=1)
+        
         ggsave(plot_file, width=2, height=1)
 
     }
