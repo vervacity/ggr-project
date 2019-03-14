@@ -188,7 +188,7 @@ def get_highly_expressed_genes(
     data = data.nlargest(k, "max")
 
     # and save out gene list
-    data.to_csv(out_file, columns=[], header=False)
+    data.to_csv(out_file, columns=[], header=False, compression="gzip")
     
     return None
 
@@ -205,7 +205,7 @@ def convert_gene_list_to_tss(gene_list, tss_file, out_file):
             
     # open files and write out
     tmp_file = "{}.tmp.bed.gz".format(out_file.split(".bed")[0])
-    with open(gene_list, "r") as fp:
+    with gzip.open(gene_list, "r") as fp:
         for line in fp:
             fields = line.strip().split()
             try:

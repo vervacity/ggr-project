@@ -231,7 +231,16 @@ def runall(args, prefix):
             args.outputs["annotations"][pwm_metadata_plus_expr_key],
             out_data["rna.counts.pc.expressed.mat"],
             args.outputs["annotations"]["geneids.mappings.mat"])
-    
+
+    # filter TSS file for expressed genes
+    expressed_tss_file = "{}/{}.tss.expressed.bed.gz".format(
+        args.outputs["annotations"]["dir"], prefix)
+    if not os.path.isfile(expressed_tss_file):
+        convert_gene_list_to_tss(
+            args.outputs["results"]["rna"]["expression_filtering"]["gene_ids.expressed.list"],
+            args.outputs["annotations"]["tss.pc.bed"],
+            expressed_tss_file)
+
     # ----------------------------------------------------
     # ANALYSIS 3 - run timeseries analysis on these genes
     # input: count matrix of expressed protein coding genes
@@ -328,7 +337,7 @@ def runall(args, prefix):
     if not os.path.isdir(highly_expressed_dynamic_dir):
         run_shell_cmd("mkdir {}".format(highly_expressed_dynamic_dir))
         # first pull a list of most highly expressed
-        highly_expressed_genes_file = "{}/highly_expressed.genes.mat.txt".format(
+        highly_expressed_genes_file = "{}/highly_expressed.genes.mat.txt.gz".format(
             highly_expressed_dynamic_dir)
         highly_expressed_tss_file = "{}.tss.bed.gz".format(highly_expressed_genes_file.split(".mat")[0])
         highly_expressed_tss_acc_file = "{}.acc.bed.gz".format(highly_expressed_tss_file.split(".bed")[0])
