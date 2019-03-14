@@ -753,6 +753,23 @@ def run_stable_epigenome_workflow(
     args.outputs["results"]["label_dirs"].append(mark_bed_dir)
     args.outputs["results"]["label_dirs"].append(state_bed_dir)
 
+    # also make a BED file of accessible stable but NON histone marked regions
+    # this is approximate (using the mark groups, which are filtered for size)
+    stable_no_histones_bed = "{}/clusters/{}.no_histones.bed.gz".format(
+        results_dir, prefix)
+    if not os.path.isfile(stable_no_histones_bed):
+        get_stable_no_histones = (
+            "bedtools subtract "
+            "-a {0} "
+            "-b {1}/*cluster*bed.gz | "
+            "sort -k1,1 -k2,2n | "
+            "bedtools merge -i stdin | "
+            "gzip -c > {2}").format(
+                args.outputs["data"]["atac.master.bed"],
+                mark_bed_dir,
+                stable_no_histones_bed)
+        run_shell_cmd(get_stable_no_histones)
+    
     # -----------------------------------------
     # ANALYSIS 3 - separate out dynamic and non-dynamic chromatin mark data,
     # mostly for plotting
