@@ -325,7 +325,7 @@ def runall(args, prefix):
             "zcat {0}/*neighborhood.bed.gz | "
             "sort -k1,1 -k2,2n | "
             "bedtools merge -i stdin | "
-            " gzip -c > {0}/{1}.hard.reordered.neighborhood.all.gz").format(
+            " gzip -c > {0}/{1}.hard.reordered.neighborhood.all.bed.gz").format(
                 cluster_tss_neighborhood_dir,
                 prefix)
         run_shell_cmd(neighborhood_all)
