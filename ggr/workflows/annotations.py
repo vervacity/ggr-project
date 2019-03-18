@@ -185,14 +185,48 @@ def runall(args, prefix):
     if not os.path.isfile(interesting_bed_file):
         # EDC
         os.system("echo 'chr1\t151896923\t153687874' | gzip -c >> {}".format(interesting_bed_file))
-        # TP63
-        os.system("echo 'chr3\t189039644\t190039644' | gzip -c >> {}".format(interesting_bed_file))
-        # MYC
-        os.system("echo 'chr8\t128250000\t129250000' | gzip -c >> {}".format(interesting_bed_file))
         # KRT locus chr12
         os.system("echo 'chr12\t52490656\t53412661' | gzip -c >> {}".format(interesting_bed_file))
         # KRT locus chr17
         os.system("echo 'chr17\t38756691\t39834792' | gzip -c >> {}".format(interesting_bed_file))
+        # MYC
+        os.system("echo 'chr8\t128250000\t129250000' | gzip -c >> {}".format(interesting_bed_file))
+        # TP63
+        os.system("echo 'chr3\t189039644\t190039644' | gzip -c >> {}".format(interesting_bed_file))
+        # ZNF750
+        os.system("echo 'chr17\t80298130\t81163605' | gzip -c >> {}".format(interesting_bed_file))
+        # KLF4
+        os.system("echo 'chr9\t109752171\t110752171' | gzip -c >> {}".format(interesting_bed_file))
+        # MAF
+        os.system("echo 'chr16\t79134765\t80134765' | gzip -c >> {}".format(interesting_bed_file))
+        # MAFB
+        os.system("echo 'chr20\t38818007\t39818007' | gzip -c >> {}".format(interesting_bed_file))
+        # OVOL1
+        os.system("echo 'chr11\t65054469\t66054469' | gzip -c >> {}".format(interesting_bed_file))
+        # GRHL3
+        os.system("echo 'chr1\t24145515\t25145515' | gzip -c >> {}".format(interesting_bed_file))
+        # IRF6
+        os.system("echo 'chr1\t209479745\t210479745' | gzip -c >> {}".format(interesting_bed_file))
+        # EHF
+        os.system("echo 'chr11\t34142872\t35142872' | gzip -c >> {}".format(interesting_bed_file))
+        # NFKB1
+        os.system("echo 'chr4\t102917087\t103917087' | gzip -c >> {}".format(interesting_bed_file))
+        # NFKB2
+        os.system("echo 'chr10\t103661938\t104661938' | gzip -c >> {}".format(interesting_bed_file))
+        # REL
+        os.system("echo 'chr2\t60609403\t61609403' | gzip -c >> {}".format(interesting_bed_file))
+        # RELA
+        os.system("echo 'chr11\t64930583\t65930583' | gzip -c >> {}".format(interesting_bed_file))
+        # RELB
+        os.system("echo 'chr19\t45005173\t46005173' | gzip -c >> {}".format(interesting_bed_file))
+        # RUNX1
+        os.system("echo 'chr21\t35916378\t36916378' | gzip -c >> {}".format(interesting_bed_file))
+        # RUNX3
+        os.system("echo 'chr1\t24792697\t25792697' | gzip -c >> {}".format(interesting_bed_file))
+        # TFAP2A
+        os.system("echo 'chr6\t9903800\t10903800' | gzip -c >> {}".format(interesting_bed_file))
+        # TFAP2B
+        os.system("echo 'chr6\t50286761\t51286761' | gzip -c >> {}".format(interesting_bed_file))
         # CEBPA/G
         os.system("echo 'chr19\t33306665\t34306665' | gzip -c >> {}".format(interesting_bed_file))
         # CEBPB
