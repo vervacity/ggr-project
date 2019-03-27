@@ -3,7 +3,8 @@
 # description: maintain consistent styling in GGR figures
 library(ggplot2)
 library(RColorBrewer)
-
+library(ggsci) # useful palettes: d3, igv, simpsons
+library(viridis)
 
 get_ggr_timepoint_colors <- function() {
     # set up color range
@@ -45,6 +46,20 @@ get_ggr_assay_palette <- function(color_string, granularity) {
 }
 
 
+ggplot_color_hue <- function(n) {
+    hues <- seq(15, 375, length = n + 1)
+    palette <- hcl(h=hues, l=65, c=100)[1:n]
+    return(palette)
+}
 
+
+get_trajectory_palette <- function(num_trajectories) {
+    if (num_trajectories == 15) {
+        palette <- rev(viridis(num_trajectories))
+    } else {
+        palette <- rev(plasma(num_trajectories))
+    }
+    return(palette)
+}
 
 

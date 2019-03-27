@@ -8,9 +8,9 @@ library(RColorBrewer)
 library(fastcluster)
 library(reshape2)
 
-# do i need these?
-#library(cluster)
-#library(dendextend)
+# load GGR style guide
+load_style_guide <- system("which ggr_style_guide.R", intern=TRUE)
+source(load_style_guide)
 
 set.seed(1337)
 
@@ -81,7 +81,7 @@ if (TRUE) {
 }
 
 # percentile clip
-if (grepl("atac", prefix)) {
+if (grepl("epigenome", prefix)) {
     thresholds <- quantile(melt(data_z)$value, c(0.01, 0.99))
 } else {
     thresholds <- quantile(melt(data_z)$value, c(0.05, 0.95))
@@ -101,14 +101,11 @@ plot_file <- paste(out_dir, "/", prefix, ".clusters.heatmap.pdf", sep="")
 my_palette <- rev(colorRampPalette(brewer.pal(11, "RdBu"))(49))
 
 # color bar
-cluster_palette <- colorRampPalette(brewer.pal(11, "Spectral"))(nrow(cluster_means))
+#cluster_palette <- colorRampPalette(brewer.pal(11, "Spectral"))(nrow(cluster_means))
+cluster_palette <- get_trajectory_palette(nrow(cluster_means))
 cluster_colors <- cluster_palette[cluster_ids_per_example]
 
 # heatmap2 grid
-#mylmat = rbind(c(0,3,0),c(2,1,0),c(0,4,0))
-#mylwid = c(2,6,2)
-#mylhei = c(0.5,12,1.5)
-
 mylmat = rbind(c(0,0,3,0),c(4,1,2,0),c(0,0,5,0))
 mylwid = c(0.05,0.1,1,0.05)
 mylhei = c(0.25,4,0.5)
