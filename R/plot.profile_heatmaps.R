@@ -40,11 +40,12 @@ data$V5 <- NULL
 data$V6 <- NULL
 data$id <- NULL
 
-# breaks: use median absolute deviation (MAD), do this across all data
-# minimum threshold at 2, which is pval 0.01
+# since using pval, convert to log10(pval)
+data <- log10(data)
+data[data < 0] <- 0
+
+# breaks: use percentiles to remove extreme outliers
 data_melted <- melt(data)
-#signal_max_thresh <- median(data_melted$value) + mad_factor * mad(data_melted$value)
-#my_breaks <- seq(2, signal_max_thresh, length.out=color_granularity)
 my_breaks <- seq(
     quantile(data_melted$value, 0.01),
     quantile(data_melted$value, 0.98),
@@ -56,8 +57,6 @@ my_breaks <- seq(
 #my_breaks <- as.numeric(my_breaks)
 
 # colors
-#my_palette <- colorRampPalette(brewer.pal(9, rcolorbrewer_palette))(color_granularity-1)
-#my_palette <- colorRampPalette(c("white", brewer.pal(9, rcolorbrewer_palette)))(color_granularity-1)
 my_palette <- get_ggr_assay_palette(rcolorbrewer_palette, color_granularity)
 
 # set up horizontal borders
@@ -85,12 +84,8 @@ add_borders <- function(i) {
 plot_profile_heatmap <- function(plot_data, i) {
 
     label <- c("d0", "d3", "d6")
-    
-    # set up sizing
-    #mylmat = rbind(c(0,3,0),c(2,1,0),c(0,4,0))
-    #mylwid = c(0.25,1,0.25)
-    #mylhei = c(0.125,2,0.25)
 
+    # grid
     mylmat = rbind(c(0,3,0),c(2,1,0),c(0,4,0))
     mylwid = c(0.05,1,0.05)
     mylhei = c(0.25,4,0.5)
