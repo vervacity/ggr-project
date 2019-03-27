@@ -9,6 +9,10 @@ library(grid)
 library(gridGraphics)
 library(gridExtra)
 
+# load GGR style guide
+load_style_guide <- system("which ggr_style_guide.R", intern=TRUE)
+source(load_style_guide)
+
 # args
 args <- commandArgs(trailingOnly=TRUE)
 deeptools_matrix_file <- args[1]
@@ -52,8 +56,9 @@ my_breaks <- seq(
 #my_breaks <- as.numeric(my_breaks)
 
 # colors
-my_palette <- colorRampPalette(brewer.pal(9, rcolorbrewer_palette))(color_granularity-1)
-my_palette <- colorRampPalette(c("white", brewer.pal(9, rcolorbrewer_palette)))(color_granularity-1)
+#my_palette <- colorRampPalette(brewer.pal(9, rcolorbrewer_palette))(color_granularity-1)
+#my_palette <- colorRampPalette(c("white", brewer.pal(9, rcolorbrewer_palette)))(color_granularity-1)
+my_palette <- get_ggr_assay_palette(rcolorbrewer_palette, color_granularity)
 
 # set up horizontal borders
 h_lines <- c(0, nrow(data)+1)

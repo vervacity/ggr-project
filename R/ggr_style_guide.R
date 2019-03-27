@@ -8,11 +8,41 @@ library(RColorBrewer)
 get_ggr_timepoint_colors <- function() {
     # set up color range
     num_timepoints <- 13
-    timepoint_palette <- colorRampPalette(brewer.pal(9, "Reds"))(num_timepoints+4)[5:(num_timepoints+1)]
+    #timepoint_palette <- colorRampPalette(brewer.pal(9, "YlOrBr"))(num_timepoints+4)[5:(num_timepoints+1)]
+    timepoint_palette <- colorRampPalette(brewer.pal(9, "YlGnBu"))(num_timepoints+4)[5:(num_timepoints+1)]
+    #timepoint_palette <- colorRampPalette(brewer.pal(9, "RdPu"))(num_timepoints+4)[5:(num_timepoints+1)]
+    #timepoint_palette <- colorRampPalette(brewer.pal(9, "PuBuGn"))(num_timepoints+4)[5:(num_timepoints+1)]
+    #timepoint_palette <- colorRampPalette(brewer.pal(9, "PuBu"))(num_timepoints+4)[5:(num_timepoints+1)]
+    #timepoint_palette <- colorRampPalette(brewer.pal(9, "BuPu"))(num_timepoints+4)[5:(num_timepoints+1)]
     return(timepoint_palette)
 }
 
 
+get_ggr_assay_palette <- function(color_string, granularity) {
+    if (granularity != 50) {
+        stop("GGR has fixed color granularity for this, do not adjust!")
+    }
+    if (color_string == "Blues") {
+        assay_palette <- colorRampPalette(
+            c("white", brewer.pal(9, color_string)))(granularity+3)[1:granularity-1]
+    } else if (color_string == "Oranges") {
+        assay_palette <- colorRampPalette(
+            c("white", brewer.pal(9, color_string)))(granularity+15)[1:granularity-1]
+    } else if (color_string == "Reds") {
+        assay_palette <- colorRampPalette(
+            c("white", brewer.pal(9, color_string)))(granularity+10)[1:granularity-1]
+    } else if (color_string == "Greens") {
+        assay_palette <- colorRampPalette(
+            c("white", brewer.pal(9, color_string)))(granularity+10)[1:granularity-1]
+    } else if (color_string == "Purples") {
+        assay_palette <- colorRampPalette(
+            c("white", brewer.pal(9, color_string)))(granularity-1)
+    } else {
+        assay_palette <- colorRampPalette(
+            c("white", brewer.pal(9, color_string)))(granularity-1)
+    }
+    return(assay_palette)
+}
 
 
 

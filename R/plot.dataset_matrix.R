@@ -68,7 +68,8 @@ p <- p +
     xlab("Timepoint (days)") + 
     theme_bw() + 
     theme(
-        text=element_text(family="ArialMT", size=4),
+        #text=element_text(family="ArialMT", size=4),
+        text=element_text(size=4),
         axis.text.x=element_text(angle=30, hjust=1, colour="black"),
         axis.text.y=element_text(colour="black"),
         axis.title.x=element_text(),
@@ -76,5 +77,5 @@ p <- p +
         legend.position="none")
 
 # save
-ggsave(plot_file, height=1.25, width=2)
+ggsave(plot_file, height=1.25, width=2, useDingbats=FALSE)
 embed_fonts(plot_file)
