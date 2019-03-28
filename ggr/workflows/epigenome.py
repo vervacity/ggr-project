@@ -868,14 +868,27 @@ def run_stable_epigenome_workflow(
     
             # plot ATAC with the summits
             if True:
+                # adjust fake clusters file here to get proper row seps
+                subsample_mat_key = "{}.mat".format(subsample_bed_key.split(".bed")[0])
+                plot_atac_ordered_subsample_file = "{}.plot.mat".format(
+                    out_results[subsample_mat_key].split(".mat")[0])
+                fake_clusters_df = pd.read_table(
+                    out_results[subsample_mat_key])
+                colnames = list(fake_clusters_df.columns)
+                colnames[-1] = "cluster"
+                colnames[0] = "fake_cluster"
+                fake_clusters_df.columns = colnames
+                fake_clusters_df.to_csv(
+                    plot_atac_ordered_subsample_file,
+                    sep="\t", index=False)
                 plot_clusters(
                     out_results[atac_fake_clusters_key],
-                    out_results[atac_ordered_subsample_key],
+                    plot_atac_ordered_subsample_file,
                     out_data[atac_stable_mat_key],
                     plot_dir,
                     prefix,
                     plot_individual=False)
-            
+
             # plot the histone signal profiles with deeptools
             histone_colors = args.inputs["chipseq"][args.cluster]["histones"]["ordered_deeptools_colors"]
             histone_r_colors = args.inputs["chipseq"][args.cluster]["histones"]["ordered_r_colors"]
@@ -903,7 +916,6 @@ def run_stable_epigenome_workflow(
                         sort=False,
                         referencepoint="center",
                         color=histone_color)
-
                 
                 # and then make own heatmap file in R with matrix output
                 row_sep_file = "{}/{}.row_seps.txt".format(plot_dir, prefix)

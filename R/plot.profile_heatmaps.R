@@ -47,7 +47,7 @@ data[data < 0] <- 0
 # breaks: use percentiles to remove extreme outliers
 data_melted <- melt(data)
 my_breaks <- seq(
-    quantile(data_melted$value, 0.01),
+    quantile(data_melted$value, 0),
     quantile(data_melted$value, 0.98),
     length.out=color_granularity)
 

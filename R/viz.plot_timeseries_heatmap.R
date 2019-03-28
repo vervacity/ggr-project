@@ -34,7 +34,6 @@ data_w_clusters <- merge(clusters, data, by="id", sort=FALSE)
 rownames(data_w_clusters) <- data_w_clusters$id
 data_w_clusters$id <- NULL
 
-# NOT USED RIGHT NOW
 # determine cluster sizes and means (for dendrogram purposes)
 cluster_names <- unique(data_w_clusters$cluster)
 cluster_sizes <- c()
@@ -53,15 +52,19 @@ for (i in 1:length(cluster_names)) {
 
 # determine row sep points and save out
 rowsep <- c()
-cluster <- 1
+cluster <- data_w_clusters$cluster[1]
 cluster_ids_per_example <- data_w_clusters$cluster
 data_w_clusters$cluster <- NULL
+color_bar_clusters <- c()
+color_bar_cluster <- 1
 for (i in 1:nrow(data_w_clusters)) {
     
     if (cluster_ids_per_example[i] != cluster) {
         rowsep <- c(rowsep, i)
         cluster <- cluster_ids_per_example[i]
+        color_bar_cluster <- color_bar_cluster + 1
     }
+    color_bar_clusters <- c(color_bar_clusters, color_bar_cluster)
 }
 row_sep_file <- paste(out_dir, "/", prefix, ".row_seps.txt", sep="")
 write.table(rowsep, row_sep_file, row.names=FALSE, col.names=FALSE)
@@ -71,6 +74,7 @@ data_w_clusters$histone_cluster <- NULL
 data_w_clusters$H3K27ac <- NULL
 data_w_clusters$H3K4me1 <- NULL
 data_w_clusters$H3K27me3 <- NULL
+data_w_clusters$fake_cluster <- NULL
 
 # TODO here's where to ajust the color scaling
 if (TRUE) {
@@ -103,7 +107,8 @@ my_palette <- rev(colorRampPalette(brewer.pal(11, "RdBu"))(49))
 # color bar
 #cluster_palette <- colorRampPalette(brewer.pal(11, "Spectral"))(nrow(cluster_means))
 cluster_palette <- get_trajectory_palette(nrow(cluster_means))
-cluster_colors <- cluster_palette[cluster_ids_per_example]
+#cluster_colors <- cluster_palette[cluster_ids_per_example]
+cluster_colors <- cluster_palette[color_bar_clusters]
 
 # heatmap2 grid
 mylmat = rbind(c(0,0,3,0),c(4,1,2,0),c(0,0,5,0))

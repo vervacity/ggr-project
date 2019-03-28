@@ -187,7 +187,8 @@ def cluster_by_chromatin_marks(
 def split_stable_atac_by_dynamic_marks(
         overlaps_file,
         dynamic_out_file,
-        stable_out_file):
+        stable_out_file,
+        min_group_size=300):
     """take the stable overlaps file and split out stable marks
     from dynamic marks (near the ATAC peak)
     """
@@ -203,9 +204,18 @@ def split_stable_atac_by_dynamic_marks(
         ((histone_overlaps["H3K4me1"] == 9) | (histone_overlaps["H3K4me1"] == 4)) &
         ((histone_overlaps["H3K27me3"] == 9) | (histone_overlaps["H3K27me3"] == 4))
     )]
-    dynamic_histones.to_csv(dynamic_out_file, sep='\t', header=True, index=False)
-    print dynamic_histones.shape
 
+    # remove the small H3K27me3 groups
+    dynamic_histones = dynamic_histones[~(
+        ((dynamic_histones["H3K27me3"] != 9) & (dynamic_histones["H3K27ac"] != 9)) &
+        ((dynamic_histones["H3K27me3"] != 9) & (dynamic_histones["H3K4me1"] != 9))
+    )]
+
+    # remove small groups
+    dynamic_histones = dynamic_histones.groupby("histone_cluster").filter(lambda x: len(x) > min_group_size)
+    
+    dynamic_histones.to_csv(dynamic_out_file, sep='\t', header=True, index=False)
+    
     # and extract stable
     stable_histones = histone_overlaps_marked[(
         ((histone_overlaps["H3K27ac"] == 9) | (histone_overlaps["H3K27ac"] == 4)) &
@@ -317,91 +327,3 @@ def get_best_summit(master_bed, peak_files, out_file):
     run_shell_cmd("rm summit_overlap.tmp")
     
     return
-
-
-
-
-
-
-
-
-# this is old! throw out soon
-def cluster_by_chromatin_state(
-        soft_cluster_files,
-        histone_overlap_mat_file,
-        histone_names,
-        out_dir,
-        prefix,
-        min_region_num=100):
-    """Take in a list of cluster files and sort by histone marks
-    """
-    # set up directories for each type of split
-    mark_dir = "{}/by_mark".format(out_dir)
-    state_dir = "{}/by_state".format(out_dir)
-    run_shell_cmd("mkdir -p {0} {0}/ids {0}/bed {1} {1}/ids {1}/bed".format(
-        mark_dir, state_dir))
-
-    for soft_cluster_file in soft_cluster_files:
-
-        if "cluster" in soft_cluster_file:
-            soft_prefix = "{}.{}".format(
-                prefix,
-                os.path.basename(soft_cluster_file).split('.')[2])
-        else:
-            soft_prefix = prefix
-            
-        # overlap files
-        soft_cluster_data = pd.read_table(soft_cluster_file)
-        soft_cluster_data = pd.DataFrame(soft_cluster_data.iloc[:,0])
-        soft_cluster_data.columns = ["region"]
-        histone_overlap_data = pd.read_table(histone_overlap_mat_file)
-
-        cluster_w_histones = soft_cluster_data.merge(
-            histone_overlap_data, how="left", on="region")
-        
-        # histone marks alone (dynamics)
-        # TODO don't take 9s.
-        for histone in histone_names:
-            cluster_w_histones[histone] = cluster_w_histones[histone].astype(int)
-            mark_states = list(set(cluster_w_histones[histone].tolist()))
-
-            for mark_state in mark_states:
-                if mark_state == 9:
-                    continue
-                
-                subset = cluster_w_histones[cluster_w_histones[histone] == mark_state]
-                if subset.shape[0] > min_region_num:
-                    overlap_file = "{}/{}.{}-{}.txt.gz".format(
-                        "{}/ids".format(mark_dir), soft_prefix, histone, mark_state)
-                    pd.DataFrame(subset["region"]).to_csv(
-                        overlap_file, sep='\t', header=False, index=False, compression="gzip")
-            
-        # chromatin state dynamics
-        # don't take 99s
-        dynamic_states = list(set(cluster_w_histones["histone_cluster"].tolist()))
-        for dynamic_state in dynamic_states:
-            if dynamic_state == 99:
-                continue
-
-            if dynamic_state == 999:
-                continue
-            
-            subset = cluster_w_histones[cluster_w_histones["histone_cluster"] == dynamic_state]
-            if subset.shape[0] > min_region_num:
-                overlap_file = "{}/{}.state-{}.txt.gz".format(
-                    "{}/ids".format(state_dir), soft_prefix, dynamic_state)
-                pd.DataFrame(subset["region"]).to_csv(
-                    overlap_file, sep='\t', header=False, index=False, compression="gzip")
-
-    # and convert all to BED
-    mark_files = glob.glob("{}/ids/*.txt.gz".format(mark_dir))
-    for mark_file in mark_files:
-        mark_bed_file = "{0}/bed/{1}.bed.gz".format(mark_dir, os.path.basename(mark_file).split('.txt')[0])
-        id_to_bed(mark_file, mark_bed_file, sort=True)
-
-    state_files = glob.glob("{}/ids/*.txt.gz".format(state_dir))
-    for state_file in state_files:
-        state_bed_file = "{0}/bed/{1}.bed.gz".format(state_dir, os.path.basename(state_file).split('.txt')[0])
-        id_to_bed(state_file, state_bed_file, sort=True)
-    
-    return None
