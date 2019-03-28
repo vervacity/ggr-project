@@ -56,6 +56,9 @@ ggplot_color_hue <- function(n) {
 get_trajectory_palette <- function(num_trajectories) {
     if (num_trajectories == 15) {
         palette <- rev(viridis(num_trajectories))
+    } else if (num_trajectories > 15) {
+        #palette <- pal_d3("category20")(num_trajectories)
+        palette <- pal_igv("default")(num_trajectories)
     } else {
         palette <- rev(plasma(num_trajectories))
     }
