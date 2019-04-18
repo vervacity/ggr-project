@@ -967,6 +967,102 @@ def run_stable_epigenome_workflow(
     return args
 
 
+def run_chromatin_states_workflow(args, prefix):
+    """aggregate information into chromatin states map
+    """
+    # logging and folder set up
+    logger = logging.getLogger(__name__)
+    logger.info("WORKFLOW: aggregate chromatin states")
+
+    # assertions
+    
+    # setup data and results
+    data_dir = args.outputs["data"]["dir"]
+    out_data = args.outputs["data"]
+
+    results_dirname = "summary"
+    results_dir = "{}/{}".format(
+        args.outputs["results"]["epigenome"]["dir"],
+        results_dirname)
+    args.outputs["results"]["epigenome"][results_dirname] = {
+        "dir": results_dir}
+    run_shell_cmd("mkdir -p {}".format(results_dir))
+    out_results = args.outputs["results"]["epigenome"][results_dirname]
+
+    # load in relevant matrices with data
+    # ATAC mat, H3K27ac mat, H3K4me1 mat, H3K27me3 mat, overlaps
+    # TODO need to run H3K27me3 overlap for dynamic
+    atac_rlog_mat_file = out_data[]
+    
+    # -----------------------------------------
+    # ANALYSIS  - pull in dynamic set
+    # inputs: BED dirs
+    # outputs: data mat of chrom states
+    # -----------------------------------------
+    atac_dpgp_dir = args.outputs["results"]["atac"]["timeseries"]["dp_gp"]["dir"]
+    traj_dir = "{}/reproducible/hard/reordered/".format(atac_dpgp_dir)
+    traj_region_id_files = glob.glob("{}/*cluster*txt.gz".format(traj_dir))
+
+    epigenome_dynamic_dir = args.outputs["results"]["epigenome"]["dynamic"]["dir"]
+    mark_region_id_dir = "{}/clusters/by_mark/ids".format(epigenome_dynamic_dir)
+    state_region_id_dir = "{}/clusters/by_state/ids".format(epigenome_dynamic_dir)
+
+    total_states = 0
+    state_summary_df = None # track: TRAJ (15), ATAC (10), H3K27ac (3), H3K4me1 (3), H3K27me3 (3)
+    for traj_region_id_file in traj_region_id_files:
+
+        # get cluster num and matching chrom mark/state files
+        cluster_prefix = os.path.basename(traj_region_id_file).split(".")[-3]
+        cluster_num = int(cluster_prefix.split("_")[-1])
+        mark_files = glob.glob("{}/*atac-{}.*.txt.gz".format(mark_region_id_dir, cluster_prefix))
+        state_files = glob.glob("{}/*atac-{}.*.txt.gz".format(state_region_id_dir, cluster_prefix))
+        print cluster_num
+        print cluster_prefix
+        print mark_files,
+        print state_files
+
+        # track regions
+        traj_regions = pd.read_csv(traj_region_id_file, sep="\t", header=None).iloc[:,0].values
+        print traj_regions
+        quit()
+        
+        # check chrom states first. if chrom states exist, use those
+        if len(state_files) is not None:
+
+            for state_file in state_files:
+                # TODO build a fn that takes a set of regions and calculates aggregate signal in those regions?
+                # ATAC can grab directly from ATAC matrix
+                # get the median profile? or mean profile
+            
+                # histone marks - need to go through "nearest peak" mapping file and then aggregate
+
+
+                # keep track of whatever is left over?
+                
+                total_states += 1
+        
+        # else, go to marks and use those.
+
+        
+        # if remainder in traj that are NOT in union (chrom states, marks)
+        # is greater than 500, include
+
+        
+    print len(traj_bed_files)
+
+    quit()
+
+
+
+    # for stable:
+
+    # look at chrom states only.
+    
+    
+    return args
+
+
+
 def runall(args, prefix):
     """Integrate epigenomic datasets
     """
@@ -1020,9 +1116,14 @@ def runall(args, prefix):
     args = run_stable_epigenome_workflow(
         args, "{}.stable".format(prefix))
 
-    # TODO: look at the histone marks that are outside of ATAC regions
+    # -----------------------------------------
+    # ANALYSIS - condense all this information into dynamic chromatin states
+    # inputs: epigenome outputs
+    # outputs: chromatin states heatmap
+    # -----------------------------------------
+    args = run_chromatin_states_workflow(
+        args, "{}.chromatin_states".format(prefix))
 
-    # TODO: condense all this information into a plot
-    
+    # TODO: look at the histone marks that are outside of ATAC regions
     
     return args
