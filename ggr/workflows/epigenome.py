@@ -124,7 +124,8 @@ def get_epigenome_static_metrics_workflow(args, prefix):
             
         # get counts for CTCF
         tf_inputs = args.inputs["chipseq"][args.cluster]
-        tfs = tf_inputs["tfs"].keys()
+        #tfs = tf_inputs["tfs"].keys()
+        tfs = ["CTCF"]
         for tf in tfs:
             peak_files = sorted(
                 glob.glob("{0}/{1}".format(
@@ -1020,6 +1021,8 @@ def runall(args, prefix):
         args, "{}.stable".format(prefix))
 
     # TODO: look at the histone marks that are outside of ATAC regions
-    
 
+    # TODO: condense all this information into a plot
+    
+    
     return args
