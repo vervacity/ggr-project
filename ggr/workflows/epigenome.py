@@ -19,6 +19,8 @@ from ggr.analyses.epigenome import get_histone_overlaps
 from ggr.analyses.epigenome import cluster_by_chromatin_marks
 from ggr.analyses.epigenome import split_stable_atac_by_dynamic_marks
 from ggr.analyses.epigenome import get_best_summit
+from ggr.analyses.epigenome import convert_overlaps_bed_to_id_mappings
+from ggr.analyses.epigenome import get_aggregate_chromatin_state_summary
 
 from ggr.analyses.filtering import sort_by_clusters
 from ggr.analyses.filtering import get_ordered_subsample
@@ -378,6 +380,19 @@ def run_dynamic_epigenome_workflow(
             args.inputs["annot"][args.cluster]["chromsizes"],
             histone_assignment=histone_assignment)
 
+        # TODO run H3K27me3 separately
+        # so that don't get a cluster file but have the nearest neighbor mark
+        inactive_mark_dir = "{}/overlap_histone.inactive".format(results_dir)
+        run_shell_cmd("mkdir -p {}".format(inactive_mark_dir))
+        inactive_overlap_mat = "{}/{}.overlaps.mat.txt.gz".format(inactive_mark_dir, prefix)
+        get_histone_overlaps(
+            out_data[atac_dynamic_bed_key],
+            [histone_files[2]],
+            inactive_mark_dir,
+            inactive_overlap_mat,
+            args.inputs["annot"][args.cluster]["chromsizes"],
+            histone_assignment=histone_assignment)
+        
     # TODO factor this out to subworkflow?
     # -----------------------------------------
     # ANALYSIS 1 - reorder ATAC with all clusters
@@ -991,9 +1006,11 @@ def run_chromatin_states_workflow(args, prefix):
 
     # load in relevant matrices with data
     # ATAC mat, H3K27ac mat, H3K4me1 mat, H3K27me3 mat, overlaps
-    # TODO need to run H3K27me3 overlap for dynamic
-    atac_rlog_mat_file = out_data[]
-    
+    atac_rlog_mat = pd.read_csv(out_data["atac.counts.pooled.rlog.mat"], sep="\t")
+    H3K27ac_rlog_mat = pd.read_csv(out_data["H3K27ac.counts.pooled.rlog.mat"], sep="\t")
+    H3K4me1_rlog_mat = pd.read_csv(out_data["H3K4me1.counts.pooled.rlog.mat"], sep="\t")
+    H3K27me3_rlog_mat = pd.read_csv(out_data["H3K27me3.counts.pooled.rlog.mat"], sep="\t")
+
     # -----------------------------------------
     # ANALYSIS  - pull in dynamic set
     # inputs: BED dirs
@@ -1001,14 +1018,38 @@ def run_chromatin_states_workflow(args, prefix):
     # -----------------------------------------
     atac_dpgp_dir = args.outputs["results"]["atac"]["timeseries"]["dp_gp"]["dir"]
     traj_dir = "{}/reproducible/hard/reordered/".format(atac_dpgp_dir)
-    traj_region_id_files = glob.glob("{}/*cluster*txt.gz".format(traj_dir))
-
+    traj_region_id_files = sorted(glob.glob("{}/*cluster*txt.gz".format(traj_dir)))
+    
+    # load in overlaps
+    overlaps_dir = "{}/overlap_histone".format(
+        args.outputs["results"]["epigenome"]["dynamic"]["dir"])
+    H3K27ac_overlaps = convert_overlaps_bed_to_id_mappings(
+        "{}/ggr.atac.ends.counts.pooled.rlog.dynamic.overlap.H3K27ac.tmp.bed.gz".format(
+            overlaps_dir),
+        extend_len=args.inputs["params"]["histones"]["H3K27ac"]["overlap_extend_len"])
+    H3K4me1_overlaps = convert_overlaps_bed_to_id_mappings(
+        "{}/ggr.atac.ends.counts.pooled.rlog.dynamic.overlap.H3K4me1.tmp.bed.gz".format(
+            overlaps_dir),
+        extend_len=args.inputs["params"]["histones"]["H3K4me1"]["overlap_extend_len"])
+    overlaps_dir = "{}/overlap_histone.inactive".format(
+        args.outputs["results"]["epigenome"]["dynamic"]["dir"])
+    H3K27me3_overlaps = convert_overlaps_bed_to_id_mappings(
+        "{}/ggr.atac.ends.counts.pooled.rlog.dynamic.overlap.H3K27me3.tmp.bed.gz".format(
+            overlaps_dir),
+        extend_len=args.inputs["params"]["histones"]["H3K27me3"]["overlap_extend_len"])
+    dynamic_histones = [
+        ("H3K27ac", H3K27ac_overlaps, H3K27ac_rlog_mat),
+        ("H3K4me1", H3K4me1_overlaps, H3K4me1_rlog_mat),
+        ("H3K27me3", H3K27me3_overlaps, H3K27me3_rlog_mat)]
+    
+    # set up chrom states/marks dirs
     epigenome_dynamic_dir = args.outputs["results"]["epigenome"]["dynamic"]["dir"]
     mark_region_id_dir = "{}/clusters/by_mark/ids".format(epigenome_dynamic_dir)
     state_region_id_dir = "{}/clusters/by_state/ids".format(epigenome_dynamic_dir)
-
+    
     total_states = 0
-    state_summary_df = None # track: TRAJ (15), ATAC (10), H3K27ac (3), H3K4me1 (3), H3K27me3 (3)
+    full_summary = None # track: TRAJ (15), ATAC (10), H3K27ac (3), H3K4me1 (3), H3K27me3 (3)
+    trajectories = ["TRAJ.{}".format(val+1) for val in range(len(traj_region_id_files))]
     for traj_region_id_file in traj_region_id_files:
 
         # get cluster num and matching chrom mark/state files
@@ -1023,32 +1064,35 @@ def run_chromatin_states_workflow(args, prefix):
 
         # track regions
         traj_regions = pd.read_csv(traj_region_id_file, sep="\t", header=None).iloc[:,0].values
-        print traj_regions
-        quit()
         
         # check chrom states first. if chrom states exist, use those
         if len(state_files) is not None:
 
             for state_file in state_files:
-                # TODO build a fn that takes a set of regions and calculates aggregate signal in those regions?
-                # ATAC can grab directly from ATAC matrix
-                # get the median profile? or mean profile
-            
-                # histone marks - need to go through "nearest peak" mapping file and then aggregate
+                print state_file
 
+                state_regions = pd.read_csv(state_file, sep="\t", header=None).iloc[:,0].values
 
-                # keep track of whatever is left over?
+                # extract data
+                state_summary = get_aggregate_chromatin_state_summary(
+                    state_regions, trajectories, cluster_num, atac_rlog_mat, dynamic_histones)
+                if full_summary is None:
+                    full_summary = state_summary.copy()
+                else:
+                    full_summary = pd.concat([full_summary, state_summary], axis=0)
+                    
+                # keep track of whatever is left over
                 
                 total_states += 1
-        
+                
+                
         # else, go to marks and use those.
-
         
+    
         # if remainder in traj that are NOT in union (chrom states, marks)
         # is greater than 500, include
-
-        
-    print len(traj_bed_files)
+    print full_summary
+    full_summary.to_csv("testing.txt", sep="\t")
 
     quit()
 

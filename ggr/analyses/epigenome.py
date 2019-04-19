@@ -3,6 +3,7 @@
 import os
 import gzip
 
+import numpy as np
 import pandas as pd
 
 from ggr.util.utils import run_shell_cmd
@@ -327,3 +328,55 @@ def get_best_summit(master_bed, peak_files, out_file):
     run_shell_cmd("rm summit_overlap.tmp")
     
     return
+
+
+def convert_overlaps_bed_to_id_mappings(overlaps_bed, extend_len=0):
+    """convert overlaps bed file to id mappings
+    """
+    overlaps = pd.read_csv(overlaps_bed, sep="\t", header=None)
+    overlaps = overlaps[overlaps.iloc[:,4] != -1]
+    overlaps["atac_id"] = overlaps.iloc[:,0].astype(str) + ":" + overlaps.iloc[:,1].astype(str) + "-" + overlaps.iloc[:,2].astype(str)
+    overlaps["histone_id"] = overlaps.iloc[:,3].astype(str) + ":" + (overlaps.iloc[:,4]+extend_len).astype(str) + "-" + (overlaps.iloc[:,5]-extend_len).astype(str)
+    overlaps = overlaps[["atac_id", "histone_id"]]
+    
+    return overlaps
+
+
+def get_aggregate_chromatin_state_summary(
+        regions,
+        trajectories,
+        traj_idx,
+        atac_mat,
+        histones):
+    """aggregate information
+    """
+    num_regions = float(regions.shape[0])
+
+    # set up the trajectory info
+    summary = pd.DataFrame(
+        data=np.zeros((len(trajectories))),
+        index=trajectories)
+    summary.loc["TRAJ.{}".format(traj_idx),0] = 1
+    summary = summary.transpose()
+    summary.insert(0, "num_regions", num_regions) # TODO fix this for num bp covered!
+    
+    # first extract atac
+    group_atac = atac_mat[atac_mat.index.isin(regions)]
+    group_atac = group_atac.sum(axis=0) / num_regions # TODO some normalization first?
+    group_atac = pd.DataFrame(group_atac).transpose()
+    group_atac.columns = ["ATAC.{}".format(val) for val in group_atac.columns]
+    summary = pd.concat([summary, group_atac], axis=1)
+    
+    # then for each histone, extract info
+    for histone, mapping, histone_mat in histones:
+        histone_regions = mapping[mapping["atac_id"].isin(regions)]["histone_id"].values
+        print histone_regions.shape
+        group_histone = histone_mat[histone_mat.index.isin(histone_regions)]
+        print group_histone.shape
+        group_histone = group_histone.sum(axis=0) / num_regions # TODO some normalization first?
+        group_histone = group_histone.fillna(0)
+        group_histone = pd.DataFrame(group_histone).transpose()
+        group_histone.columns = ["{}.{}".format(histone, val) for val in group_histone.columns]
+        summary = pd.concat([summary, group_histone], axis=1)
+    
+    return summary
