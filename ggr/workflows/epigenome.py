@@ -1006,6 +1006,7 @@ def run_chromatin_states_workflow(args, prefix):
 
     # load in relevant matrices with data
     # ATAC mat, H3K27ac mat, H3K4me1 mat, H3K27me3 mat, overlaps
+    _MIN_REGION_NUM = 500
     atac_rlog_mat = pd.read_csv(out_data["atac.counts.pooled.rlog.mat"], sep="\t")
     H3K27ac_rlog_mat = pd.read_csv(out_data["H3K27ac.counts.pooled.rlog.mat"], sep="\t")
     H3K4me1_rlog_mat = pd.read_csv(out_data["H3K4me1.counts.pooled.rlog.mat"], sep="\t")
@@ -1066,34 +1067,63 @@ def run_chromatin_states_workflow(args, prefix):
         traj_regions = pd.read_csv(traj_region_id_file, sep="\t", header=None).iloc[:,0].values
         
         # check chrom states first. if chrom states exist, use those
-        if len(state_files) is not None:
+        for state_file in state_files:
+            print state_file
 
-            for state_file in state_files:
-                print state_file
+            # get the region ids
+            state_name = os.path.basename(state_file).split(".")[-3]
+            state_regions = pd.read_csv(state_file, sep="\t", header=None).iloc[:,0].values
 
-                state_regions = pd.read_csv(state_file, sep="\t", header=None).iloc[:,0].values
+            # extract data
+            state_summary = get_aggregate_chromatin_state_summary(
+                state_regions, trajectories, cluster_num, atac_rlog_mat, dynamic_histones,
+                index=state_name)
+            if full_summary is None:
+                full_summary = state_summary.copy()
+            else:
+                full_summary = pd.concat([full_summary, state_summary], axis=0)
 
-                # extract data
-                state_summary = get_aggregate_chromatin_state_summary(
-                    state_regions, trajectories, cluster_num, atac_rlog_mat, dynamic_histones)
+            # keep track of whatever is left over
+            keep_indices = np.where(np.isin(traj_regions, state_regions, invert=True))[0]
+            traj_regions = traj_regions[keep_indices]
+            print traj_regions.shape
+            
+            total_states += 1
+                
+        # if many regions still left (>500?), go to marks and use those.
+        print "after chrom states, num remaining:", traj_regions.shape[0]
+        if traj_regions.shape[0] >= _MIN_REGION_NUM:
+            used_mark_regions = [] # TODO add to here as going through, and then reduce out at end
+            for mark_file in mark_files:
+
+                # load, and only keep if > 500 in traj_regions
+                mark_regions = pd.read_csv(mark_file, sep="\t", header=None).iloc[:,0].values
+                mark_not_used_indices = np.where(np.isin(mark_regions, traj_regions))[0]
+                if mark_not_used_indices.shape[0] < _MIN_REGION_NUM:
+                    continue
+
+                # if keeping, extract data
+                print mark_file
+                mark_name = os.path.basename(mark_file).split(".")[-3]
+                mark_not_used_regions = mark_regions[mark_not_used_indices]
+                mark_summary = get_aggregate_chromatin_state_summary(
+                    mark_not_used_regions, trajectories, cluster_num, atac_rlog_mat, dynamic_histones,
+                    index=mark_name)
                 if full_summary is None:
-                    full_summary = state_summary.copy()
+                    full_summary = mark_summary.copy()
                 else:
-                    full_summary = pd.concat([full_summary, state_summary], axis=0)
-                    
-                # keep track of whatever is left over
-                
-                total_states += 1
-                
-                
-        # else, go to marks and use those.
-        
-    
+                    full_summary = pd.concat([full_summary, mark_summary], axis=0)
+
+
         # if remainder in traj that are NOT in union (chrom states, marks)
-        # is greater than 500, include
+        # is greater than 500, include as null state (just ATAC, no chrom marks)
+        
+        
+        
     print full_summary
     full_summary.to_csv("testing.txt", sep="\t")
-
+    
+    
     quit()
 
 
@@ -1101,6 +1131,11 @@ def run_chromatin_states_workflow(args, prefix):
     # for stable:
 
     # look at chrom states only.
+
+    # finally - important to look at non ATAC regions that are marked with histone marks!
+    # TODO need to pull histone marks that DONT overlap with ATAC - use inverse set?
+    # just copy the stable workflow but use the non-ATAC regions (with padding)
+    # as the set. 
     
     
     return args

@@ -347,7 +347,8 @@ def get_aggregate_chromatin_state_summary(
         trajectories,
         traj_idx,
         atac_mat,
-        histones):
+        histones,
+        index=None):
     """aggregate information
     """
     num_regions = float(regions.shape[0])
@@ -370,13 +371,14 @@ def get_aggregate_chromatin_state_summary(
     # then for each histone, extract info
     for histone, mapping, histone_mat in histones:
         histone_regions = mapping[mapping["atac_id"].isin(regions)]["histone_id"].values
-        print histone_regions.shape
         group_histone = histone_mat[histone_mat.index.isin(histone_regions)]
-        print group_histone.shape
         group_histone = group_histone.sum(axis=0) / num_regions # TODO some normalization first?
         group_histone = group_histone.fillna(0)
         group_histone = pd.DataFrame(group_histone).transpose()
         group_histone.columns = ["{}.{}".format(histone, val) for val in group_histone.columns]
         summary = pd.concat([summary, group_histone], axis=1)
-    
+
+    if index is not None:
+        summary.index = [index]
+        
     return summary
