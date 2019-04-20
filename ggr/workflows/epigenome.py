@@ -1084,8 +1084,7 @@ def run_chromatin_states_workflow(args, prefix):
                 full_summary = pd.concat([full_summary, state_summary], axis=0)
 
             # keep track of whatever is left over
-            keep_indices = np.where(np.isin(traj_regions, state_regions, invert=True))[0]
-            traj_regions = traj_regions[keep_indices]
+            traj_regions = traj_regions[np.isin(traj_regions, state_regions, invert=True)]
             print traj_regions.shape
             
             total_states += 1
@@ -1114,29 +1113,154 @@ def run_chromatin_states_workflow(args, prefix):
                 else:
                     full_summary = pd.concat([full_summary, mark_summary], axis=0)
 
+                #print mark_not_used_regions.shape
+                used_mark_regions += list(mark_not_used_regions)
+                print len(used_mark_regions)
+
+            # keep track of whatever is left over
+            traj_regions = traj_regions[np.isin(traj_regions, used_mark_regions, invert=True)]
 
         # if remainder in traj that are NOT in union (chrom states, marks)
         # is greater than 500, include as null state (just ATAC, no chrom marks)
+        if traj_regions.shape[0] >= _MIN_REGION_NUM:
+            group_name = "Null"
+            null_summary = get_aggregate_chromatin_state_summary(
+                traj_regions, trajectories, cluster_num, atac_rlog_mat, dynamic_histones,
+                index=group_name)
+            if full_summary is None:
+                full_summary = null_summary.copy()
+            else:
+                full_summary = pd.concat([full_summary, null_summary], axis=0)
+                
+    # -----------------------------------------
+    # ANALYSIS  - pull in stable set
+    # inputs: BED dirs
+    # outputs: data mat of chrom states
+    # -----------------------------------------
+    stable_regions = pd.read_csv(
+        out_data["atac.counts.pooled.rlog.stable.mat"],
+        sep="\t", index_col=0).index.values
+    
+    # load in overlaps
+    overlaps_dir = "{}/overlap_histone".format(
+        args.outputs["results"]["epigenome"]["stable"]["dir"])
+    H3K27ac_overlaps = convert_overlaps_bed_to_id_mappings(
+        "{}/ggr.atac.ends.counts.pooled.rlog.stable.overlap.H3K27ac.tmp.bed.gz".format(
+            overlaps_dir),
+        extend_len=args.inputs["params"]["histones"]["H3K27ac"]["overlap_extend_len"])
+    H3K4me1_overlaps = convert_overlaps_bed_to_id_mappings(
+        "{}/ggr.atac.ends.counts.pooled.rlog.stable.overlap.H3K4me1.tmp.bed.gz".format(
+            overlaps_dir),
+        extend_len=args.inputs["params"]["histones"]["H3K4me1"]["overlap_extend_len"])
+    H3K27me3_overlaps = convert_overlaps_bed_to_id_mappings(
+        "{}/ggr.atac.ends.counts.pooled.rlog.stable.overlap.H3K27me3.tmp.bed.gz".format(
+            overlaps_dir),
+        extend_len=args.inputs["params"]["histones"]["H3K27me3"]["overlap_extend_len"])
+    dynamic_histones = [
+        ("H3K27ac", H3K27ac_overlaps, H3K27ac_rlog_mat),
+        ("H3K4me1", H3K4me1_overlaps, H3K4me1_rlog_mat),
+        ("H3K27me3", H3K27me3_overlaps, H3K27me3_rlog_mat)]
+    
+    # set up chrom states/marks dirs
+    epigenome_stable_dir = args.outputs["results"]["epigenome"]["stable"]["dir"]
+    mark_region_id_dir = "{}/clusters/by_mark/ids".format(epigenome_stable_dir)
+    state_region_id_dir = "{}/clusters/by_state/ids".format(epigenome_stable_dir)
+    mark_files = sorted(glob.glob("{}/*.txt.gz".format(mark_region_id_dir)))
+    state_files = sorted(glob.glob("{}/*.txt.gz".format(state_region_id_dir)))
+    
+    # look at chrom states
+    for state_file in state_files:
+        print state_file
         
-        
-        
+        # get the region ids
+        state_name = os.path.basename(state_file).split(".")[-3]
+        state_regions = pd.read_csv(state_file, sep="\t", header=None).iloc[:,0].values
+
+        # extract data
+        state_summary = get_aggregate_chromatin_state_summary(
+            state_regions, trajectories, None, atac_rlog_mat, dynamic_histones,
+            index=state_name)
+        if full_summary is None:
+            full_summary = state_summary.copy()
+        else:
+            full_summary = pd.concat([full_summary, state_summary], axis=0)
+            
+        # keep track of whatever is left over
+        stable_regions = stable_regions[np.isin(stable_regions, state_regions, invert=True)]
+        print stable_regions.shape
+            
+        total_states += 1
+
+    # sort and save out
+    full_summary = full_summary.sort_values(trajectories, ascending=False)
     print full_summary
     full_summary.to_csv("testing.txt", sep="\t")
-    
-    
+
     quit()
+    # if many regions still left (>500?), go to marks and use those.
+    print "after chrom states, num remaining:", stable_regions.shape[0]
+    if stable_regions.shape[0] >= _MIN_REGION_NUM:
+        used_mark_regions = [] # TODO add to here as going through, and then reduce out at end
+        for mark_file in mark_files:
+
+            # load, and only keep if > 500 in stable_regions
+            mark_regions = pd.read_csv(mark_file, sep="\t", header=None).iloc[:,0].values
+            mark_not_used_indices = np.where(np.isin(mark_regions, traj_regions))[0]
+            if mark_not_used_indices.shape[0] < _MIN_REGION_NUM:
+                continue
+
+            # if keeping, extract data
+            print mark_file
+            mark_name = os.path.basename(mark_file).split(".")[-3]
+            mark_not_used_regions = mark_regions[mark_not_used_indices]
+            mark_summary = get_aggregate_chromatin_state_summary(
+                mark_not_used_regions, trajectories, cluster_num, atac_rlog_mat, dynamic_histones,
+                index=mark_name)
+            if full_summary is None:
+                full_summary = mark_summary.copy()
+            else:
+                full_summary = pd.concat([full_summary, mark_summary], axis=0)
+
+            #print mark_not_used_regions.shape
+            used_mark_regions += list(mark_not_used_regions)
+            print len(used_mark_regions)
+
+        # keep track of whatever is left over
+        traj_regions = traj_regions[np.isin(traj_regions, used_mark_regions, invert=True)]
+
+    # if remainder in traj that are NOT in union (chrom states, marks)
+    # is greater than 500, include as null state (just ATAC, no chrom marks)
+    if traj_regions.shape[0] >= _MIN_REGION_NUM:
+        group_name = "Null"
+        null_summary = get_aggregate_chromatin_state_summary(
+            traj_regions, trajectories, cluster_num, atac_rlog_mat, dynamic_histones,
+            index=group_name)
+        if full_summary is None:
+            full_summary = null_summary.copy()
+        else:
+            full_summary = pd.concat([full_summary, null_summary], axis=0)
+                
 
 
 
-    # for stable:
 
-    # look at chrom states only.
+
+
+    
 
     # finally - important to look at non ATAC regions that are marked with histone marks!
     # TODO need to pull histone marks that DONT overlap with ATAC - use inverse set?
     # just copy the stable workflow but use the non-ATAC regions (with padding)
-    # as the set. 
+    # as the set.
+
+
+    # sort and save out
+    full_summary = full_summary.sort_values(trajectories, ascending=False)
+    print full_summary
+    full_summary.to_csv("testing.txt", sep="\t")
     
+
+    quit()
     
     return args
 

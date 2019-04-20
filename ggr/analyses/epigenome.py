@@ -357,7 +357,8 @@ def get_aggregate_chromatin_state_summary(
     summary = pd.DataFrame(
         data=np.zeros((len(trajectories))),
         index=trajectories)
-    summary.loc["TRAJ.{}".format(traj_idx),0] = 1
+    if traj_idx is not None:
+        summary.loc["TRAJ.{}".format(traj_idx),0] = 1
     summary = summary.transpose()
     summary.insert(0, "num_regions", num_regions) # TODO fix this for num bp covered!
     
