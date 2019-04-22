@@ -1192,9 +1192,12 @@ def run_chromatin_states_workflow(args, prefix):
         total_states += 1
 
     # sort and save out
+    # TODO sort by histone marks too
     full_summary = full_summary.sort_values(trajectories, ascending=False)
     print full_summary
     full_summary.to_csv("testing.txt", sep="\t")
+
+    # TODO test plot
 
     quit()
     # if many regions still left (>500?), go to marks and use those.
