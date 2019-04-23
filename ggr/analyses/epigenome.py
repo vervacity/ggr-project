@@ -376,6 +376,7 @@ def get_aggregate_chromatin_state_summary(
         group_histone = group_histone.sum(axis=0) / num_regions # TODO some normalization first?
         group_histone = group_histone.fillna(0)
         group_histone = pd.DataFrame(group_histone).transpose()
+        group_histone["max"] = np.max(group_histone.values, axis=1)
         group_histone.columns = ["{}.{}".format(histone, val) for val in group_histone.columns]
         summary = pd.concat([summary, group_histone], axis=1)
 

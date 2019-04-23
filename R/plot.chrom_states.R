@@ -34,7 +34,7 @@ plot_profile_heatmap <- function(plot_data, color_set) {
 
     # adjust color range
     if (color_set != "Purples") {
-        my_breaks <- seq(3, max(plot_data), length.out=50)
+        my_breaks <- seq(6, max(plot_data), length.out=50)
         print(my_breaks)
     } else {
         my_breaks=NULL
@@ -84,8 +84,8 @@ grab_grob <- function(fn) {
 }
 
 # sets
-start_stop_sets <- c("3,17", "18,27", "28,30", "31,33", "34,36")
-colors <- c("Purples", "Blues", "Reds", "Oranges", "Greens")
+start_stop_sets <- c("2,2", "3,17", "18,27", "28,30", "32,34", "36,38")
+colors <- c("Blues", "Purples", "Blues", "Reds", "Oranges", "Greens")
 
 # get grobs
 grob_list <- lapply(
@@ -101,6 +101,10 @@ grob_list <- lapply(
         # get data subset
         data_subset <- data[,start:end]
         print(head(data_subset))
+
+        if (is.null(dim(data_subset))) {
+            data_subset <- data.frame(x=data_subset, y=data_subset)
+        }
         
         # plot heatmap and save out
         fn <- function() plot_profile_heatmap(data_subset, colors[i])

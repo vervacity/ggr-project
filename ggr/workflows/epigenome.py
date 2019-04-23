@@ -1193,7 +1193,8 @@ def run_chromatin_states_workflow(args, prefix):
 
     # sort and save out
     # TODO sort by histone marks too
-    full_summary = full_summary.sort_values(trajectories, ascending=False)
+    sort_columns = trajectories + ["H3K27ac.max", "H3K4me1.max", "H3K27me3.max"]
+    full_summary = full_summary.sort_values(sort_columns, ascending=False)
     print full_summary
     full_summary.to_csv("testing.txt", sep="\t")
 
