@@ -125,6 +125,10 @@ def main():
     from ggr.workflows.epigenome import runall
     args = runall(args, "ggr.epigenome")
 
+    # run linking workflow
+    from ggr.workflows.linking import runall
+    args = runall(args, "ggr.linking")
+
     # run deep learning workflow
     from ggr.workflows.learning import runall
     args = runall(args, "ggr")
