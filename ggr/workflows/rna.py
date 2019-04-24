@@ -234,8 +234,10 @@ def runall(args, prefix):
             args.outputs["annotations"]["geneids.mappings.mat"])
 
     # filter TSS file for expressed genes
+    expressed_tss_key = "tss.pc.expressed"
     expressed_tss_file = "{}/{}.tss.expressed.bed.gz".format(
         args.outputs["annotations"]["dir"], prefix)
+    out_results["expression_filtering"][expressed_tss_key] = expressed_tss_file
     if not os.path.isfile(expressed_tss_file):
         convert_gene_list_to_tss(
             args.outputs["results"]["rna"]["expression_filtering"]["gene_ids.expressed.list"],
@@ -368,7 +370,7 @@ def runall(args, prefix):
     if not os.path.isfile(marked_tss_file):
         add_clusters_to_tss_file(
             cluster_results[cluster_key],
-            args.outputs["annotations"]["tss.pc.bed"],
+            out_results["expression_filtering"][expressed_tss_key],
             marked_tss_file)
         
     # ------------------------------------------------
