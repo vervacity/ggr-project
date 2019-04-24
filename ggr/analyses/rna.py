@@ -225,6 +225,28 @@ def convert_gene_list_to_tss(gene_list, tss_file, out_file):
     return None
 
 
+def add_clusters_to_tss_file(cluster_file, tss_file, out_file):
+    """
+    """
+    # read in files
+    tss_data = pd.read_csv(tss_file, sep="\t", header=None)
+    cluster_data = pd.read_csv(cluster_file, sep="\t")
+
+    # intersect
+    tss_w_clusters = tss_data.merge(cluster_data, how="left", left_on=3, right_on="id")
+
+    # clean up
+    tss_w_clusters = tss_w_clusters.drop("id", axis=1)
+    tss_w_clusters = tss_w_clusters.fillna(-1)
+    tss_w_clusters[3] = "gene_id=" + tss_w_clusters[3].map(str) + ";traj=" + tss_w_clusters["cluster"].astype(int).map(str)
+    tss_w_clusters = tss_w_clusters.drop("cluster", axis=1)
+
+    # save out
+    tss_w_clusters.to_csv(out_file, sep="\t", compression="gzip", header=False, index=False)
+    
+    return
+
+
 def run_rdavid(gene_list, background_gene_list, out_dir):
     """Run DAVID using R
     """

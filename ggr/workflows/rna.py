@@ -15,6 +15,7 @@ from ggr.analyses.rna import get_nearest_regions
 from ggr.analyses.rna import get_neighborhood
 from ggr.analyses.rna import get_highly_expressed_genes
 from ggr.analyses.rna import convert_gene_list_to_tss
+from ggr.analyses.rna import add_clusters_to_tss_file
 from ggr.analyses.rna import run_rdavid
 
 from ggr.analyses.motifs import add_expressed_genes_to_metadata
@@ -359,6 +360,17 @@ def runall(args, prefix):
             highly_expressed_tss_acc_file,
             "-D a")
 
+    # build a TSS file with trajectory numbers marked
+    marked_tss_key = "tss.w_clusters"
+    marked_tss_file = "{}/reproducible/hard/reordered/tss/{}.traj.tss.bed.gz".format(
+        out_results["timeseries"]["dp_gp"]["dir"], prefix)
+    out_results["timeseries"]["dp_gp"][marked_tss_key] = marked_tss_file
+    if not os.path.isfile(marked_tss_file):
+        add_clusters_to_tss_file(
+            cluster_results[cluster_key],
+            args.outputs["annotations"]["tss.pc.bed"],
+            marked_tss_file)
+        
     # ------------------------------------------------
     # ANALYSIS 5 - Gene Ontology enrichments
     # input: gene clusters
