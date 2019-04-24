@@ -1004,6 +1004,13 @@ def run_chromatin_states_workflow(args, prefix):
     run_shell_cmd("mkdir -p {}".format(results_dir))
     out_results = args.outputs["results"]["epigenome"][results_dirname]
 
+    # out file
+    state_summary_key = "chrom_states.mat"
+    state_summary_file = "{}/chrom_states.summary.txt".format(results_dir)
+    out_results[state_summary_key] = state_summary_file
+    if os.path.isfile(out_results[state_summary_key]):
+        return args
+    
     # load in relevant matrices with data
     # ATAC mat, H3K27ac mat, H3K4me1 mat, H3K27me3 mat, overlaps
     _MIN_REGION_NUM = 500
@@ -1192,12 +1199,15 @@ def run_chromatin_states_workflow(args, prefix):
         total_states += 1
 
     # sort and save out
-    # TODO sort by histone marks too
     sort_columns = trajectories + ["H3K27ac.max", "H3K4me1.max", "H3K27me3.max"]
     full_summary = full_summary.sort_values(sort_columns, ascending=False)
-    print full_summary
-    full_summary.to_csv("testing.txt", sep="\t")
+    full_summary.to_csv(out_results[state_summary_key], sep="\t")
 
+    return args
+
+
+def not_used():
+    
     # TODO test plot
 
     quit()
