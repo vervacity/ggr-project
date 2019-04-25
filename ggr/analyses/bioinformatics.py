@@ -51,6 +51,20 @@ def run_great(
     
     return None
 
+def run_gprofiler(
+        gene_set_file,
+        background_gene_set_file,
+        out_dir):
+    """
+    """
+    gprofiler_cmd = "bioinformatics.go.gProfileR.R {} {} {}".format(
+        gene_set_file,
+        background_gene_set_file,
+        out_dir)
+    run_shell_cmd(gprofiler_cmd)
+
+    return
+
 
 def run_bioinformatics_on_bed(bed_file, background_bed_file, out_dir):
     """Given a bed file and background bed file, 

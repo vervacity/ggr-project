@@ -12,8 +12,8 @@ background_list_file <- args[2]
 out_dir <- args[3]
 
 # read in gene list and background gene list
-gene_list <- read.table(gzfile(gene_list_file), stringsAsFactors=FALSE)$V1
-background_list <- read.table(gzfile(background_list_file), stringsAsFactors=FALSE)$V1
+gene_list <- read.table(gzfile(gene_list_file), header=TRUE, stringsAsFactors=FALSE)[,1]
+background_list <- read.table(gzfile(background_list_file), header=TRUE, stringsAsFactors=FALSE)[,1]
 
 prefix <- sub('\\.txt.gz$', "", basename(gene_list_file))
 padj_cutoff <- 0.1
@@ -21,7 +21,7 @@ padj_cutoff <- 0.1
 # run gProfileR
 results <- gprofiler(
     gene_list,
-    ordered_query=TRUE,
+    #ordered_query=TRUE,
     organism="hsapiens",
     #max_p_value=padj_cutoff,
     #correction_method="fdr",

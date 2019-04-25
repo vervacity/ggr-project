@@ -12,6 +12,10 @@ from ggr.util.utils import parallel_copy
 from ggr.util.bed_utils import merge_regions
 from ggr.util.bed_utils import id_to_bed
 
+from ggr.analyses.bioinformatics import run_gprofiler
+from ggr.analyses.linking import bed_to_gene_set_by_proximity
+from ggr.analyses.linking import build_confusion_matrix
+
 
 def runall(args, prefix):
     """all workflows for atac-seq data
@@ -38,13 +42,56 @@ def runall(args, prefix):
     # -------------------------------------------
     logger.info("ANALYSIS: try naive proximal linking")
 
-    # generate the gene sets for each ATAC trajectory
-    
-    
-    # run enrichments (gprofiler)
+    # set up dir
+    atac_linking_dir = "{}/atac".format(results_dir)
+    run_shell_cmd("mkdir -p {}".format(atac_linking_dir))
 
-    # collect into a confusion matrix
+    # use the TSS file that only has expressed genes
+    tss_file = args.outputs["results"]["rna"]["timeseries"]["dp_gp"]["tss.w_clusters"]
     
+    # generate the gene sets for each ATAC trajectory
+    atac_traj_dir = "{}/reproducible/hard/reordered/bed".format(
+        args.outputs["results"]["atac"]["timeseries"]["dp_gp"]["dir"])
+    traj_bed_files = sorted(glob.glob("{}/*cluster*bed.gz".format(atac_traj_dir)))
+    gene_set_files = []
+    for traj_bed_file in traj_bed_files:
+        gene_set_file = "{}/{}.linked_genes.txt.gz".format(
+            atac_linking_dir,
+            os.path.basename(traj_bed_file).split(".bed")[0])
+        if not os.path.isfile(gene_set_file):
+            bed_to_gene_set_by_proximity(
+                traj_bed_file,
+                tss_file,
+                gene_set_file,
+                k_nearest=2,
+                max_dist=100000)
+        gene_set_files.append(gene_set_file)
+        
+    # run enrichments (gprofiler)
+    background_gene_set_file = args.outputs["data"]["rna.counts.pc.expressed.mat"]
+    atac_linked_genes_enrich_dir = "{}/enrichments".format(atac_linking_dir)
+    if not os.path.isdir(atac_linked_genes_enrich_dir):
+        run_shell_cmd("mkdir -p {}".format(atac_linked_genes_enrich_dir))
+        for gene_set_file in gene_set_files:
+            run_gprofiler(
+                gene_set_file,
+                background_gene_set_file,
+                atac_linked_genes_enrich_dir)
+    
+    # collect into a confusion matrix
+    cluster_file = args.outputs["results"]["rna"]["timeseries"]["dp_gp"]["clusters.reproducible.hard.reordered.list"]
+    confusion_matrix_file = "{}/{}.confusion_mat.txt.gz".format(atac_linking_dir, prefix)
+    #if not os.path.isfile(confusion_matrix_file):
+    if True:
+        build_confusion_matrix(
+            traj_bed_files,
+            gene_set_files,
+            cluster_file,
+            confusion_matrix_file)
+
+
+
+    # and then rerun select enrichments?
     
 
     quit()
