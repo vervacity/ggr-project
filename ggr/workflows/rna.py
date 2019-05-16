@@ -17,6 +17,7 @@ from ggr.analyses.rna import get_highly_expressed_genes
 from ggr.analyses.rna import convert_gene_list_to_tss
 from ggr.analyses.rna import add_clusters_to_tss_file
 from ggr.analyses.rna import run_rdavid
+from ggr.analyses.rna import run_gsea_on_series
 
 from ggr.analyses.motifs import add_expressed_genes_to_metadata
 
@@ -156,6 +157,16 @@ def runall(args, prefix):
     args.outputs["results"][results_dirname] = {"dir": results_dir}
     run_shell_cmd("mkdir -p {}".format(results_dir))
     out_results = args.outputs["results"][results_dirname]
+
+    # TODO
+    # annotation - pull in Andrew preprocessed scRNA-seq
+    # basal vs differentiated state and create gene sigs (.gmt) for gsea downstream
+    gsea_annot_dir = "{}/gsea".format(args.outputs["annotations"]["dir"])
+    if not os.path.isdir(gsea_annot_dir):
+        run_shell_cmd("mkdir -p {}".format(gsea_annot_dir))
+        
+        
+    quit()
     
     # ----------------------------------------------------
     # ANALYSIS 0 - create data matrices of expected counts
@@ -255,6 +266,32 @@ def runall(args, prefix):
         datatype_key="rna",
         mat_key="rna.counts.pc.expressed.mat")
 
+    # TODO - run GSEA on differential results (over d0 baseline)
+    # produce 1 final results table that is gene_set x timepoint
+    gsea_dir = "{}/gsea".format(
+        args.outputs["results"][results_dirname]["timeseries"]["dir"])
+    args.outputs["results"][results_dirname]["timeseries"]["gsea"] = {
+        "dir": gsea_dir}
+    #if not os.path.isdir(gsea_dir):
+    if True:
+        run_shell_cmd("mkdir -p {}".format(gsea_dir))
+        deseq_files = sorted(glob.glob(
+            "{}/deseq2/*over_d00_resultsAll.txt.gz".format(
+                args.outputs["results"][results_dirname]["timeseries"]["dir"])))
+        deseq_files = [filename for filename in deseq_files if "d05" not in filename]
+        gsea_results_file = "{}/{}.gsea_results.txt.gz".format(gsea_dir, prefix)
+        run_gsea_on_series(
+            deseq_files,
+            args.inputs["annot"][args.cluster]["gsea_gene_sets"],
+            gsea_results_file,
+            id_conversion_file=args.outputs["annotations"]["geneids.mappings.mat"],
+            tmp_dir=gsea_dir)
+
+    quit()
+        
+    
+
+    
     # TODO: maybe need to have a link to the cluster path and dir?
     cluster_key = "clusters.reproducible.hard.reordered.list"
     out_data = args.outputs["data"]

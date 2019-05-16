@@ -66,6 +66,15 @@ def run_gprofiler(
     return
 
 
+def run_gsea(rank_file, gene_sets=[]):
+    """take gene set and run gsea
+    make sure the file has HGNC ids and rank values
+    """
+    
+    
+    return
+
+
 def run_bioinformatics_on_bed(bed_file, background_bed_file, out_dir):
     """Given a bed file and background bed file, 
     run HOMER/GREAT

@@ -43,6 +43,107 @@ def threshold_empirically_off_genes(mat_file, out_file, thresh=1.0):
     return None
 
 
+def run_gsea_on_series(
+        deseq_files,
+        genesets_file,
+        out_file,
+        id_conversion_file=None,
+        tmp_dir="."):
+    """gsea on sequence, aggregated to one output file
+    """
+    results_df = None
+    for file_idx in range(len(deseq_files)):
+        deseq_file = deseq_files[file_idx]
+        deseq_file_prefix = os.path.basename(
+            deseq_file).split("_over")[0].split("rna.")[1]
+        
+        # build rank file
+        tmp_rank_file = "{}/{}.rnk".format(
+            tmp_dir,
+            os.path.basename(deseq_file).split(".txt")[0])
+        build_gsea_rank_file(
+            deseq_file, tmp_rank_file,
+            id_conversion_file=id_conversion_file)
+
+        # run GSEA
+        deseq_out_dir = "{}/{}".format(
+            tmp_dir,
+            os.path.basename(deseq_file).split(".txt")[0])
+        gsea_results_files = run_gsea_on_mat(
+            tmp_rank_file, genesets_file, deseq_out_dir)
+
+        # read in data and save to aggregate matrix
+        # want to save p-vals and normalized enrichment scores
+        for gsea_file_idx in range(len(gsea_results_files)):
+            gsea_results_file = gsea_results_files[gsea_file_idx]
+            gsea_results = pd.read_csv(gsea_results_file, sep="\t")
+            gsea_results = gsea_results[["NAME", "NES", "FDR q-val"]]
+            gsea_results["timepoints"] = deseq_file_prefix
+
+            if (file_idx == 0) and (gsea_file_idx == 0):
+                results_df = gsea_results.copy()
+            else:
+                results_df = pd.concat([results_df, gsea_results], axis=0)
+
+    # save it all out
+    results_df.to_csv(out_file, sep="\t", index=False, compression="gzip")
+
+    # and plot
+    plot_file = "{}.summary_plot.pdf".format(out_file.split(".txt")[0])
+    plot_cmd = "plot.gsea_summary.R {} {}".format(out_file, plot_file)
+    print plot_cmd
+    quit()
+    
+    return None
+
+
+def build_gsea_rank_file(deseq_results_file, out_file, id_conversion_file=None):
+    """get a rank file from a DESeq2 results file
+    """
+    data = pd.read_csv(deseq_results_file, sep="\t")
+
+    # use conversion if needed
+    if id_conversion_file is not None:
+        id_conversions = pd.read_csv(id_conversion_file, sep="\t")
+        id_conversions = id_conversions[["ensembl_gene_id", "hgnc_symbol"]]
+        id_conversions = id_conversions.set_index("ensembl_gene_id")
+        id_conversions = id_conversions[~pd.isna(id_conversions["hgnc_symbol"])]
+        data = data.merge(id_conversions, left_index=True, right_index=True)
+
+    # extract just HGNC and logFC
+    data = data[["hgnc_symbol", "log2FoldChange"]]
+    data.to_csv(out_file, sep="\t", header=False, index=False)
+    
+    return None
+
+
+def run_gsea_on_mat(rank_file, genesets_file, out_dir):
+    """given a data mat, split to each column to run through prerank
+    """
+    #chip_file = "gseaftp.broadinstitute.org://pub/gsea/annotations/ENSEMBL_human_gene.chip"
+    example_cmd = (
+        "java -cp ~/software/gsea/3.0/gsea-3.0.jar -Xmx1014m xtools.gsea.GseaPreranked "
+        "-rnk {} "
+        "-gmx {} "
+        "-set_max 1000 "
+        "-set_min 15 "
+        "-out {} "
+        "-gui false").format(
+            rank_file,
+            genesets_file,
+            out_dir)
+    if not os.path.isdir(out_dir):
+        print example_cmd
+        run_shell_cmd(example_cmd)
+
+    # figure out which file has the results (neg and pos) and return
+    gsea_results_files = sorted(glob.glob(
+        "{}/*/gsea*xls".format(out_dir)))
+    assert len(gsea_results_files) == 2
+    
+    return gsea_results_files
+
+
 def filter_clusters_for_tfs(
         cluster_file,
         out_cluster_file,
