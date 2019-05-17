@@ -7,6 +7,7 @@ import logging
 from ggr.util.utils import run_shell_cmd
 from ggr.analyses.filtering import filter_for_ids
 
+from ggr.analyses.rna import get_gene_sets_from_scRNA_dataset
 from ggr.analyses.rna import make_rsem_matrix
 from ggr.analyses.rna import threshold_empirically_off_genes
 from ggr.analyses.rna import filter_clusters_for_tfs
@@ -18,6 +19,9 @@ from ggr.analyses.rna import convert_gene_list_to_tss
 from ggr.analyses.rna import add_clusters_to_tss_file
 from ggr.analyses.rna import run_rdavid
 from ggr.analyses.rna import run_gsea_on_series
+
+from ggr.analyses.utils import build_id_matching_mat
+from ggr.analyses.utils import plot_PCA
 
 from ggr.analyses.motifs import add_expressed_genes_to_metadata
 
@@ -158,15 +162,27 @@ def runall(args, prefix):
     run_shell_cmd("mkdir -p {}".format(results_dir))
     out_results = args.outputs["results"][results_dirname]
 
-    # TODO
     # annotation - pull in Andrew preprocessed scRNA-seq
     # basal vs differentiated state and create gene sigs (.gmt) for gsea downstream
     gsea_annot_dir = "{}/gsea".format(args.outputs["annotations"]["dir"])
+    gene_sets_scRNA_file = "{}/genesets_scRNA.gmt".format(gsea_annot_dir)
     if not os.path.isdir(gsea_annot_dir):
         run_shell_cmd("mkdir -p {}".format(gsea_annot_dir))
-        
-        
-    quit()
+        get_gene_sets_from_scRNA_dataset(
+            args.inputs["annot"][args.cluster]["scRNA_diff"],
+            gene_sets_scRNA_file)
+
+    # if using the sc data, merge in with other gene sets - if not, then don't
+    if os.path.isdir(gsea_annot_dir):
+        geneset_file = "{}/genesets_GGR.gmt".format(gsea_annot_dir)
+        merge_cmd = "cat {} {} > {}".format(
+            args.inputs["annot"][args.cluster]["gsea_gene_sets"],
+            gene_sets_scRNA_file,
+            geneset_file)
+        if not os.path.isfile(geneset_file):
+            run_shell_cmd(merge_cmd)
+    else:
+        geneset_file = args.inputs["annot"][args.cluster]["gsea_gene_sets"]
     
     # ----------------------------------------------------
     # ANALYSIS 0 - create data matrices of expected counts
@@ -254,7 +270,7 @@ def runall(args, prefix):
             args.outputs["results"]["rna"]["expression_filtering"]["gene_ids.expressed.list"],
             args.outputs["annotations"]["tss.pc.bed"],
             expressed_tss_file)
-
+        
     # ----------------------------------------------------
     # ANALYSIS 3 - run timeseries analysis on these genes
     # input: count matrix of expressed protein coding genes
@@ -265,9 +281,47 @@ def runall(args, prefix):
         prefix,
         datatype_key="rna",
         mat_key="rna.counts.pc.expressed.mat")
+        
+    # here can do a PCA/correlation plot to show samples
+    plot_dir = "{}/plots".format(
+        out_results["dir"])
+    if not os.path.isdir(plot_dir):
+        run_shell_cmd("mkdir -p {}".format(plot_dir))
 
-    # TODO - run GSEA on differential results (over d0 baseline)
-    # produce 1 final results table that is gene_set x timepoint
+        # pull the two reps
+        gene_mat_files = sorted(glob.glob(
+            "{}/matrices/ggr.rna.counts.pc.expressed.timeseries_adj.rep*rlog.dynamic.mat.txt.gz".format(
+                out_results["timeseries"]["dir"])))
+        print len(gene_mat_files)
+        
+        # plot PCA/correlation (bio reps separately and pooled)
+        pca_file = "{}/{}.pca.pdf".format(
+            plot_dir,
+            os.path.basename(gene_mat_files[0]).split(".rep")[0])
+        plot_PCA(gene_mat_files, pca_file)
+        
+        # plot PCA/correlation additionally considering scRNA-seq samples
+        # for this, pre-adjust scRNA-seq data to a mat file that matches the gene_mat order
+        # NOTE: the normalizations too different, doesn't work (but keep for history)
+        match_sc_mat_file = "{}/{}.scRNA.mat.txt.gz".format(
+            plot_dir, prefix)
+        build_id_matching_mat(
+            gene_mat_files[0],
+            args.inputs["annot"][args.cluster]["scRNA_mat"],
+            match_sc_mat_file,
+            id_conversion_file=args.outputs["annotations"]["geneids.mappings.mat"])
+        gene_mat_files.append(match_sc_mat_file)
+        pca_file = "{}/{}.incl_scRNA.pca.pdf".format(
+            plot_dir,
+            os.path.basename(gene_mat_files[0]).split(".rep")[0])
+        plot_PCA(gene_mat_files, pca_file)
+    
+    # ----------------------------------------------------
+    # ANALYSIS - run GSEA on timepoint comparisons to get
+    # enrichments across time
+    # ----------------------------------------------------
+    
+    # run GSEA on differential results (over d0 baseline)
     gsea_dir = "{}/gsea".format(
         args.outputs["results"][results_dirname]["timeseries"]["dir"])
     args.outputs["results"][results_dirname]["timeseries"]["gsea"] = {
@@ -282,15 +336,12 @@ def runall(args, prefix):
         gsea_results_file = "{}/{}.gsea_results.txt.gz".format(gsea_dir, prefix)
         run_gsea_on_series(
             deseq_files,
-            args.inputs["annot"][args.cluster]["gsea_gene_sets"],
+            geneset_file,
             gsea_results_file,
             id_conversion_file=args.outputs["annotations"]["geneids.mappings.mat"],
             tmp_dir=gsea_dir)
 
     quit()
-        
-    
-
     
     # TODO: maybe need to have a link to the cluster path and dir?
     cluster_key = "clusters.reproducible.hard.reordered.list"

@@ -43,6 +43,40 @@ def threshold_empirically_off_genes(mat_file, out_file, thresh=1.0):
     return None
 
 
+def get_gene_sets_from_scRNA_dataset(
+        sc_rna_file,
+        out_file,
+        pval_cutoff=0.05,
+        logfc_cutoff=0.15): # 0.15
+    """get results from Andrew's analysis file
+    """
+    diff_results = pd.read_csv(sc_rna_file, sep="\t")
+
+    # get sig up and write out to file
+    diff_sig_up = diff_results[
+        (diff_results["p_val_adj"] < pval_cutoff) &
+        (diff_results["avg_logFC"] > logfc_cutoff)
+    ]
+
+    with open(out_file, "w") as fp:
+        fp.write("{}\t{}\n".format(
+            "SINGLECELL_DIFFERENTIATED",
+            "\t".join(list(diff_sig_up.index.values))))
+
+    # get sig down and write out to file
+    diff_sig_down = diff_results[
+        (diff_results["p_val_adj"] < pval_cutoff) &
+        (diff_results["avg_logFC"] < -logfc_cutoff)
+    ]
+
+    with open(out_file, "a") as fp:
+        fp.write("{}\t{}\n".format(
+            "SINGLECELL_PROGENITOR",
+            "\t".join(list(diff_sig_down.index.values))))
+        
+    return
+
+
 def run_gsea_on_series(
         deseq_files,
         genesets_file,
@@ -89,10 +123,11 @@ def run_gsea_on_series(
     results_df.to_csv(out_file, sep="\t", index=False, compression="gzip")
 
     # and plot
-    plot_file = "{}.summary_plot.pdf".format(out_file.split(".txt")[0])
-    plot_cmd = "plot.gsea_summary.R {} {}".format(out_file, plot_file)
-    print plot_cmd
-    quit()
+    dot_plot_file = "{}.dot_summary.pdf".format(out_file.split(".txt")[0])
+    line_plot_file = "{}.line_summary.pdf".format(out_file.split(".txt")[0])
+    plot_cmd = "plot.gsea_summary.R {} {} {}".format(
+        out_file, dot_plot_file, line_plot_file)
+    run_shell_cmd(plot_cmd)
     
     return None
 
@@ -117,20 +152,25 @@ def build_gsea_rank_file(deseq_results_file, out_file, id_conversion_file=None):
     return None
 
 
-def run_gsea_on_mat(rank_file, genesets_file, out_dir):
+def run_gsea_on_mat(
+        rank_file, genesets_file, out_dir,
+        min_geneset_size=15, max_geneset_size=1000):
     """given a data mat, split to each column to run through prerank
     """
     #chip_file = "gseaftp.broadinstitute.org://pub/gsea/annotations/ENSEMBL_human_gene.chip"
     example_cmd = (
         "java -cp ~/software/gsea/3.0/gsea-3.0.jar -Xmx1014m xtools.gsea.GseaPreranked "
+        "-scoring_scheme classic "
         "-rnk {} "
         "-gmx {} "
-        "-set_max 1000 "
-        "-set_min 15 "
+        "-set_max {} "
+        "-set_min {} "
         "-out {} "
         "-gui false").format(
             rank_file,
             genesets_file,
+            max_geneset_size,
+            min_geneset_size,
             out_dir)
     if not os.path.isdir(out_dir):
         print example_cmd
