@@ -25,6 +25,14 @@ for (i in 1:length(mat_files)) {
 
 all_data <- all_data[,order(names(all_data))]
 
+# just keep the top 10%?
+if (FALSE) {
+    all_data_max <- apply(all_data, 1, max)
+    cutoff <- quantile(all_data_max, probs=c(0.50))
+    print(cutoff[1])
+    all_data <- all_data[all_data_max > cutoff,]
+}
+
 print(head(all_data))
 print(dim(all_data))
 
@@ -38,6 +46,6 @@ pca_data$group <- row.names(pca_data)
 
 # plot
 ggplot(pca_data, aes(x=x, y=y, colour=group)) +
-    geom_point(size=3) +
+    geom_point(size=3) + xlim(-250,250) + ylim(-250,250) + 
     theme_bw()
 ggsave(plot_file)

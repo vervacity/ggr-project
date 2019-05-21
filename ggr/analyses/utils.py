@@ -11,11 +11,16 @@ def build_id_matching_mat(
         secondary_mat_file,
         secondary_out_file,
         keep_cols=["Basal_Avg", "Diff_Avg"],
+        primary_id_col=None,
         id_conversion_file=None):
     """
     """
     primary_data = pd.read_csv(primary_mat_file, sep="\t", index_col=0)
+    if primary_id_col is not None:
+        primary_data = primary_data.set_index(primary_id_col)
     secondary_data = pd.read_csv(secondary_mat_file, sep="\t")
+    if secondary_data.columns[0].startswith("Unnamed"):
+        secondary_data = pd.read_csv(secondary_mat_file, sep="\t", index_col=0)
     
     if id_conversion_file is not None:
         mappings = pd.read_csv(id_conversion_file, sep="\t")
@@ -27,15 +32,15 @@ def build_id_matching_mat(
         secondary_data = secondary_data[~pd.isna(secondary_data["ensembl_gene_id"])]
         secondary_data = secondary_data.set_index("ensembl_gene_id")
 
-    secondary_data = secondary_data[keep_cols]
+    if len(keep_cols) > 0:
+        secondary_data = secondary_data[keep_cols]
 
     # merge to match and fill na
-    print primary_data.shape
     merged = primary_data.merge(secondary_data, left_index=True, right_index=True, how="left")
     merged = merged.fillna(0)
-    merged = merged[keep_cols]
 
-    print merged.shape
+    if len(keep_cols) > 0:
+        merged = merged[keep_cols]
 
     # and save out to new file
     merged.to_csv(secondary_out_file, sep="\t", compression="gzip")

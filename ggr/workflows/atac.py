@@ -13,8 +13,9 @@ from ggr.util.bed_utils import merge_regions
 from ggr.util.bed_utils import id_to_bed
 
 from ggr.analyses.filtering import filter_for_ids
-
 from ggr.analyses.counting import make_count_matrix
+from ggr.analyses.utils import build_id_matching_mat
+from ggr.analyses.utils import plot_PCA
 
 from ggr.workflows.timeseries import run_timeseries_workflow
 
@@ -138,6 +139,43 @@ def runall(args, prefix):
         datatype_key="atac",
         mat_key=counts_key)
 
+    # TODO get PCA
+    plot_dir = "{}/plots".format(
+        out_results["timeseries"]["dir"])
+    #if not os.path.isdir(plot_dir):
+    if True:
+        run_shell_cmd("mkdir -p {}".format(plot_dir))
+
+        # pull the two reps
+        atac_mat_files = sorted(glob.glob(
+            "{}/ggr.atac.*.rep*rlog.dynamic.mat.txt.gz".format(
+                args.outputs["data"]["dir"])))
+
+        # and build filtered mat files based on final dynamic set
+        final_dynamic_list = args.outputs["results"]["atac"]["timeseries"]["dp_gp"][
+            "clusters.reproducible.hard.reordered.list"]
+        filt_mat_files = []
+        for atac_mat_file in atac_mat_files:
+            filt_atac_mat_file = "{}/{}.filt.mat.txt.gz".format(
+                plot_dir,
+                os.path.basename(atac_mat_file).split(".mat")[0])
+            build_id_matching_mat(
+                final_dynamic_list,
+                atac_mat_file,
+                filt_atac_mat_file,
+                keep_cols=[],
+                primary_id_col="id")
+            filt_mat_files.append(filt_atac_mat_file)
+
+        # plot PCA/correlation (bio reps separately and pooled)
+        pca_file = "{}/{}.pca.pdf".format(
+            plot_dir,
+            os.path.basename(atac_mat_files[0]).split(".rep")[0])
+        plot_PCA(filt_mat_files, pca_file)
+        
+    quit()
+    
+    
     # get BED files for each cluster and add to label_dirs
     cluster_dir = "{}/timeseries/dp_gp/reproducible/hard/reordered".format(results_dir)
     cluster_bed_dir = "{}/bed".format(cluster_dir)
