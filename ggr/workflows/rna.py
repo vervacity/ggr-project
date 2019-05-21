@@ -326,8 +326,7 @@ def runall(args, prefix):
         args.outputs["results"][results_dirname]["timeseries"]["dir"])
     args.outputs["results"][results_dirname]["timeseries"]["gsea"] = {
         "dir": gsea_dir}
-    #if not os.path.isdir(gsea_dir):
-    if True:
+    if not os.path.isdir(gsea_dir):
         run_shell_cmd("mkdir -p {}".format(gsea_dir))
         deseq_files = sorted(glob.glob(
             "{}/deseq2/*over_d00_resultsAll.txt.gz".format(
@@ -341,8 +340,6 @@ def runall(args, prefix):
             id_conversion_file=args.outputs["annotations"]["geneids.mappings.mat"],
             tmp_dir=gsea_dir)
 
-    quit()
-    
     # TODO: maybe need to have a link to the cluster path and dir?
     cluster_key = "clusters.reproducible.hard.reordered.list"
     out_data = args.outputs["data"]

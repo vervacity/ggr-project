@@ -139,11 +139,10 @@ def runall(args, prefix):
         datatype_key="atac",
         mat_key=counts_key)
 
-    # TODO get PCA
+    # get PCA
     plot_dir = "{}/plots".format(
         out_results["timeseries"]["dir"])
-    #if not os.path.isdir(plot_dir):
-    if True:
+    if not os.path.isdir(plot_dir):
         run_shell_cmd("mkdir -p {}".format(plot_dir))
 
         # pull the two reps
@@ -172,9 +171,6 @@ def runall(args, prefix):
             plot_dir,
             os.path.basename(atac_mat_files[0]).split(".rep")[0])
         plot_PCA(filt_mat_files, pca_file)
-        
-    quit()
-    
     
     # get BED files for each cluster and add to label_dirs
     cluster_dir = "{}/timeseries/dp_gp/reproducible/hard/reordered".format(results_dir)
