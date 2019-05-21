@@ -8,6 +8,8 @@ from collections import Counter
 import numpy as np
 import pandas as pd
 
+from scipy.stats import pearsonr
+
 def bed_to_gene_set_by_proximity(
         bed_file,
         tss_file,
@@ -44,6 +46,88 @@ def bed_to_gene_set_by_proximity(
     os.system("rm {}".format(tmp_file))
     
     return data
+
+
+def build_correlation_matrix(
+        atac_cluster_ids,
+        atac_mat_file,
+        rna_cluster_ids,
+        rna_mat_file,
+        out_file):
+    """using the mean trajectory for ATAC and RNA, make a correlation
+    matrix on those patterns
+    """
+    # to consider - do anything with proximity?
+    
+    # for each cluster id set, pull mean traj out
+    atac_data = pd.read_csv(atac_mat_file, sep="\t", index_col=0)
+    # for GGR, need to remove d05
+    atac_data = atac_data.drop("d05", axis=1)
+    atac_clusters = pd.read_csv(atac_cluster_ids, sep="\t")
+    atac_unique_clusters = np.sort(
+        np.unique(atac_clusters["cluster"].values))
+    atac_cluster_means = []
+    for atac_cluster_id in atac_unique_clusters:
+        # get example ids in cluster
+        example_ids = atac_clusters[
+            atac_clusters["cluster"] == atac_cluster_id]["id"].values
+        
+        # extract set from mat file
+        atac_cluster_set = atac_data[atac_data.index.isin(example_ids)]
+        
+        # and get means
+        cluster_mean = np.mean(atac_cluster_set, axis=0)
+        atac_cluster_means.append(cluster_mean)
+
+    # do the same for RNA
+    rna_data = pd.read_csv(rna_mat_file, sep="\t", index_col=0)
+    rna_clusters = pd.read_csv(rna_cluster_ids, sep="\t")
+    rna_unique_clusters = np.sort(
+        np.unique(rna_clusters["cluster"].values))
+    rna_cluster_means = []
+    for rna_cluster_id in rna_unique_clusters:
+        # get example ids in cluster
+        example_ids = rna_clusters[
+            rna_clusters["cluster"] == rna_cluster_id]["id"].values
+        
+        # extract set from mat file
+        rna_cluster_set = rna_data[rna_data.index.isin(example_ids)]
+        
+        # and get means
+        cluster_mean = np.mean(rna_cluster_set, axis=0)
+        rna_cluster_means.append(cluster_mean)
+    
+    # and now build out matrix
+    correlation_mat = np.zeros((
+        len(atac_unique_clusters),
+        len(rna_unique_clusters)))
+    for atac_i in range(len(atac_unique_clusters)):
+        for rna_j in range(len(rna_unique_clusters)):
+            # do a pearson corr
+            coeff, pval = pearsonr(
+                atac_cluster_means[atac_i],
+                rna_cluster_means[rna_j])
+
+            # save to mat
+            correlation_mat[atac_i, rna_j] = coeff
+
+    # and save out
+    correlation_df = pd.DataFrame(
+        data=correlation_mat,
+        columns=rna_unique_clusters,
+        index=atac_unique_clusters)
+    correlation_df.to_csv(out_file, sep="\t", compression="gzip")
+
+    # and plot
+    plot_file = "{}.pdf".format(out_file.split(".txt")[0])
+    plot_cmd = "plot.corr.R {} {}".format(
+        out_file, plot_file)
+    print plot_cmd
+    
+    quit()
+    
+
+    return
 
 
 def build_confusion_matrix(traj_bed_files, gene_sets, gene_clusters_file, out_file):
