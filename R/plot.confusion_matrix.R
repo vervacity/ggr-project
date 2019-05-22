@@ -23,17 +23,20 @@ print(head(data))
 plot_heatmap <- function(plot_data, color_set) {
 
     # grid
-    mylmat = rbind(c(0,3,0),c(2,1,0),c(0,4,0))
-    mylwid = c(0.05,1,0.05)
-    mylhei = c(0.25,4,0.5)
+    mylmat = rbind(
+        c(0,0,5,0),
+        c(0,0,2,0),
+        c(4,1,3,0),
+        c(0,0,6,0))
+    mylwid = c(0.05,0.25,4.4,0.05)
+    mylhei = c(0.05,0.25,6,0.5)
 
     # get GGR colors
     granularity <- 49
     my_palette <- colorRampPalette(
         brewer.pal(9, "YlGnBu"))(granularity)
-    #my_palette <- rev(viridis(granularity))
-    #my_palette <- rev(plasma(49))
-    #my_palette <- pal_material("lime")(granularity)
+    row_colors <- get_trajectory_palette(15)
+    col_colors <- get_trajectory_palette(11)
     
     # sep
     rowsep <- 1:nrow(plot_data)
@@ -74,15 +77,14 @@ plot_heatmap <- function(plot_data, color_set) {
         breaks=my_breaks,
         rowsep=rowsep,
         colsep=colsep,
+        RowSideColors=row_colors,
+        ColSideColors=col_colors,
         sepcolor="black")
-        #add.expr=add_borders(i),
-        #useRaster=TRUE,
-       # par(xpd=FALSE)) # xpd - where plotting shows up
 
 }
 
 
 # plot joint heatmap
-pdf(file=plot_file, height=7, width=7, onefile=FALSE, family="ArialMT")
+pdf(file=plot_file, height=9, width=9, onefile=FALSE, family="ArialMT")
 plot_heatmap(data, "Blues")
 dev.off()

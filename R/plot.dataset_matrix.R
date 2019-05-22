@@ -23,6 +23,7 @@ day_labels <- gsub("day.", "day ", colnames(data))[2:length(colnames(data))]
 data <- data[data[,1] != "RAMPAGE",]
 data <- data[data[,1] != "RNA-seq (polyA+)",]
 data <- data[data[,1] != "RNA-seq (Ribo-Zero)",]
+data <- data[data[,1] != "CTCF ChIP-seq",]
 data$day.3.5 <- NULL
 data$day.4.0 <- NULL
 data$day.5.5 <- NULL

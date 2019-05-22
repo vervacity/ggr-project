@@ -14,8 +14,8 @@ line_plot_file <- args[3]
 gsea_summary <- read.table(gsea_summary_file, sep="\t", header=TRUE)
 
 keep_terms <- c(
-    "SINGLECELL_PROGENITOR",
-    "SINGLECELL_DIFFERENTIATED",
+    #"SINGLECELL_PROGENITOR",
+    #"SINGLECELL_DIFFERENTIATED",
     #"GO_POSITIVE_REGULATION_OF_EPITHELIAL_CELL_MIGRATION",
     #"GO_REGULATION_OF_STEM_CELL_PROLIFERATION",
     "GO_KERATINOCYTE_DIFFERENTIATION",
@@ -30,6 +30,10 @@ if (TRUE) {
 gsea_summary$sig <- gsea_summary$FDR.q.val < 0.25
 gsea_summary$sig[gsea_summary$sig] <- 2
 gsea_summary$sig[gsea_summary$sig !=2 ] <- 1.5
+
+# adjust names
+gsea_summary$timepoints <- gsub("0$", ".0", gsea_summary$timepoints)
+gsea_summary$timepoints <- gsub("5$", ".5", gsea_summary$timepoints)
 
 ggplot(gsea_summary, aes(x=timepoints, y=NAME)) +
     #geom_point(aes(colour=sig, size=NES)) +
@@ -46,8 +50,30 @@ ggsave(dot_plot_file, width=14, height=7)
 
 # plot as line plots
 ggplot(gsea_summary, aes(x=timepoints, y=NES, group=NAME, colour=NAME)) +
+    ggtitle("Gene set enrichments") +
     geom_line() +
-    geom_point(aes(size=sig)) +
-ggsave(line_plot_file, width=42, height=7) # width 14
+    geom_point() +
+    #geom_point(aes(size=sig)) +
+    theme_bw() +
+    theme(
+        text=element_text(size=5),
+        aspect.ratio=1,
+        panel.grid.major=element_blank(),
+        panel.grid.minor=element_blank(),
+        panel.background=element_blank(),
+        panel.border=element_rect(size=0.25),
+        axis.title=element_text(margin=margin(0,0,0,0)),
+        axis.line=element_blank(),
+        axis.ticks=element_line(size=0.25),
+        legend.title=element_blank(),
+        legend.text=element_text(size=2),
+        #legend.justification=c(1,0),
+        #legend.position=c(1,0),
+        legend.justification=c(0,1),
+        legend.position=c(0,1),
+        legend.background=element_blank(),
+        legend.key.size=unit(0.01,"in"))
+
+ggsave(line_plot_file, height=2, width=2.5) # width 14
 
 # plot just the best subset

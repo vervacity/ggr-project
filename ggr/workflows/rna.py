@@ -285,7 +285,8 @@ def runall(args, prefix):
     # here can do a PCA/correlation plot to show samples
     plot_dir = "{}/plots".format(
         out_results["dir"])
-    if not os.path.isdir(plot_dir):
+    #if not os.path.isdir(plot_dir):
+    if True:
         run_shell_cmd("mkdir -p {}".format(plot_dir))
 
         # pull the two reps
@@ -326,7 +327,8 @@ def runall(args, prefix):
         args.outputs["results"][results_dirname]["timeseries"]["dir"])
     args.outputs["results"][results_dirname]["timeseries"]["gsea"] = {
         "dir": gsea_dir}
-    if not os.path.isdir(gsea_dir):
+    #if not os.path.isdir(gsea_dir):
+    if True:
         run_shell_cmd("mkdir -p {}".format(gsea_dir))
         deseq_files = sorted(glob.glob(
             "{}/deseq2/*over_d00_resultsAll.txt.gz".format(

@@ -69,8 +69,6 @@ def runall(args, prefix):
             rna_mat_file,
             correlation_matrix_file)
     
-    quit()
-    
     # -------------------------------------------
     # ANALYSIS - overlap ATAC trajectories with RNA
     # input: atac trajectories, tss file
@@ -113,7 +111,8 @@ def runall(args, prefix):
     # collect into a confusion matrix
     cluster_file = args.outputs["results"]["rna"]["timeseries"]["dp_gp"]["clusters.reproducible.hard.reordered.list"]
     confusion_matrix_file = "{}/{}.confusion_mat.txt.gz".format(atac_linking_dir, prefix)
-    if not os.path.isfile(confusion_matrix_file):
+    #if not os.path.isfile(confusion_matrix_file):
+    if True:
         build_confusion_matrix(
             traj_bed_files,
             gene_set_files,

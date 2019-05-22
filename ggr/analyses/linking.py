@@ -124,9 +124,6 @@ def build_correlation_matrix(
         out_file, plot_file)
     print plot_cmd
     
-    quit()
-    
-
     return
 
 
@@ -167,12 +164,16 @@ def build_confusion_matrix(traj_bed_files, gene_sets, gene_clusters_file, out_fi
             mat[gene_set_idx, col_idx] = total / (float(cluster_counts[cluster_idx]) * float(num_regions))
 
     # maybe just row normalize?
-    
             
     # save out
     results = pd.DataFrame(data=mat)
     results = results.div(results.sum(axis=1), axis=0)
-    
     results.to_csv(out_file, sep="\t", compression="gzip")
 
+    # and plot
+    plot_file = "{}.pdf".format(out_file.split(".txt")[0])
+    plot_cmd = "plot.confusion_matrix.R {} {}".format(
+        out_file, plot_file)
+    print plot_cmd
+    
     return

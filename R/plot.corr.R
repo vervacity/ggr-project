@@ -4,6 +4,10 @@
 library(gplots)
 library(RColorBrewer)
 
+# load GGR style guide
+load_style_guide <- system("which ggr_style_guide.R", intern=TRUE)
+source(load_style_guide)
+
 # args
 args <- commandArgs(trailingOnly=TRUE)
 mat_file <- args[1]
@@ -15,14 +19,25 @@ print(head(data))
 
 
 # grid
-mylmat = rbind(c(0,3,0),c(2,1,0),c(0,4,0))
-mylwid = c(0.05,4,0.05)
-mylhei = c(0.05,4,0.5)
+mylmat = rbind(
+    c(0,0,5,0),
+    c(0,0,2,0),
+    c(4,1,3,0),
+    c(0,0,6,0))
+mylwid = c(0.05,0.25,4.4,0.05)
+mylhei = c(0.05,0.25,6,0.5)
 
-my_palette <- rev(colorRampPalette(brewer.pal(9, "RdBu"))(49))
-    
+# pull the trajectory palettes
+row_colors <- get_trajectory_palette(15)
+col_colors <- get_trajectory_palette(11)
+my_palette <- rev(colorRampPalette(brewer.pal(9, "PuOr"))(49))
+
+# breaks
+my_breaks <- seq(-1, 1, length.out=50)
+
 # plot
-pdf(plot_file, height=6, width=5)
+pdf(plot_file, height=9, width=9)
+
 heatmap.2(
     as.matrix(data),
     Rowv=FALSE,
@@ -50,16 +65,10 @@ heatmap.2(
     lwid=mylwid,
     lhei=mylhei,
     col=my_palette,
-    #breaks=my_breaks,
-    #rowsep=rowsep,
+    breaks=my_breaks,
+    rowsep=1:nrow(data),
+    colsep=1:ncol(data),
+    RowSideColors=row_colors,
+    ColSideColors=col_colors,
     sepcolor="black")
 dev.off()
-
-
-quit()
-
-# plot
-ggplot(pca_data, aes(x=x, y=y, colour=group)) +
-    geom_point(size=3) + xlim(-250,250) + ylim(-250,250) + 
-    theme_bw()
-ggsave(plot_file)

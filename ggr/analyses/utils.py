@@ -55,6 +55,7 @@ def plot_PCA(mat_files, out_file):
     """
     pca_cmd = "plot.pca.R {} {}".format(out_file, " ".join(mat_files))
     print pca_cmd
+    #os.system(pca_cmd)
     
     return
 
