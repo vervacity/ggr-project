@@ -3,6 +3,11 @@
 # description: plot GSEA summary
 library(ggplot2)
 library(viridis)
+library(ggsci)
+
+# load GGR style guide
+load_style_guide <- system("which ggr_style_guide.R", intern=TRUE)
+source(load_style_guide)
 
 # args
 args <- commandArgs(trailingOnly=TRUE)
@@ -35,6 +40,13 @@ gsea_summary$sig[gsea_summary$sig !=2 ] <- 1.5
 gsea_summary$timepoints <- gsub("0$", ".0", gsea_summary$timepoints)
 gsea_summary$timepoints <- gsub("5$", ".5", gsea_summary$timepoints)
 
+# get colors
+ggr_colors <- get_ggr_timepoint_colors()
+ggr_colors <- ggr_colors[3:length(ggr_colors)]
+name_colors <- pal_nejm("default")(3)
+ggr_colors <- c(ggr_colors, name_colors)
+
+
 ggplot(gsea_summary, aes(x=timepoints, y=NAME)) +
     #geom_point(aes(colour=sig, size=NES)) +
     geom_point(aes(colour=NES, size=sig)) +
@@ -49,10 +61,12 @@ ggplot(gsea_summary, aes(x=timepoints, y=NAME)) +
 ggsave(dot_plot_file, width=14, height=7)
 
 # plot as line plots
-ggplot(gsea_summary, aes(x=timepoints, y=NES, group=NAME, colour=NAME)) +
+ggplot(gsea_summary, aes(x=timepoints, y=NES, group=NAME)) +
     ggtitle("Gene set enrichments") +
-    geom_line() +
-    geom_point() +
+    geom_line(aes(colour=NAME)) +
+    #geom_smooth(se=FALSE, aes(colour=NAME)) +
+    #geom_point(aes(fill=timepoints, colour=timepoints)) +
+    geom_point(shape=21, stroke=1, fill="white", aes(colour=timepoints)) +
     #geom_point(aes(size=sig)) +
     theme_bw() +
     theme(
@@ -72,8 +86,10 @@ ggplot(gsea_summary, aes(x=timepoints, y=NES, group=NAME, colour=NAME)) +
         legend.justification=c(0,1),
         legend.position=c(0,1),
         legend.background=element_blank(),
-        legend.key.size=unit(0.01,"in"))
+        legend.key.size=unit(0.01,"in")) +
+        scale_color_manual(values=ggr_colors)
 
-ggsave(line_plot_file, height=2, width=2.5) # width 14
+
+ggsave(line_plot_file, height=2, width=2.5, useDingbats=FALSE) # width 14
 
 # plot just the best subset

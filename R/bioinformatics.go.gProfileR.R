@@ -10,10 +10,18 @@ args <- commandArgs(trailingOnly=TRUE)
 gene_list_file <- args[1]
 background_list_file <- args[2]
 out_dir <- args[3]
+header <- as.numeric(args[4])
 
 # read in gene list and background gene list
-gene_list <- read.table(gzfile(gene_list_file), header=TRUE, stringsAsFactors=FALSE)[,1]
-background_list <- read.table(gzfile(background_list_file), header=TRUE, stringsAsFactors=FALSE)[,1]
+if (header != 0) {
+    gene_list <- read.table(
+        gzfile(gene_list_file), header=TRUE, stringsAsFactors=FALSE)[,1]
+} else {
+    gene_list <- read.table(
+        gzfile(gene_list_file), header=FALSE, stringsAsFactors=FALSE)[,1]
+}
+background_list <- read.table(
+    gzfile(background_list_file), header=TRUE, stringsAsFactors=FALSE)[,1]
 
 prefix <- sub('\\.txt.gz$', "", basename(gene_list_file))
 padj_cutoff <- 0.1

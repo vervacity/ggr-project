@@ -142,8 +142,7 @@ def runall(args, prefix):
     # get PCA
     plot_dir = "{}/plots".format(
         out_results["timeseries"]["dir"])
-    #if not os.path.isdir(plot_dir):
-    if True:
+    if not os.path.isdir(plot_dir):
         run_shell_cmd("mkdir -p {}".format(plot_dir))
 
         # pull the two reps

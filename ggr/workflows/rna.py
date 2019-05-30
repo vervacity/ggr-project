@@ -5,8 +5,8 @@ import glob
 import logging
 
 from ggr.util.utils import run_shell_cmd
+from ggr.analyses.bioinformatics import run_gprofiler
 from ggr.analyses.filtering import filter_for_ids
-
 from ggr.analyses.rna import get_gene_sets_from_scRNA_dataset
 from ggr.analyses.rna import make_rsem_matrix
 from ggr.analyses.rna import threshold_empirically_off_genes
@@ -285,8 +285,7 @@ def runall(args, prefix):
     # here can do a PCA/correlation plot to show samples
     plot_dir = "{}/plots".format(
         out_results["dir"])
-    #if not os.path.isdir(plot_dir):
-    if True:
+    if not os.path.isdir(plot_dir):
         run_shell_cmd("mkdir -p {}".format(plot_dir))
 
         # pull the two reps
@@ -468,6 +467,20 @@ def runall(args, prefix):
     single_cluster_files = sorted(
         glob.glob("{}/reproducible/hard/reordered/*cluster_*txt.gz".format(
             out_results["timeseries"]["dp_gp"]["dir"])))
+
+    # gprofiler
+    cluster_dir = "{}/reproducible/hard/reordered".format(
+        out_results["timeseries"]["dp_gp"]["dir"])
+    go_dir = "{}/gprofiler".format(cluster_dir)
+    if not os.path.isdir(go_dir):
+        run_shell_cmd("mkdir -p {}".format(go_dir))
+        for single_cluster_file in single_cluster_files:
+            run_gprofiler(
+                single_cluster_file,
+                args.outputs["data"]["rna.counts.pc.expressed.mat"],
+                #args.outputs["annotations"]["geneids.pc.list"],
+                go_dir,
+                header=False)
     
     # rDAVID
     cluster_dir = "{}/reproducible/hard/reordered".format(
@@ -482,15 +495,6 @@ def runall(args, prefix):
                 go_dir)
     
     logger.info("MASTER_WORKFLOW: DONE")
-
-    # for figures:
-    # supplements: GO enrichment plots
-    # supplements QC
-    # main figure - promoter analyses: show ATAC, histones (this might go into supplements)
-    # transcription factor sub heatmap and line plots for key TFs (basically ordered TF cascade for known TFs)
-    
-    # eventually 3d linking to enhancers
-    
     
     return args
 

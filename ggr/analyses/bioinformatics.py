@@ -54,13 +54,20 @@ def run_great(
 def run_gprofiler(
         gene_set_file,
         background_gene_set_file,
-        out_dir):
+        out_dir,
+        header=True):
     """
     """
-    gprofiler_cmd = "bioinformatics.go.gProfileR.R {} {} {}".format(
+    if header:
+        header_val = 1
+    else:
+        header_val = 0
+    
+    gprofiler_cmd = "bioinformatics.go.gProfileR.R {} {} {} {}".format(
         gene_set_file,
         background_gene_set_file,
-        out_dir)
+        out_dir,
+        header_val)
     run_shell_cmd(gprofiler_cmd)
 
     return
