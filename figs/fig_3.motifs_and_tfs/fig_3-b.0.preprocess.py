@@ -60,7 +60,8 @@ def main():
 
     # server specific
     WORK_DIR = "/mnt/lab_data/kundaje/projects/skin/data/bds/processed.atac.2016-10-06.fixed_filtered_align"
-    OUT_DIR = '/mnt/lab_data/kundaje/projects/skin/data/bds/processed.atac.2019-06-04.bams_bp-position-matched'
+    #OUT_DIR = '/mnt/lab_data/kundaje/projects/skin/data/bds/processed.atac.2019-06-04.bams_bp-position-matched'
+    OUT_DIR = "/srv/scratch/dskim89/ggr/fig_3-b"
     os.system("mkdir -p {}".format(OUT_DIR))
 
     # first unfix BAM files
@@ -73,7 +74,7 @@ def main():
             OUT_DIR, os.path.basename(bam_file).split(".bam")[0])
         sort_cmd = "samtools sort -o {} -n -@ 16 {}".format(
             tmp_sort_bam_file, bam_file)
-        if not osa.path.isfile(tmp_sort_bam_file):
+        if not os.path.isfile(tmp_sort_bam_file):
             os.system(sort_cmd)
             
         # and then unfix
