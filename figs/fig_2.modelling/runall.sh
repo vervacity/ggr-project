@@ -1,0 +1,7 @@
+SCRIPT_DIR=~/git/ggr-project/figs/fig_2.modelling
+EVAL_DIR="/mnt/lab_data/kundaje/users/dskim89/ggr/nn/evals.2018-12-03"
+
+# fig 2b
+#$SCRIPT_DIR/fig_2-b.0.plot.encode_clf.R fig_2-b.0 $EVAL_DIR/encode-roadmap.basset.clf.testfold-*/by_task/*txt
+#$SCRIPT_DIR/fig_2-b.1.plot.ggr_clf.R fig_2-b.1 $EVAL_DIR/ggr.basset.clf.random_init.testfold-*/by_task/*txt $EVAL_DIR/ggr.basset.clf.pretrained.folds.testfold-*/by_task/*txt
+$SCRIPT_DIR/fig_2-b.2.plot.ggr_regr.R fig_2-b.1 $EVAL_DIR/ggr.basset.regr.random_init.testfold-*/by_task/*txt $EVAL_DIR/ggr.basset.regr.pretrained.folds.testfold-*/by_task/*txt

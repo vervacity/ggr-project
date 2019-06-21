@@ -65,7 +65,7 @@ if (FALSE) {
 ggplot(gsea_summary, aes(x=timepoints, y=NES, group=NAME)) +
     ggtitle("Gene set enrichments") +
     geom_line(aes(colour=NAME)) +
-    geom_point(shape=21, stroke=1, fill="white", aes(colour=timepoints)) +
+    geom_point(shape=21, stroke=1, fill="white", aes(colour=timepoints), show.legend=FALSE) +
     theme_bw() +
     theme(
         text=element_text(family="ArialMT"),
