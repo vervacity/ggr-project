@@ -17,7 +17,7 @@ mat_files <- args[2:length(args)]
 
 # load data
 for (i in 1:length(mat_files)) {
-    print(mat_files[i])
+    #print(mat_files[i])
     
     data <- read.table(gzfile(mat_files[i]), sep="\t", header=TRUE, row.names=1)
 
@@ -39,8 +39,8 @@ if (FALSE) {
     all_data <- all_data[all_data_max > cutoff,]
 }
 
-print(head(all_data))
-print(dim(all_data))
+#print(head(all_data))
+#print(dim(all_data))
 
 # put into pca
 pca_obj <- prcomp(t(all_data), center=TRUE, scale=TRUE)
@@ -53,11 +53,11 @@ pca_data <- data.frame(x=pc1, y=pc2)
 group_levels <- colnames(all_data)
 group_levels <- gsub("0_", ".0 ", group_levels)
 group_levels <- gsub("5_", ".5 ", group_levels)
-print(group_levels)
+#print(group_levels)
 pca_data$group <- row.names(pca_data)
 pca_data$group <- gsub("0_", ".0 ", pca_data$group)
 pca_data$group <- gsub("5_", ".5 ", pca_data$group)
-print(head(pca_data))
+#print(head(pca_data))
 pca_data$group <- factor(pca_data$group, levels=group_levels)
 
 # pull GGR colors and adjust
@@ -70,7 +70,7 @@ my_colors_r1 <- my_colors
 my_colors_r1 <- lighten(my_colors, amount=0.2)
 my_colors_r2 <- darken(my_colors, amount=0.2)
 my_colors <- c(my_colors_r1, my_colors_r2)
-print(head(pca_data))
+#print(head(pca_data))
 
 # plot
 p <- ggplot(pca_data, aes(x=x, y=y, colour=group)) +
