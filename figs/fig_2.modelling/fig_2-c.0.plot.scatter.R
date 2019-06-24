@@ -7,7 +7,11 @@ library(ggplot2)
 library(ggsci)
 
 # load GGR style guide
+load_style_guide <- system("which ggr_style_guide.R", intern=TRUE)
+source(load_style_guide)
 
+timepoint_colors <- get_ggr_timepoint_colors()
+print(timepoint_colors)
 
 # args
 args <- commandArgs(trailingOnly=TRUE)
@@ -23,7 +27,7 @@ r_val <- data.frame(x=5, y=0.1,text=r_val)
 plot_file <- "fig_2-c.0.scatter_day-0.pdf"
 ggplot(data, aes(x=x, y=y)) +
     geom_point(
-        alpha=0.05, shape=16, stroke=0, size=0.3) +
+        alpha=0.1, shape=16, stroke=0, size=0.3, colour=timepoint_colors[1]) + # alpha= 0.05
     geom_text(data=r_val, aes(label=text), size=1.5, vjust="inward", hjust="inward") +
     labs(x="Predicted", y="Actual") +
     theme_bw() +
@@ -58,7 +62,7 @@ r_val <- data.frame(x=5, y=0.1,text=r_val)
 plot_file <- "fig_2-c.0.scatter_day-3.pdf"
 ggplot(data, aes(x=x, y=y)) +
     geom_point(
-        alpha=0.05, shape=16, stroke=0, size=0.3) +
+        alpha=0.1, shape=16, stroke=0, size=0.3, colour=timepoint_colors[7]) +
     geom_text(data=r_val, aes(label=text), size=1.5, vjust="inward", hjust="inward") +
     labs(x="Predicted", y="Actual") +
     theme_bw() +
@@ -93,7 +97,7 @@ r_val <- data.frame(x=5, y=0.1,text=r_val)
 plot_file <- "fig_2-c.0.scatter_day-6.pdf"
 ggplot(data, aes(x=x, y=y)) +
     geom_point(
-        alpha=0.05, shape=16, stroke=0, size=0.3) +
+        alpha=0.1, shape=16, stroke=0, size=0.3, colour=timepoint_colors[10]) +
     geom_text(data=r_val, aes(label=text), size=1.5, vjust="inward", hjust="inward") +
     labs(x="Predicted", y="Actual") +
     theme_bw() +
