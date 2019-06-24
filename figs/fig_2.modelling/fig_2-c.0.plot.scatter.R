@@ -29,6 +29,7 @@ ggplot(data, aes(x=x, y=y)) +
     geom_point(
         alpha=0.1, shape=16, stroke=0, size=0.3, colour=timepoint_colors[1]) + # alpha= 0.05
     geom_text(data=r_val, aes(label=text), size=1.5, vjust="inward", hjust="inward") +
+    geom_abline(size=0.115, intercept=0, slope=1, color="gray", linetype="dashed") +
     labs(x="Predicted", y="Actual") +
     theme_bw() +
     theme(
@@ -39,14 +40,14 @@ ggplot(data, aes(x=x, y=y)) +
         panel.border=element_blank(),
         panel.grid=element_blank(),
         axis.title=element_text(size=5),
-        axis.text.y=element_text(size=5),
-        axis.text.x=element_text(size=5),
+        axis.text.y=element_text(size=4),
+        axis.text.x=element_text(size=4),
         axis.line=element_line(color="black", size=0.115, lineend="square"),
         axis.ticks=element_line(size=0.115),
         axis.ticks.length=unit(0.01, "in"),
         legend.key.size=unit(0.01, "in"),
         legend.margin=margin(5,0,0,0),
-        legend.title=element_text(size=5),
+        legend.title=element_text(size=4),
         legend.text=element_text(size=4)) +
     scale_x_continuous(limits=c(0,5), expand=c(0,0)) +
     scale_y_continuous(limits=c(0,5), expand=c(0,0))
@@ -64,6 +65,7 @@ ggplot(data, aes(x=x, y=y)) +
     geom_point(
         alpha=0.1, shape=16, stroke=0, size=0.3, colour=timepoint_colors[7]) +
     geom_text(data=r_val, aes(label=text), size=1.5, vjust="inward", hjust="inward") +
+    geom_abline(size=0.115, intercept=0, slope=1, color="gray", linetype="dashed") +
     labs(x="Predicted", y="Actual") +
     theme_bw() +
     theme(
@@ -74,14 +76,14 @@ ggplot(data, aes(x=x, y=y)) +
         panel.border=element_blank(),
         panel.grid=element_blank(),
         axis.title=element_text(size=5),
-        axis.text.y=element_text(size=5),
-        axis.text.x=element_text(size=5),
+        axis.text.y=element_text(size=4),
+        axis.text.x=element_text(size=4),
         axis.line=element_line(color="black", size=0.115, lineend="square"),
         axis.ticks=element_line(size=0.115),
         axis.ticks.length=unit(0.01, "in"),
         legend.key.size=unit(0.01, "in"),
         legend.margin=margin(5,0,0,0),
-        legend.title=element_text(size=5),
+        legend.title=element_text(size=4),
         legend.text=element_text(size=4)) +
     scale_x_continuous(limits=c(0,5), expand=c(0,0)) +
     scale_y_continuous(limits=c(0,5), expand=c(0,0))
@@ -99,6 +101,7 @@ ggplot(data, aes(x=x, y=y)) +
     geom_point(
         alpha=0.1, shape=16, stroke=0, size=0.3, colour=timepoint_colors[10]) +
     geom_text(data=r_val, aes(label=text), size=1.5, vjust="inward", hjust="inward") +
+    geom_abline(size=0.115, intercept=0, slope=1, color="gray", linetype="dashed") +
     labs(x="Predicted", y="Actual") +
     theme_bw() +
     theme(
@@ -109,14 +112,14 @@ ggplot(data, aes(x=x, y=y)) +
         panel.border=element_blank(),
         panel.grid=element_blank(),
         axis.title=element_text(size=5),
-        axis.text.y=element_text(size=5),
-        axis.text.x=element_text(size=5),
+        axis.text.y=element_text(size=4),
+        axis.text.x=element_text(size=4),
         axis.line=element_line(color="black", size=0.115, lineend="square"),
         axis.ticks=element_line(size=0.115),
         axis.ticks.length=unit(0.01, "in"),
         legend.key.size=unit(0.01, "in"),
         legend.margin=margin(5,0,0,0),
-        legend.title=element_text(size=5),
+        legend.title=element_text(size=4),
         legend.text=element_text(size=4)) +
     scale_x_continuous(limits=c(0,5), expand=c(0,0)) +
     scale_y_continuous(limits=c(0,5), expand=c(0,0))
