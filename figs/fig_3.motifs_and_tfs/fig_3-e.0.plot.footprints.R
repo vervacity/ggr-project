@@ -12,7 +12,25 @@ plot_file <- args[2]
 
 # read in data and adjust as needed
 data <- read.table(input_file, sep="\t", header=TRUE, row.names=1)
+
+# normalize to flank
+data_norm <- rbind(data[1:10,], data[191:200,])
+flank_norm_factors <- apply(data_norm, 2, mean)
+
+#data_norm <- rbind(data[50:75,], data[125:150,])
+#center_norm_factors <- apply(data_norm, 2, mean)
+
+#norm_factors <- center_norm_factors - flank_norm_factors
+data <- data.frame(t(t(data) / flank_norm_factors))
+
+# and then bias adjust
+data_norm <- rbind(data[50:75,], data[125:150,])
+norm_factors <- apply(data_norm, 2, mean)
+data <- data.frame(t(t(data) - norm_factors))
+
 data$index <- as.numeric(rownames(data)) - (nrow(data) / 2)
+data <- data[50:150,]
+
 data_melted <- melt(data, id.vars=c("index"))
 
 # plot
@@ -42,8 +60,12 @@ ggplot(data_melted, aes(x=index, y=value, colour=variable)) +
         legend.box.margin=margin(0,0,0,0),
         legend.box.spacing=unit(0.05, "in"),
         legend.title=element_blank(),
-        legend.text=element_text(size=4)) +
-    scale_x_continuous(limits=c(-100,100), expand=c(0,0)) +
-    scale_y_continuous(expand=c(0,0))
-ggsave(plot_file, height=1, width=1.25, useDingbats=FALSE)
+        legend.text=element_text(size=4),
+        strip.background=element_blank(),
+        strip.text=element_blank()) +
+    scale_x_continuous(limits=c(-51,51), expand=c(0,0)) +
+    scale_y_continuous(expand=c(0,0)) +
+    facet_grid(. ~ variable)
+
+ggsave(plot_file, height=2, width=4, useDingbats=FALSE)
 
