@@ -67,28 +67,29 @@ ggplot(auprc_results, aes(x=fold, y=value, colour=fold)) +
         shape=18, # 16
         stroke=0,
         size=0.6, show.legend=FALSE) +
-    labs(x="Fold", y="AUPRC") +
+    labs(title="ENCODE/Roadmap DNase peaks", x="Fold", y="AUPRC") +
     theme_bw() +
     theme(
-        text=element_text(family="ArialMT"),
+        text=element_text(family="ArialMT", size=6),
         plot.margin=margin(5,1,1,1),
+        plot.title=element_text(size=6, margin=margin(0,0,0,0)),
         panel.background=element_blank(),
         panel.border=element_blank(),
         panel.grid=element_blank(),
-        axis.title=element_text(size=5),
-        axis.text.y=element_text(size=4),
-        axis.text.x=element_text(size=4),
+        axis.title=element_text(size=6),
+        axis.text.y=element_text(size=6),
+        axis.text.x=element_text(size=6),
         axis.line=element_line(color="black", size=0.115, lineend="square"),
         axis.ticks=element_line(size=0.115),
         axis.ticks.length=unit(0.01, "in"),
         legend.key.size=unit(0.01, "in"),
-        legend.margin=margin(5,0,0,0),
-        legend.title=element_text(size=4),
-        legend.text=element_text(size=4)) +
+        legend.margin=margin(5,0,0,0)) +
+        #legend.title=element_text(size=6),
+        #legend.text=element_text(size=6)) +
     scale_color_npg() +
     scale_fill_npg() +
     scale_y_continuous(limits=c(0,0.8), expand=c(0,0))
-ggsave(auprc_file, height=1.5, width=1.5, useDingbats=FALSE)
+ggsave(auprc_file, height=1, width=1.5, useDingbats=FALSE)
 
 
 # auroc

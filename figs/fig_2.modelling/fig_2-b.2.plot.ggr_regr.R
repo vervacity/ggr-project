@@ -91,7 +91,7 @@ ggplot(mse_results, aes(x=train, y=value, colour=fold)) +
     scale_color_npg() +
     scale_fill_npg() +
     scale_y_continuous(limits=c(0.4,1.2), expand=c(0,0))
-ggsave(mse_file, height=1.5, width=1.5, useDingbats=FALSE)
+ggsave(mse_file, height=1, width=1.5, useDingbats=FALSE)
 
 
 # plot spearman
@@ -100,28 +100,29 @@ spearman_results$train <- factor(spearman_results$train, levels=c(rand_init, pre
 ggplot(spearman_results, aes(x=train, y=value, colour=fold)) +
     geom_boxplot(size=0.1, outlier.size=0, outlier.stroke=0) +
     geom_point(shape=16, stroke=0, size=0.3, aes(fill=fold), position=position_jitterdodge(jitter.width=0.01), show.legend=FALSE) +
-    labs(x="", y="Spearman R") +
+    labs(title="Keratinocyte ATAC signals", x="", y="Spearman R") +
     theme_bw() +
     theme(
-        text=element_text(family="ArialMT"),
+        text=element_text(family="ArialMT", size=6),
         plot.margin=margin(5,1,1,1),
+        plot.title=element_text(size=6, margin=margin(0,0,0,0)),
         panel.background=element_blank(),
         panel.border=element_blank(),
         panel.grid=element_blank(),
-        axis.title=element_text(size=5),
-        axis.text.y=element_text(size=4),
-        axis.text.x=element_text(size=4),
+        axis.title=element_text(size=6),
+        axis.text.y=element_text(size=6),
+        axis.text.x=element_text(size=6),
         axis.line=element_line(color="black", size=0.115, lineend="square"),
         axis.ticks=element_line(size=0.115),
         axis.ticks.length=unit(0.01, "in"),
         legend.key.size=unit(0.01, "in"),
-        legend.margin=margin(5,0,0,0),
-        legend.title=element_text(size=4),
-        legend.text=element_text(size=4)) +
+        legend.margin=margin(5,0,0,0)) +
+        #legend.title=element_text(size=4),
+        #legend.text=element_text(size=4)) +
     scale_color_npg() +
     scale_fill_npg() +
     scale_y_continuous(limits=c(0.50, 0.80), expand=c(0,0))
-ggsave(spearman_file, height=1.5, width=1.5, useDingbats=FALSE)
+ggsave(spearman_file, height=1, width=1.5, useDingbats=FALSE)
 
 # plot pearson
 pearson_file <- "fig_2-b.2.ggr_pearson.pdf"
