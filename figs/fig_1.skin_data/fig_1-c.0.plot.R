@@ -49,6 +49,7 @@ pc2 <- pca_obj$x[,2]
 
 pca_data <- data.frame(x=pc1, y=pc2)
 
+
 # adjust group names
 group_levels <- colnames(all_data)
 group_levels <- gsub("0_", ".0 ", group_levels)
@@ -59,6 +60,11 @@ pca_data$group <- gsub("0_", ".0 ", pca_data$group)
 pca_data$group <- gsub("5_", ".5 ", pca_data$group)
 #print(head(pca_data))
 pca_data$group <- factor(pca_data$group, levels=group_levels)
+
+#if (!grepl("rna", plot_file, fixed=TRUE)) {
+#    pca_data$x <-
+#}
+
 
 # pull GGR colors and adjust
 my_colors <- get_ggr_timepoint_colors()
@@ -85,13 +91,16 @@ p <- ggplot(pca_data, aes(x=x, y=y, colour=group)) +
         plot.margin=margin(0,0,0,0),
         plot.title=element_text(margin=margin(0,0,0,0)),
         panel.background=element_blank(),
+        panel.border=element_blank(),
         panel.grid.major=element_blank(),
         panel.grid.minor=element_blank(),
-        panel.border=element_rect(size=0.25),
-        axis.title=element_text(size=5, margin=margin(0,0,0,0)),
-        axis.line=element_blank(),
-        axis.text=element_text(size=4),
-        axis.ticks=element_line(size=0.25),
+        #panel.border=element_rect(size=0.1155),
+        axis.title=element_text(size=6, margin=margin(0,0,0,0)),
+        axis.title.x=element_text(vjust=1.5),
+        axis.title.y=element_text(vjust=-1),
+        axis.line=element_line(color="black", size=0.115, lineend="square"),
+        axis.text=element_text(size=6),
+        axis.ticks=element_line(size=0.115),
         axis.ticks.length=unit(0.01, "in"),
         legend.text=element_text(size=1),
         legend.title=element_blank(),
@@ -99,10 +108,13 @@ p <- ggplot(pca_data, aes(x=x, y=y, colour=group)) +
 
 if (!grepl("rna", plot_file, fixed=TRUE)) {
     # adjust limits of plot as needed
-    p <- p + xlim(-250,250) + ylim(-250,250)
+    p <- p + scale_x_continuous(limits=c(-300,300), breaks=c(-200, 0, 200), expand=c(0,0)) +
+        scale_y_continuous(limits=c(-300,300), breaks=c(-200, 0, 200), expand=c(0,0))
     p <- p + ggtitle("ATAC-seq")
 } else {
+    p <- p + scale_x_continuous(limits=c(-90,90), expand=c(0,0)) +
+        scale_y_continuous(limits=c(-90,90), expand=c(0,0))
     p <- p + ggtitle("RNA-seq")
 }
 
-ggsave(plot_file, height=1, width=1.5, units="in", useDingbats=FALSE)
+ggsave(plot_file, height=0.95, width=1.5, units="in", useDingbats=FALSE)

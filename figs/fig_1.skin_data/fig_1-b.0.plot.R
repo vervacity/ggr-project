@@ -60,7 +60,7 @@ p <- p + geom_point(
         colour=as.factor(day)),
     shape=21,
     fill="white",
-    size=1.5,
+    size=1.75,
     stroke=0.5) +
     scale_color_manual(values=palette)
 
@@ -71,7 +71,7 @@ p <- p +
     theme_bw() + 
     theme(
         text=element_text(family="ArialMT"),
-        axis.text.x=element_text(size=5, angle=30, hjust=1, colour="black"),
+        axis.text.x=element_text(size=6, angle=30, hjust=1, colour="black"),
         axis.text.y=element_text(size=6, colour="black"),
         axis.title.x=element_text(size=6),
         panel.grid.minor=element_blank(),

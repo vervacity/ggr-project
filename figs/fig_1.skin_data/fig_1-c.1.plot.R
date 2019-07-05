@@ -39,6 +39,8 @@ gsea_summary$sig[gsea_summary$sig !=2 ] <- 1.5
 # adjust names
 gsea_summary$timepoints <- gsub("0$", ".0", gsea_summary$timepoints)
 gsea_summary$timepoints <- gsub("5$", ".5", gsea_summary$timepoints)
+gsea_summary$timepoints <- gsub("d", "", gsea_summary$timepoints)
+
 
 # get colors
 ggr_colors <- get_ggr_timepoint_colors()
@@ -66,27 +68,31 @@ ggplot(gsea_summary, aes(x=timepoints, y=NES, group=NAME)) +
     ggtitle("Gene set enrichments") +
     geom_line(aes(colour=NAME)) +
     geom_point(shape=21, stroke=1, fill="white", aes(colour=timepoints), show.legend=FALSE) +
+    labs(x="Timepoint (day)") +
     theme_bw() +
     theme(
         text=element_text(family="ArialMT"),
         title=element_text(size=6),
+        plot.title=element_text(margin=margin(0,0,0,0)),
         aspect.ratio=1,
         panel.grid.major=element_blank(),
         panel.grid.minor=element_blank(),
         panel.background=element_blank(),
-        panel.border=element_rect(size=0.25),
+        panel.border=element_blank(),
+        #panel.border=element_rect(size=0.25),
         axis.title=element_text(size=6, margin=margin(0,0,0,0)),
-        axis.line=element_blank(),
-        axis.ticks=element_line(size=0.25),
-        axis.text=element_text(size=5),
+        axis.line=element_line(color="black", size=0.115, lineend="square"),
+        axis.ticks=element_line(size=0.115),
+        axis.text=element_text(size=6),
+        axis.text.x=element_text(angle=30, hjust=1),
         legend.title=element_blank(),
-        legend.text=element_text(size=4),
+        legend.text=element_text(size=5),
         legend.justification=c(0,1),
         legend.position=c(0,1),
         legend.background=element_blank(),
         legend.key.size=unit(0.01,"in")) +
-        scale_color_manual(values=ggr_colors)
-
+    scale_color_manual(values=ggr_colors) +
+    scale_y_continuous(limits=c(3.5, 6), expand=c(0,0)) +
 
 ggsave(line_plot_file, height=2, width=2.5, useDingbats=FALSE) # width 14
 
