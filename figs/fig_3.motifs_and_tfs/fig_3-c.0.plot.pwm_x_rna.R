@@ -24,8 +24,8 @@ make_heatmap <- function(data, data_max, use_colsep, use_labrow, rowlab_left) {
 
     # grid
     mylmat = rbind(c(0,0,3,0),c(0,1,2,0),c(0,4,5,0))
-    mylwid = c(0,0.07,0.7,0.50) # 1.5
-    mylhei = c(0.10,2,0.25) # 3
+    mylwid = c(0,0.07,0.7,0.75)
+    mylhei = c(0.10,2,0.25)
     
     if (!is.null(data_max)) {
         # for the rowside colors
@@ -59,23 +59,27 @@ make_heatmap <- function(data, data_max, use_colsep, use_labrow, rowlab_left) {
     
     # adjust for rowlab_left
     if (rowlab_left) {
-        mylwid = c(0.5,0.07,0.7,0.05)
-        offsetRow <- -10
-        my_palette <- colorRampPalette(brewer.pal(9, "Oranges"))(49)
+        mylwid = c(0.75,0.07,0.7,0.05)
+        offsetRow <- -6
+        adjRow <- c(1, NA)
+        #my_palette <- colorRampPalette(brewer.pal(9, "Oranges"))(20)
+        my_palette <- colorRampPalette(brewer.pal(9, "OrRd")[1:7])(20)
     } else {
         offsetRow <- -0.2
-        my_palette <- colorRampPalette(brewer.pal(9, "Purples"))(49)
+        my_palette <- colorRampPalette(brewer.pal(9, "Purples")[1:7])(20)
+        adjRow <- c(0, NA)
     }
     offsetCol <- 0
     
     # adjust color again
     if (!key) {
-        my_palette <- colorRampPalette(brewer.pal(9, "Blues"))(49)
+        my_palette <- colorRampPalette(brewer.pal(9, "Blues"))(20)
         if (colsepwidth > 0) {
             mylhei = c(0.05,1,0.9)
             offsetRow <- -0.2
             offsetCol <- 10
         }
+        adjRow <- c(0, NA)
     }
     
     # plot
@@ -92,6 +96,7 @@ make_heatmap <- function(data, data_max, use_colsep, use_labrow, rowlab_left) {
         sepwidth=c(0.001,colsepwidth),
 
         labRow=labRow,
+        adjRow=adjRow,
         cexRow=0.5,
         offsetRow=offsetRow,
         
@@ -104,7 +109,7 @@ make_heatmap <- function(data, data_max, use_colsep, use_labrow, rowlab_left) {
         key.title=NA,
         key.xlab=NA,
         key.par=list(
-            mar=c(2,6,1.7,6),
+            mar=c(2,6,1.9,6),
             mgp=c(0,-0.1,0),
             tcl=-0.1,
             lend=2,
@@ -284,18 +289,29 @@ for (group_i in 1:length(groups)) {
     }
 
     # now try plot all together
+    #grob_list <- list(
+    #    "1"=grab_grob(fn1),
+    #    "2"=grab_grob(fn3),
+    #    "3"=grab_grob(fn2),
+    #    "4"=grab_grob(fn4))
+
+    null_plot <- function() {plot.new()}
+
     grob_list <- list(
-        "1"=grab_grob(fn1),
-        "2"=grab_grob(fn3),
-        "3"=grab_grob(fn2),
-        "4"=grab_grob(fn4))
+        "1"=grab_grob(fn4),
+        "2"=grab_grob(null_plot),
+        "3"=grab_grob(null_plot),
+        "4"=grab_grob(fn1),
+        "5"=grab_grob(fn3),
+        "6"=grab_grob(fn2))
     
     pdf(
         file=paste(plot_prefix, ".all.pdf", sep=""),
         height=3.5, width=2.75, onefile=FALSE, useDingbats=FALSE, family="ArialMT")
     plot.new()
     grid.newpage()
-    grid.arrange(grobs=grob_list, nrow=2, ncol=3, heights=c(3, 0.25), widths=c(1, 0.08, 1), clip=FALSE)
+    #grid.arrange(grobs=grob_list, nrow=2, ncol=3, heights=c(3, 0.25), widths=c(1, 0.08, 1), clip=FALSE)
+    grid.arrange(grobs=grob_list, nrow=2, ncol=3, heights=c(0.25, 3), widths=c(1, 0.08, 1), clip=FALSE)
     title(groups[group_i], adj=0.2, outer=TRUE, line=-0.5, cex.main=0.5)
     dev.off()
 

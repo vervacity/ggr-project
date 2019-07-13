@@ -4,6 +4,7 @@
 
 library(gplots)
 library(RColorBrewer)
+library(ggsci)
 library(reshape2)
 
 set.seed(1337)
@@ -16,11 +17,17 @@ my_hclust <- function(data) {
 
 # make heatmap fn
 make_heatmap <- function(data, my_palette, my_breaks) {
+
+    # par - layout 3x3 will adjust cex down 2/3 (2x2 down to 0.83)
+    # ie, if want font point 6, set at 9
+    font_point <- 5
+    par(ps=font_point*3/2,
+        cex=1, cex.axis=1, cex.main=1)
     
     # grid
     mylmat = rbind(c(0,3,0),c(2,1,0),c(0,4,0))
-    mylwid = c(0.05,0.8,0.3)
-    mylhei = c(0.10,4.5,0.25)
+    mylwid = c(0.5,0.7,0.1)
+    mylhei = c(0.05,2,0.20)
 
     # plot
     heatmap.2(
@@ -35,15 +42,16 @@ make_heatmap <- function(data, my_palette, my_breaks) {
         rowsep=0:(nrow(data)+1),
         sepcolor="black",
         sepwidth=c(0.001, 0.001),
-        cexCol=0.5,
+        cexCol=1,
         srtCol=45,
         offsetCol=-0.1,
-        cexRow=0.5,
-        offsetRow=-0.1,
+        cexRow=1,
+        offsetRow=-6,
+        adjRow=c(1,NA),
         key.title=NA,
         key.xlab=NA,
         key.par=list(
-            mar=c(0.7,0.1,0.7,0.1),
+            mar=c(1.1,1,1.7,1),
             mgp=c(0,-0.1,0),
             tcl=-0.1,
             lend=2,
@@ -54,8 +62,7 @@ make_heatmap <- function(data, my_palette, my_breaks) {
             breaks <- breaks[c(1,length(breaks))]
             list(at = parent.frame()$scale01(breaks),
                  labels = breaks)},
-
-        margins=c(1,0),
+        margins=c(0,0),
         lmat=mylmat,
         lwid=mylwid,
         lhei=mylhei,
@@ -64,7 +71,6 @@ make_heatmap <- function(data, my_palette, my_breaks) {
         useRaster=FALSE
 
         )
-
 }
 
 # args
@@ -100,19 +106,24 @@ pwm_traj_presence <- pwm_traj_presence[pwm_ordering,]
 pwm_patterns <- pwm_patterns[pwm_ordering,]
 
 # plot
+pwm_plot_height <- 5.5
+pwm_plot_width <- 1.3
 pwm_traj_presence_plot_file <- "fig_3-d.0.motifs_traj_presence.pdf"
 my_palette <- colorRampPalette(brewer.pal(9, "Reds"))(49)
-pdf(pwm_traj_presence_plot_file, height=5.5, width=1.3)
+pdf(pwm_traj_presence_plot_file, height=pwm_plot_height, width=pwm_plot_width,
+    family="ArialMT", useDingbats=FALSE)
 make_heatmap(pwm_traj_presence, my_palette, NULL)
 title("Motif sig in trajectory", adj=0.2, outer=TRUE, line=-0.5, cex.main=0.5)
 dev.off()
 
-my_breaks <- quantile(melt(pwm_patterns)$value, probs=seq(0.10, 1, length.out=30))
+my_breaks <- quantile(melt(pwm_patterns)$value, probs=seq(0.10, 1, length.out=20))
 my_breaks <- my_breaks[!duplicated(my_breaks)]
 
 pwm_patterns_plot_file <- "fig_3-d.0.motifs_patterns.pdf"
-my_palette <- colorRampPalette(brewer.pal(9, "Oranges")[1:8])(length(my_breaks)-1)
-pdf(pwm_patterns_plot_file, height=5.5, width=1.3)
+#my_palette <- colorRampPalette(brewer.pal(9, "Oranges")[1:8])(length(my_breaks)-1)
+my_palette <- colorRampPalette(brewer.pal(9, "OrRd")[1:7])(length(my_breaks)-1)
+pdf(pwm_patterns_plot_file, height=pwm_plot_height, width=pwm_plot_width,
+    family="ArialMT", useDingbats=FALSE)
 make_heatmap(pwm_patterns, my_palette, my_breaks)
 title("Motif dynamics", adj=0.2, outer=TRUE, line=-0.5, cex.main=0.5)
 dev.off()
@@ -143,9 +154,12 @@ tf_traj_presence <- tf_traj_presence[tf_ordering,]
 tf_patterns <- tf_patterns[tf_ordering,]
 
 # plot
+tf_plot_height <- 9
+tf_plot_width <- 1.3
 tf_traj_presence_plot_file <- "fig_3-g.0.tfs_traj_presence.pdf"
 my_palette <- colorRampPalette(brewer.pal(9, "Reds"))(49)
-pdf(tf_traj_presence_plot_file, height=8.5, width=1.3)
+pdf(tf_traj_presence_plot_file, height=tf_plot_height, width=tf_plot_width,
+    family="ArialMT", useDingbats=FALSE)
 make_heatmap(tf_traj_presence, my_palette, NULL)
 title("TF match in trajectory", adj=0.2, outer=TRUE, line=-0.5, cex.main=0.5)
 dev.off()
@@ -154,8 +168,9 @@ my_breaks <- quantile(melt(tf_patterns)$value, probs=seq(0.10, 1, length.out=20)
 my_breaks <- my_breaks[!duplicated(my_breaks)]
 
 tf_patterns_plot_file <- "fig_3-g.0.tfs_patterns.pdf"
-my_palette <- colorRampPalette(brewer.pal(9, "Purples"))(length(my_breaks)-1)
-pdf(tf_patterns_plot_file, height=8.5, width=1.3)
+my_palette <- colorRampPalette(brewer.pal(9, "Purples")[1:7])(length(my_breaks)-1)
+pdf(tf_patterns_plot_file, height=tf_plot_height, width=tf_plot_width,
+    family="ArialMT", useDingbats=FALSE)
 make_heatmap(tf_patterns, my_palette, my_breaks)
 title("TF expression", adj=0.2, outer=TRUE, line=-0.5, cex.main=0.5)
 dev.off()

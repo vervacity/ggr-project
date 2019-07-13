@@ -60,29 +60,34 @@ pca_data$group <- gsub("0_", ".0 ", pca_data$group)
 pca_data$group <- gsub("5_", ".5 ", pca_data$group)
 #print(head(pca_data))
 pca_data$group <- factor(pca_data$group, levels=group_levels)
+pca_data$day <- factor(gsub(" b.", "", pca_data$group))
+#pca_data$day <- gsub("d", "", pca_data$day)
 
-#if (!grepl("rna", plot_file, fixed=TRUE)) {
-#    pca_data$x <-
-#}
-
+pca_data$rep <- as.character(gsub(".+ ", "", pca_data$group))
 
 # pull GGR colors and adjust
 my_colors <- get_ggr_timepoint_colors()
 if (grepl("rna", plot_file, fixed=TRUE)) {
     my_colors <- c(my_colors[1], my_colors[3:length(my_colors)])
+    mid_idx <- 10
+} else {
+    mid_idx <- 9
 }
 
 my_colors_r1 <- my_colors
 my_colors_r1 <- lighten(my_colors, amount=0.2)
 my_colors_r2 <- darken(my_colors, amount=0.2)
-my_colors <- c(my_colors_r1, my_colors_r2)
-#print(head(pca_data))
+my_colors_joint <- c(my_colors_r1, my_colors_r2)
 
 # plot
-p <- ggplot(pca_data, aes(x=x, y=y, colour=group)) +
-    geom_point(size=0.25) +
+p <- ggplot(pca_data, aes(x=x, y=y, colour=group, fill=day)) +
+    geom_tile() + 
+    geom_tile(fill="white", show.legend=FALSE) +
+    geom_point(size=0.25, show.legend=FALSE) +
     labs(x="PC1", y="PC2") + 
-    scale_color_manual(values=my_colors) + 
+    scale_color_manual(values=my_colors_joint, guide="none") +
+    scale_fill_manual(values=my_colors) +
+    #guides(size=FALSE, colour=FALSE) +        
     theme_bw() +
     theme(
         text=element_text(family="ArialMT"),
@@ -102,9 +107,12 @@ p <- ggplot(pca_data, aes(x=x, y=y, colour=group)) +
         axis.text=element_text(size=6),
         axis.ticks=element_line(size=0.115),
         axis.ticks.length=unit(0.01, "in"),
-        legend.text=element_text(size=1),
+        legend.margin=margin(0,0,0,0),
+        legend.text=element_text(size=3),
         legend.title=element_blank(),
-        legend.key.size = unit(0, 'in'))
+        legend.spacing.x=unit(0.05, "in"),
+        legend.key=element_rect(size=0.1, fill="white", colour="black"),
+        legend.key.size=unit(0.05, 'in'))
 
 if (!grepl("rna", plot_file, fixed=TRUE)) {
     # adjust limits of plot as needed

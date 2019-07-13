@@ -6,6 +6,7 @@
 
 library(ggplot2)
 library(reshape2)
+library(ggsci)
 
 # args
 args <- commandArgs(trailingOnly=TRUE)
@@ -60,7 +61,8 @@ ggplot(data, aes(x=sig, y=delta_logit, colour=sig)) +
         legend.margin=margin(5,0,0,0),
         legend.title=element_text(size=4),
         legend.text=element_text(size=4)) +
-    scale_y_continuous(limits=c(-0.05, 1), expand=c(0,0))
+    scale_y_continuous(limits=c(-0.05, 1), expand=c(0,0)) + 
+    scale_color_jama()
 ggsave(plot_file, width=1.25, height=1.25)
 
 
@@ -113,5 +115,6 @@ ggplot(data, aes(x=variant.impt_score.present, y=beta_max, colour=variant.impt_s
         legend.margin=margin(5,0,0,0),
         legend.title=element_text(size=4),
         legend.text=element_text(size=4)) +
-    scale_y_continuous(limits=c(1.35, 3), expand=c(0,0))
+    scale_y_continuous(limits=c(1.35, 3), expand=c(0,0)) +
+    scale_color_jama()
 ggsave(plot_file, width=1.25, height=1.25)
