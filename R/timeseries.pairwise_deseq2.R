@@ -63,8 +63,9 @@ for (idx1 in seq(1, ncol(count_data)-1, 2)) {
         pairwise_count_data <- count_data[, desired_columns]
 
         # make the condition table
-        conditions <- sub("_b.", "", colnames(pairwise_count_data))
+        conditions <- sub("_B.", "", colnames(pairwise_count_data))
         unique_conditions <- unique(conditions)
+        print(unique_conditions)
         t_baseline <- unique_conditions[1]
         t_compare <- unique_conditions[2]
         col_data <- data.frame(condition=conditions)

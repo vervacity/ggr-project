@@ -19,7 +19,7 @@ master_counts <- read.table(
     sep='\t')
 
 # Set up conditions table
-conditions <- sub("_b.", "", colnames(master_counts))
+conditions <- sub("_B.", "", colnames(master_counts))
 col_data <- data.frame(condition=conditions)
 rownames(col_data) <- colnames(master_counts)
 
@@ -56,7 +56,7 @@ for (count_file_idx in 1:length(other_count_files)) {
         sep='\t')
     
     # set up conditions table
-    conditions <- sub("_b.", "", colnames(counts))
+    conditions <- sub("_B.", "", colnames(counts))
     col_data <- data.frame(condition=conditions)
     rownames(col_data) <- colnames(counts)
 
