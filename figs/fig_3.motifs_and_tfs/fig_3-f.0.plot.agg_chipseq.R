@@ -18,23 +18,14 @@ plot_file <- args[2]
 data <- read.table(input_file, sep="\t", header=TRUE, row.names=1)
 
 # normalize to flank
-data_norm <- rbind(data[1:10,], data[191:200,])
+data_norm <- rbind(data[1:10,], data[(nrow(data)-9):nrow(data),])
 flank_norm_factors <- apply(data_norm, 2, mean)
-
-#data_norm <- rbind(data[50:75,], data[125:150,])
-#center_norm_factors <- apply(data_norm, 2, mean)
-
-#norm_factors <- center_norm_factors - flank_norm_factors
 data <- data.frame(t(t(data) / flank_norm_factors))
 
-# and then bias adjust
-data_norm <- rbind(data[50:75,], data[125:150,])
-norm_factors <- apply(data_norm, 2, mean)
-data <- data.frame(t(t(data) - norm_factors))
-
+# index
 data$index <- as.numeric(rownames(data)) - (nrow(data) / 2)
-data <- data[50:150,]
 
+# melt
 data_melted <- melt(data, id.vars=c("index"))
 
 # adjust colors if actually just pos/neg
@@ -48,8 +39,9 @@ if (dim(data)[2] == 3) {
     data_melted$variable <- factor(data_melted$variable, levels=c("d6.0", "d3.0", "d0.0"))
 }
 
-# make pretty y limit
+# make pretty limits
 y_limit <- ceiling(2*max(abs(data_melted$value))) / 2
+x_limit <- abs(min(data$index))
 
 # figure out title
 title_name <- strsplit(basename(plot_file), ".", fixed=TRUE)[[1]]
@@ -58,7 +50,7 @@ title_name <- title_name[2]
 # plot
 ggplot(data_melted, aes(x=index, y=value, colour=variable)) +
     geom_line(alpha=0.7, size=0.230) + # 0.115
-    labs(title=title_name, x="Position (bp)", y="Normalized read coverage") +
+    labs(title=title_name, x="Position (bp)", y="Read coverage") +
     theme_bw() +
     theme(
         text=element_text(family="ArialMT"),
@@ -87,9 +79,9 @@ ggplot(data_melted, aes(x=index, y=value, colour=variable)) +
         strip.background=element_blank(),
         strip.text=element_blank()) +
     scale_color_manual(values=ggr_colors) +
-    scale_x_continuous(limits=c(-50,50), expand=c(0,0)) +
-    scale_y_continuous(limits=c(-y_limit, y_limit), expand=c(0,0)) #+
+    scale_x_continuous(limits=c(-x_limit,x_limit), expand=c(0,0)) +
+    scale_y_continuous(limits=c(0, y_limit), expand=c(0,0)) #+
     #facet_grid(. ~ variable)
 
-ggsave(plot_file, height=1.2, width=2, useDingbats=FALSE)
+ggsave(plot_file, height=1.2, width=1, useDingbats=FALSE)
 
