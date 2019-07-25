@@ -110,7 +110,7 @@ grammars <- read.table(grammar_file, sep="\t", stringsAsFactors=FALSE, header=TR
 for (i in 1:nrow(grammars)) {
 
     # prefix
-    grammar_prefix <- strsplit(basename(grammars$filename), ".gml")[[1]]
+    grammar_prefix <- strsplit(basename(grammars$filename[i]), ".gml")[[1]]
     print(grammar_prefix)
     
     # extract nodes
@@ -118,6 +118,10 @@ for (i in 1:nrow(grammars)) {
     title <- grammars$nodes[i]
     print(nodes)
 
+    #if (!grepl("KLF", title)) {
+    #    next
+    #}
+    
     # get pwm indices
     pwm_indices <- c()
     for (i in 1:length(nodes)) {
@@ -129,7 +133,8 @@ for (i in 1:nrow(grammars)) {
             }
         }
     }
- 
+    print(pwm_indices)
+    
     # run analysis with pwms
     pwm_features <- data.frame(t(weighted_pwm_positions[1,pwm_indices,]))
 
@@ -145,7 +150,7 @@ for (i in 1:nrow(grammars)) {
     # plot counts
     plot_file <- paste("fig_5-b.", grammar_prefix, ".spacing.pdf", sep="")
     print(plot_file)
-    plot_motif_counts(pwm_features, plot_file, title)
+    #plot_motif_counts(pwm_features, plot_file, title)
     
     # plot for each activity phenotype (ATAC, H3K27ac)
     for (activity_idx in 1:length(activity_keys)) {
@@ -164,12 +169,31 @@ for (i in 1:nrow(grammars)) {
             task_features <- pwm_features
             print(dim(task_features))
             task_features$activity <- activity[,task_idx]
-            task_features <- task_features[task_features$activity > min_activity,]
-            print(dim(task_features))
             
+            if (FALSE) {
+                # filter for acetylation
+                acetylation <- t(h5read(data_file, activity_key))
+                acetylation <- acetylation[grammar_indices,]
+                acetylation <- apply(acetylation, 1, max)
+                task_features$acetylation <- acetylation
+            }
+            
+            task_features <- task_features[task_features$activity > min_activity,]
+
+            if (FALSE) {
+                # filter for acetylation
+                task_features <- task_features[task_features$acetylation > 0,]
+            }
+            
+            
+            print(dim(task_features))
+            plot_file <- paste("fig_5-b.", task_prefix, ".counts.spacing.pdf", sep="")
+            print(plot_file)
+            plot_motif_counts(task_features, plot_file, title)
+
             plot_file <- paste("fig_5-b.", task_prefix, ".spacing.pdf", sep="")
             print(plot_file)
-            plot_activity_density(task_features, plot_file, title)
+            #plot_activity_density(task_features, plot_file, title)
         }
     }
 }
