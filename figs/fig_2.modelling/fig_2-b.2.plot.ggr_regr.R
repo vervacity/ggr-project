@@ -64,91 +64,61 @@ for (i in 2:length(args)) {
 
 }
 
-# plot mse
+# plot function
+plot_metric <- function(results, plot_file, title, metric_name, limits) {
+    p <- ggplot(results, aes(x=train, y=value, colour=fold)) +
+        geom_boxplot(size=0.1, outlier.size=0, outlier.stroke=0) +
+        geom_point(
+            shape=16,
+            stroke=0,
+            size=0.3,
+            aes(fill=fold),
+            position=position_jitterdodge(jitter.width=0.01),
+            show.legend=FALSE)
+    if (metric_name == "AUPRC") {
+        p <- p + geom_point(
+            data=auprc_baselines,
+            aes(x=train, y=value, colour=fold),
+            position=position_jitterdodge(jitter.width=0),
+            shape=18,
+            stroke=0, size=0.6, show.legend=FALSE)
+    }
+    p <- p +labs(title=title, x="", y=metric_name) +
+        theme_bw() +
+        theme(
+            text=element_text(family="ArialMT", size=6),
+            plot.margin=margin(5,1,1,1),
+            plot.title=element_text(size=6, margin=margin(0,0,0,0)),
+            panel.background=element_blank(),
+            panel.border=element_blank(),
+            panel.grid=element_blank(),
+            axis.title=element_text(size=6),
+            axis.text.y=element_text(size=6),
+            axis.text.x=element_text(size=6),
+            axis.line=element_line(color="black", size=0.115, lineend="square"),
+            axis.ticks=element_line(size=0.115),
+            axis.ticks.length=unit(0.01, "in"),
+            legend.key.size=unit(0.01, "in"),
+            legend.margin=margin(5,0,0,0)) +
+        scale_color_npg() +
+        scale_fill_npg() +
+        scale_y_continuous(limits=limits, expand=c(0,0))
+    ggsave(plot_file, height=1.5, width=1.5, useDingbats=FALSE)
+
+}
+
+
+# mse
 mse_file <- "fig_2-b.2.ggr_mse.pdf"
 mse_results$train <- factor(mse_results$train, levels=c(rand_init, pretrain))
-ggplot(mse_results, aes(x=train, y=value, colour=fold)) +
-    geom_boxplot(size=0.1, outlier.size=0, outlier.stroke=0) +
-    geom_point(shape=16, stroke=0, size=0.3, aes(fill=fold), position=position_jitterdodge(jitter.width=0.01), show.legend=FALSE) +
-    labs(x="", y="MSE") +
-    theme_bw() +
-    theme(
-        text=element_text(family="ArialMT"),
-        plot.margin=margin(5,1,1,1),
-        panel.background=element_blank(),
-        panel.border=element_blank(),
-        panel.grid=element_blank(),
-        axis.title=element_text(size=5),
-        axis.text.y=element_text(size=4),
-        axis.text.x=element_text(size=4),
-        axis.line=element_line(color="black", size=0.115, lineend="square"),
-        axis.ticks=element_line(size=0.115),
-        axis.ticks.length=unit(0.01, "in"),
-        legend.key.size=unit(0.01, "in"),
-        legend.margin=margin(5,0,0,0),
-        legend.title=element_text(size=4),
-        legend.text=element_text(size=4)) +
-    scale_color_npg() +
-    scale_fill_npg() +
-    scale_y_continuous(limits=c(0.4,1.2), expand=c(0,0))
-ggsave(mse_file, height=1, width=1.5, useDingbats=FALSE)
-
+plot_metric(mse_results, mse_file, "Keratinocyte ATAC signals", "MSE", c(0.4,1.2))
 
 # plot spearman
 spearman_file <- "fig_2-b.2.ggr_spearman.pdf"
 spearman_results$train <- factor(spearman_results$train, levels=c(rand_init, pretrain))
-ggplot(spearman_results, aes(x=train, y=value, colour=fold)) +
-    geom_boxplot(size=0.1, outlier.size=0, outlier.stroke=0) +
-    geom_point(shape=16, stroke=0, size=0.3, aes(fill=fold), position=position_jitterdodge(jitter.width=0.01), show.legend=FALSE) +
-    labs(title="Keratinocyte ATAC signals", x="", y="Spearman R") +
-    theme_bw() +
-    theme(
-        text=element_text(family="ArialMT", size=6),
-        plot.margin=margin(5,1,1,1),
-        plot.title=element_text(size=6, margin=margin(0,0,0,0)),
-        panel.background=element_blank(),
-        panel.border=element_blank(),
-        panel.grid=element_blank(),
-        axis.title=element_text(size=6),
-        axis.text.y=element_text(size=6),
-        axis.text.x=element_text(size=6),
-        axis.line=element_line(color="black", size=0.115, lineend="square"),
-        axis.ticks=element_line(size=0.115),
-        axis.ticks.length=unit(0.01, "in"),
-        legend.key.size=unit(0.01, "in"),
-        legend.margin=margin(5,0,0,0)) +
-        #legend.title=element_text(size=4),
-        #legend.text=element_text(size=4)) +
-    scale_color_npg() +
-    scale_fill_npg() +
-    scale_y_continuous(limits=c(0.50, 0.80), expand=c(0,0))
-ggsave(spearman_file, height=1, width=1.5, useDingbats=FALSE)
+plot_metric(spearman_results, spearman_file, "Keratinocyte ATAC signals", "Spearman R", c(0.5,0.8))
 
 # plot pearson
 pearson_file <- "fig_2-b.2.ggr_pearson.pdf"
 pearson_results$train <- factor(pearson_results$train, levels=c(rand_init, pretrain))
-ggplot(pearson_results, aes(x=train, y=value, colour=fold)) +
-    geom_boxplot(size=0.1, outlier.size=0, outlier.stroke=0) +
-    geom_point(shape=16, stroke=0, size=0.3, aes(fill=fold), position=position_jitterdodge(jitter.width=0.01), show.legend=FALSE) +
-    labs(x="", y="Pearson R") +
-    theme_bw() +
-    theme(
-        text=element_text(family="ArialMT"),
-        plot.margin=margin(5,1,1,1),
-        panel.background=element_blank(),
-        panel.border=element_blank(),
-        panel.grid=element_blank(),
-        axis.title=element_text(size=5),
-        axis.text.y=element_text(size=4),
-        axis.text.x=element_text(size=4),
-        axis.line=element_line(color="black", size=0.115, lineend="square"),
-        axis.ticks=element_line(size=0.115),
-        axis.ticks.length=unit(0.01, "in"),
-        legend.key.size=unit(0.01, "in"),
-        legend.margin=margin(5,0,0,0),
-        legend.title=element_text(size=4),
-        legend.text=element_text(size=4)) +
-    scale_color_npg() +
-    scale_fill_npg() +
-    scale_y_continuous(limits=c(0.45, 0.80), expand=c(0,0))
-ggsave(pearson_file, height=1.5, width=1.5, useDingbats=FALSE)
+plot_metric(pearson_results, pearson_file, "Keratinocyte ATAC signals", "Pearson R", c(0.45,0.8))

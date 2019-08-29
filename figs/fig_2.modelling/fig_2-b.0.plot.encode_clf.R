@@ -57,94 +57,58 @@ for (i in 2:length(args)) {
 
 }
 
+# plot function
+plot_metric <- function(results, plot_file, title, metric_name, limits) {
+    p <- ggplot(results, aes(x=fold, y=value, colour=fold)) +
+        geom_boxplot(size=0.1, outlier.size=0, outlier.stroke=0) +
+        geom_point(
+            shape=16,
+            stroke=0,
+            size=0.3,
+            aes(fill=fold),
+            position=position_jitterdodge(),
+            show.legend=FALSE)
+    if (metric_name == "AUPRC") {
+        p <- p + geom_point(
+            data=auprc_baselines,
+            aes(x=fold, y=value, colour=fold),
+            position=position_jitterdodge(jitter.width=0),
+            shape=18,
+            stroke=0, size=0.6, show.legend=FALSE)
+    }
+    p <- p +labs(title=title, x="Fold", y=metric_name) +
+        theme_bw() +
+        theme(
+            text=element_text(family="ArialMT", size=6),
+            plot.margin=margin(5,1,1,1),
+            plot.title=element_text(size=6, margin=margin(0,0,0,0)),
+            panel.background=element_blank(),
+            panel.border=element_blank(),
+            panel.grid=element_blank(),
+            axis.title=element_text(size=6),
+            axis.text.y=element_text(size=6),
+            axis.text.x=element_text(size=6),
+            axis.line=element_line(color="black", size=0.115, lineend="square"),
+            axis.ticks=element_line(size=0.115),
+            axis.ticks.length=unit(0.01, "in"),
+            legend.key.size=unit(0.01, "in"),
+            legend.margin=margin(5,0,0,0)) +
+        scale_color_npg() +
+        scale_fill_npg() +
+        scale_y_continuous(limits=limits, expand=c(0,0))
+    ggsave(plot_file, height=1.5, width=1.5, useDingbats=FALSE)
+
+}
+
+
 # plot auprc
 auprc_file <- "fig_2-b.0.encode_auprc.pdf"
-ggplot(auprc_results, aes(x=fold, y=value, colour=fold)) +
-    geom_boxplot(size=0.1, outlier.size=0, outlier.stroke=0) +
-    geom_point(shape=16, stroke=0, size=0.3, aes(fill=fold), position=position_jitterdodge(), show.legend=FALSE) +
-    geom_point(
-        data=auprc_baselines,
-        shape=18, # 16
-        stroke=0,
-        size=0.6, show.legend=FALSE) +
-    labs(title="ENCODE/Roadmap DNase peaks", x="Fold", y="AUPRC") +
-    theme_bw() +
-    theme(
-        text=element_text(family="ArialMT", size=6),
-        plot.margin=margin(5,1,1,1),
-        plot.title=element_text(size=6, margin=margin(0,0,0,0)),
-        panel.background=element_blank(),
-        panel.border=element_blank(),
-        panel.grid=element_blank(),
-        axis.title=element_text(size=6),
-        axis.text.y=element_text(size=6),
-        axis.text.x=element_text(size=6),
-        axis.line=element_line(color="black", size=0.115, lineend="square"),
-        axis.ticks=element_line(size=0.115),
-        axis.ticks.length=unit(0.01, "in"),
-        legend.key.size=unit(0.01, "in"),
-        legend.margin=margin(5,0,0,0)) +
-        #legend.title=element_text(size=6),
-        #legend.text=element_text(size=6)) +
-    scale_color_npg() +
-    scale_fill_npg() +
-    scale_y_continuous(limits=c(0,0.8), expand=c(0,0))
-ggsave(auprc_file, height=1, width=1.5, useDingbats=FALSE)
-
+plot_metric(auprc_results, auprc_file, "ENCODE/Roadmap DNase peaks", "AUPRC", c(0.0,0.8))
 
 # auroc
 auroc_file <- "fig_2-b.0.encode_auroc.pdf"
-ggplot(auroc_results, aes(x=fold, y=value, colour=fold)) +
-    geom_boxplot(size=0.1, outlier.size=0, outlier.stroke=0) +
-    geom_point(shape=16, stroke=0, size=0.3, aes(fill=fold), position=position_jitterdodge(), show.legend=FALSE) +
-    labs(x="Fold", y="AUROC") +
-    theme_bw() +
-    theme(
-        text=element_text(family="ArialMT"),
-        plot.margin=margin(5,1,1,1),
-        panel.background=element_blank(),
-        panel.border=element_blank(),
-        panel.grid=element_blank(),
-        axis.title=element_text(size=5),
-        axis.text.y=element_text(size=4),
-        axis.text.x=element_text(size=4),
-        axis.line=element_line(color="black", size=0.115, lineend="square"),
-        axis.ticks=element_line(size=0.115),
-        axis.ticks.length=unit(0.01, "in"),
-        legend.key.size=unit(0.01, "in"),
-        legend.margin=margin(5,0,0,0),
-        legend.title=element_text(size=4),
-        legend.text=element_text(size=4)) +
-    scale_color_npg() +
-    scale_fill_npg() +
-    scale_y_continuous(limits=c(0.5,1.0), expand=c(0,0))
-ggsave(auroc_file, height=1, width=1.5, useDingbats=FALSE)
-
+plot_metric(auroc_results, auroc_file, "ENCODE/Roadmap DNase peaks", "AUROC", c(0.5,1.0))
 
 # recall
 recall_file <- "fig_2-b.0.encode_recall.pdf"
-ggplot(recall_results, aes(x=fold, y=value, colour=fold)) +
-    geom_boxplot(size=0.1, outlier.size=0, outlier.stroke=0) +
-    geom_point(shape=16, stroke=0, size=0.3, aes(fill=fold), position=position_jitterdodge(), show.legend=FALSE) +
-    labs(x="Fold", y="Recall at 25% FDR") +
-    theme_bw() +
-    theme(
-        text=element_text(family="ArialMT"),
-        plot.margin=margin(5,1,1,1),
-        panel.background=element_blank(),
-        panel.border=element_blank(),
-        panel.grid=element_blank(),
-        axis.title=element_text(size=5),
-        axis.text.y=element_text(size=4),
-        axis.text.x=element_text(size=4),
-        axis.line=element_line(color="black", size=0.115, lineend="square"),
-        axis.ticks=element_line(size=0.115),
-        axis.ticks.length=unit(0.01, "in"),
-        legend.key.size=unit(0.01, "in"),
-        legend.margin=margin(5,0,0,0),
-        legend.title=element_text(size=4),
-        legend.text=element_text(size=4)) +
-    scale_color_npg() +
-    scale_fill_npg() +
-    scale_y_continuous(limits=c(0,0.8), expand=c(0,0))
-ggsave(recall_file, height=1, width=1.5, useDingbats=FALSE)
+plot_metric(recall_results, recall_file, "ENCODE/Roadmap DNase peaks", "Recall at 25% FDR", c(0,0.8))

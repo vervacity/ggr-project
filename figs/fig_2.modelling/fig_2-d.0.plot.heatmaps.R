@@ -100,11 +100,6 @@ xlab <- c(
     "day 5.0",
     "day 6.0")
 
-# heatmap2 grid
-mylmat = rbind(c(0,0,3,0),c(4,1,2,0),c(0,0,5,0))
-mylwid = c(0.05,0.1,0.7,0.3) # vs 0.7
-mylhei = c(0.10,2,0.35)
-
 # figure out row seps and cluster colors
 rowsep <- c(0)
 cluster_ids <- c()
@@ -124,87 +119,61 @@ colsep <- c(0, 10)
 cluster_colors <- cluster_palette[cluster_ids]
 
 # plot
+plot_heatmap <- function(data, plot_file, title) {
+
+    mylmat = rbind(c(0,0,3,0),c(4,1,2,0),c(0,0,5,0))
+    mylwid = c(0.05,0.1,0.7,0.3) # vs 0.7
+    mylhei = c(0.10,2,0.27)
+    
+    pdf(plot_file, height=3.75, width=1.25, family="ArialMT", useDingbats=FALSE)
+    heatmap.2(
+        as.matrix(data),
+        Rowv=FALSE,
+        Colv=FALSE,
+        dendrogram="none",
+        trace='none',
+        density.info="none",
+        key.title=NA,
+        key.xlab=NA,
+        key.par=list(
+            mar=c(0.9,1,1.55,1),
+            mgp=c(0,-0.1,0),
+            tcl=-0.1,
+            lend=2,
+            cex.axis=0.6,
+            bty="n"),
+        key.xtickfun=function() {
+            breaks=pretty(parent.frame()$breaks)
+            breaks=breaks[c(1, as.integer(length(breaks)/2)+1, length(breaks))]
+            list(at=parent.frame()$scale01(breaks),
+                 labels = breaks)
+        },
+        srtCol=45,
+        cexCol=0.5,
+        offsetCol=-0.5,
+        labRow="",
+        labCol=xlab,
+        margins=c(0,0),
+        col=my_palette,
+        lmat=mylmat,
+        lwid=mylwid,
+        lhei=mylhei,
+        rowsep=rowsep,
+        colsep=colsep,
+        sepcolor="black",
+        sepwidth=c(0.0001, 0.0001),
+        RowSideColors=cluster_colors)
+    title(title, adj=0.2, outer=TRUE, line=-0.5, cex.main=0.5)
+    dev.off()
+
+}
+
+
+
+# plot
 plot_file <- "fig_2-d.0.actual.pdf"
-pdf(plot_file, height=3, width=1.3, family="ArialMT", useDingbats=FALSE)
-heatmap.2(
-    as.matrix(actual_subset),
-    Rowv=FALSE,
-    Colv=FALSE,
-    dendrogram="none",
-    trace='none',
-    density.info="none",
-    key.title=NA,
-    key.xlab=NA,
-    key.par=list(
-        mar=c(0.9,1,1.55,1),
-        mgp=c(0,-0.1,0),
-        tcl=-0.1,
-        lend=2,
-        cex.axis=0.6,
-        bty="n"),
-    key.xtickfun=function() {
-        breaks=pretty(parent.frame()$breaks)
-        breaks=breaks[c(1, as.integer(length(breaks)/2)+1, length(breaks))]
-        list(at=parent.frame()$scale01(breaks),
-             labels = breaks)
-    },
-    srtCol=45,
-    cexCol=0.5,
-    offsetCol=-0.5,
-    labRow="",
-    labCol=xlab,
-    margins=c(0,0),
-    col=my_palette,
-    lmat=mylmat,
-    lwid=mylwid,
-    lhei=mylhei,
-    rowsep=rowsep,
-    colsep=colsep,
-    sepcolor="black",
-    sepwidth=c(0.0001, 0.0001),
-    RowSideColors=cluster_colors)
-title("Actual", adj=0.2, outer=TRUE, line=-0.5, cex.main=0.5)
-dev.off()
+plot_heatmap(actual_subset, plot_file, "Actual")
 
 # plot
 plot_file <- "fig_2-d.0.predicted.pdf"
-pdf(plot_file, height=3, width=1.3, family="ArialMT", useDingbats=FALSE)
-heatmap.2(
-    as.matrix(predicted_subset),
-    Rowv=FALSE,
-    Colv=FALSE,
-    dendrogram="none",
-    trace='none',
-    density.info="none",
-    key.title=NA,
-    key.xlab=NA,
-    key.par=list(
-        mar=c(0.9,1,1.55,1),
-        mgp=c(0,-0.1,0),
-        tcl=-0.1,
-        lend=2,
-        cex.axis=0.6,
-        bty="n"),
-    key.xtickfun=function() {
-        breaks=pretty(parent.frame()$breaks)
-        breaks=breaks[c(1, as.integer(length(breaks)/2)+1, length(breaks))]
-        list(at=parent.frame()$scale01(breaks),
-             labels = breaks)
-    },
-    srtCol=45,
-    cexCol=0.5,
-    offsetCol=-0.5,
-    labRow="",
-    labCol=xlab,
-    margins=c(0,0),
-    col=my_palette,
-    lmat=mylmat,
-    lwid=mylwid,
-    lhei=mylhei,
-    rowsep=rowsep,
-    colsep=colsep,
-    sepcolor="black",
-    sepwidth=c(0.0001, 0.0001),
-    RowSideColors=cluster_colors)
-title("Predicted", adj=0.2, outer=TRUE, line=-0.5, cex.main=0.5)
-dev.off()
+plot_heatmap(predicted_subset, plot_file, "Predicted")
