@@ -62,9 +62,11 @@ def main():
         pwm_results[activity_key] = {} # {N, timepoint+count}
     
     # analyze per pwm and save out
+    keep_pwm_names = []
     for i in range(len(sig_indices)):
         sig_idx = sig_indices[i]
         pwm_name = all_pwms[sig_idx]
+        keep_pwm_names.append(pwm_name)
         print sig_idx, pwm_name
         
         # extract features
@@ -99,8 +101,8 @@ def main():
             activity_df.to_csv(pwm_example_counts_file, sep="\t", compression="gzip")
             plot_cmd = "Rscript ~/git/ggr-project/figs/fig_3.homotypic/fig_3-b.0.plot.example_counts.R {}".format(
                 pwm_example_counts_file)
-            print plot_cmd
-            os.system(plot_cmd)
+            #print plot_cmd
+            #os.system(plot_cmd)
 
             # filter max count
             activity_df = activity_df[activity_df["counts"] <= MAX_COUNT]
@@ -113,8 +115,20 @@ def main():
             heatmap_results[activity_key][:,i,:] = activity_per_count_df.transpose().values
             
     # with all results collected, save out and plot
-    
-    
+    h5_results_file = "motifs.counts_v_activity.h5"
+    if not os.path.isfile(h5_results_file):
+        for key in heatmap_results.keys():
+            print key
+            print heatmap_results[key].shape
+            with h5py.File(h5_results_file, "a") as out:
+                out.create_dataset(key, data=heatmap_results[key])
+                out[key].attrs["pwm_names"] = keep_pwm_names
+
+    # plot
+    plot_cmd = "Rscript ~/git/ggr-project/figs/fig_3.homotypic/plot_by_density.R {}".format(
+        h5_results_file)
+    print plot_cmd
+    os.system(plot_cmd)
     
     return
 
