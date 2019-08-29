@@ -41,6 +41,8 @@ for (pwm_idx in 1:length(sig_pwms)) {
     pwm_max_vals <- aperm(max_vals)[,global_pwm_idx,1]
     example_indices <- which(pwm_max_vals != 0)
     pwm_max_indices <- aperm(max_indices)[example_indices,global_pwm_idx,1]
+    print(length(example_indices))
+    quit()
     
     # select out this slice
     pwm_scores <- h5read(data_file, pwm_scores_key, index=list(global_pwm_idx, NULL, NULL, example_indices))
@@ -50,7 +52,7 @@ for (pwm_idx in 1:length(sig_pwms)) {
     # make zeros arrays
     aligned_array <- matrix(0, nrow=length(example_indices), ncol=2*(num_positions))
     aligned_raw_array <- matrix(0, nrow=length(example_indices), ncol=2*(num_positions))
-
+    
     # insert each row with offset
     for (example_idx in 1:nrow(aligned_array)) {
 
@@ -72,6 +74,10 @@ for (pwm_idx in 1:length(sig_pwms)) {
     clip_stop <- max_idx + final_extend_len
     aligned_array <- aligned_array[,clip_start:clip_stop]
     aligned_raw_array <- aligned_raw_array[,clip_start:clip_stop]
+
+    # save out spacing info BEFORE zeroing out 
+    save_file <- paste(out_prefix, ".", pwm_name, ".spacings.txt", sep="")
+    write.table(aligned_array, file=save_file, quote=FALSE, sep="\t")
     
     # and now build mean array
     max_pos <- (dim(aligned_array)[2] - 1) / 2
@@ -79,16 +85,16 @@ for (pwm_idx in 1:length(sig_pwms)) {
     means <- apply(aligned_array, 2, mean)
     means <- data.frame(mean=means, pos=-max_pos:max_pos)
     means$scores <- "weighted"
+    means$mean <- means$mean / max(means$mean)
     means$mean[155:165] <- 0
     
     raw_means <- apply(aligned_raw_array, 2, mean)
     raw_means <- data.frame(mean=raw_means, pos=-max_pos:max_pos)
     raw_means$scores <- "original"
+    raw_means$mean <- raw_means$mean / max(raw_means$mean)
     raw_means$mean[155:165] <- 0
     
     # pull together
-    means$mean <- means$mean / max(means$mean)
-    raw_means$mean <- raw_means$mean / max(raw_means$mean)
     means <- rbind(means, raw_means)
     
     # plot
@@ -128,7 +134,6 @@ for (pwm_idx in 1:length(sig_pwms)) {
         #scale_colour_distiller(limits=limits, palette=palette, direction=1, na.value="white") +
         #scale_fill_distiller(limits=limits, palette=palette, direction=1, na.value="white")
     ggsave(plot_file, height=1.5, width=5.5)
-
 
     # TODO collect results and plot heatmap
     
