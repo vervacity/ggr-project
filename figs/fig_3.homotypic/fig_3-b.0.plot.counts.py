@@ -45,6 +45,10 @@ def main():
     activity_keys = ["ATAC_SIGNALS.NORM", "H3K27ac_SIGNALS.NORM"]
 
     manual_keep = ["SMAD3"]
+
+    # make a tmp_dir
+    tmp_dir = "tmp"
+    os.system("mkdir -p {}".format(tmp_dir))
     
     # params
     POOL_WINDOW = 20 # from scanmotifs
@@ -127,7 +131,7 @@ def main():
             activity_df = activity_df.iloc[activity_indices]
 
             # save out and plot these results
-            pwm_example_counts_file = "{}.{}.counts.per_example.txt.gz".format(pwm_name, activity_key)
+            pwm_example_counts_file = "{}/{}.{}.counts.per_example.txt.gz".format(tmp_dir, pwm_name, activity_key)
             activity_df.to_csv(pwm_example_counts_file, sep="\t", compression="gzip")
             plot_cmd = "Rscript ~/git/ggr-project/figs/fig_3.homotypic/fig_3-b.0.plot.example_counts.R {}".format(
                 pwm_example_counts_file)
@@ -144,14 +148,6 @@ def main():
                     activity_per_count_df.loc[count] = 0
             activity_per_count = activity_per_count_df.transpose().values
             heatmap_results[activity_key]["count"][:,i,:] = activity_per_count
-
-            # here, check each to see if they are nonlinear
-            # and by nonlinear, we mean make a linear fit with x=1, x=2 and then
-            # extrapolate to highest available x val, if real is ABOVE then mark as
-            # nonlinear
-            #nonlinear_results = np.apply_along_axis(
-            #    check_nonlinear, 1, activity_per_count)
-            #print nonlinear_results
 
     # now only keep those that have strong activation
     for key in heatmap_results.keys():
@@ -170,8 +166,10 @@ def main():
                     
         heatmap_results[key]["nonlinear"][:] = keep
 
-        print np.array(keep_pwm_names)[keep == 0]
-        print np.array(keep_pwm_names)[keep == 0].shape
+        # save out list of keep pwms
+        pwm_names_file = "{}.pwms.keep.txt".format(key)
+        pd.DataFrame(
+            np.array(keep_pwm_names)[keep == 1]).to_csv(pwm_names_file, header=False, index=False)
         
     # with all results collected, save out and plot
     h5_results_file = "motifs.counts_v_activity.h5"
