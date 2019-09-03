@@ -14,15 +14,27 @@ grab_grob <- function(fn) {
     grid.grabExpr(grid.echo(fn))
 }
 
-plot_heatmap <- function(data) {
+plot_null <- function() { plot.new() }
 
+plot_heatmap <- function(data, labelRow, plot_title) {
+
+    # grid
     mylmat = rbind(c(0,3,0),c(2,1,0),c(0,4,0))
-    mylwid = c(0.07,0.7,0.75)
-    mylhei = c(0.10,2,0.25)
+    mylwid = c(0.07,0.7,0.07)
+    mylhei = c(0.09,2,0.20)
 
+    # color
     my_palette <- colorRampPalette(brewer.pal(9, "Blues"))(49)
 
+    # adjust row labels
+    if (labelRow) {
+        labRow <- rownames(data)
+    } else {
+        labRow <- rep("", nrow(data))
+    }
     
+    
+    # heatmap
     heatmap.2(
         as.matrix(data),
         Rowv=FALSE,
@@ -36,20 +48,18 @@ plot_heatmap <- function(data) {
         sepcolor="black",
         sepwidth=c(0.001,0.001),
 
-        #labRow=labRow,
-        #adjRow=adjRow,
+        labRow=labRow,
         cexRow=0.5,
-        #offsetRow=offsetRow,
+        offsetRow=-6,
         
-        #labCol=labCol,
         cexCol=0.5,
-        #srtCol=45,
-        #offsetCol=offsetCol,
-
+        offsetCol=-0.25,
+        srtCol=0,
+        
         key.title=NA,
         key.xlab=NA,
         key.par=list(
-            mar=c(2,6,1.9,6),
+            mar=c(2,6,1.4,6),
             mgp=c(0,-0.1,0),
             tcl=-0.1,
             lend=2,
@@ -69,17 +79,18 @@ plot_heatmap <- function(data) {
         col=my_palette)
         #RowSideColors=rowsidecolors)
 
-
+    title(plot_title, adj=0.2, outer=TRUE, line=-0.5, cex.main=0.5)
 }
 
 
 # args
 args <- commandArgs(trailingOnly=TRUE)
 data_file <- args[1]
+out_prefix <- args[2]
+do_filter <- args[3]
+dataset_keys <- args[4:length(args)]
 
-# check keys in file
-contents <- h5ls(data_file)
-dataset_keys <- contents$name
+plot_titles <- c("day 0", "day 3", "day 6")
 
 # go through each key
 for (i in 1:length(dataset_keys)) {
@@ -87,11 +98,23 @@ for (i in 1:length(dataset_keys)) {
     # get data
     dataset_key <- dataset_keys[i]
     print(dataset_key)
-    data <- h5read(data_file, dataset_key, read.attributes=TRUE)
+    data <- h5read(
+        data_file,
+        paste(dataset_key, "/count", sep=""),
+        read.attributes=TRUE)
     pwm_names <- attr(data, "pwm_names")
     pwm_names <- gsub("HCLUST-\\d+.", "", pwm_names)
     pwm_names <- gsub(".UNK.0.A", "", pwm_names)
     num_tasks <- dim(data)[3]
+
+    # also get the smaller version
+    if (do_filter == "TRUE") {
+        keep <- h5read(
+            data_file,
+            paste(dataset_key, "/nonlinear", sep=""))
+        data <- data[,keep==1,]
+        pwm_names <- pwm_names[keep==1]
+    }
     
     # flatten for clustering
     data_flat <- aperm(data, c(2,3,1))
@@ -112,35 +135,39 @@ for (i in 1:length(dataset_keys)) {
     data[data == 0] <- NA
     
     # for each task
-    grob_list <- list()
+    grob_list <- list("1"=grab_grob(plot_null))
     for (task_i in 1:num_tasks) {
 
         # get data and order
         task_data <- aperm(data)[task_i,,]
         task_data <- task_data[ordering,]
         rownames(task_data) <- pwm_names
-        
-        # attach pwm names
 
+        if (task_i == 1) {
+            labelRow <- TRUE
+        } else {
+            labelRow <- FALSE
+        }
+        
         # make grob
-        heatmap_fn <- function() plot_heatmap(task_data)
-        grob_list[[task_i]] <- grab_grob(heatmap_fn)
+        heatmap_fn <- function() plot_heatmap(task_data, labelRow, plot_titles[task_i])
+        grob_list[[task_i+1]] <- grab_grob(heatmap_fn)
         
     }
 
     # plot
-    plot_file <- paste(dataset_key, ".counts_v_activity.pdf", sep="")
+    plot_file <- paste(out_prefix, ".", dataset_key, ".counts_v_activity.pdf", sep="")
     pdf(
         plot_file,
         height=3.5,
-        width=3,
+        width=2,
         onefile=FALSE,
         useDingbats=FALSE,
         family="ArialMT")
     plot.new()
     grid.newpage()
-    grid.arrange(grobs=grob_list, nrow=1, ncol=num_tasks,
-                 heights=c(3), widths=c(1, 1, 1))
+    grid.arrange(grobs=grob_list, nrow=1, ncol=num_tasks+1,
+                 heights=c(3), widths=c(0.25, 0.5, 0.5, 0.5))
     dev.off()
 
 }

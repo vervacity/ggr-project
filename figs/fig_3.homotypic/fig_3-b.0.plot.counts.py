@@ -10,6 +10,31 @@ import pandas as pd
 from tronn.util.utils import DataKeys
 
 
+def check_nonlinear(y):
+    """given 1d array, take first two values to fit line
+    """
+    # get a linear fit
+    slope = y[1] - y[2] # x is 2 - 1 = 1
+    intercept = y[1] - slope # x is 1
+    
+    # then get max val and count
+    max_idx = np.argmax(y)
+    actual = y[max_idx]
+    count_for_max = max_idx + 1
+    
+    # expected linear val
+    expected = slope * count_for_max + intercept
+
+    # if actual > expected, nonlinear
+    nonlinear = 0
+    if actual > expected:
+        #print "nonlinear"
+        nonlinear = 1
+    
+    return nonlinear
+
+
+
 def main():
     """aggregate into counts
     """
@@ -18,6 +43,8 @@ def main():
     sig_pwms_file = sys.argv[2]
     density_key = DataKeys.ORIG_SEQ_PWM_MAX_DENSITIES
     activity_keys = ["ATAC_SIGNALS.NORM", "H3K27ac_SIGNALS.NORM"]
+
+    manual_keep = ["SMAD3"]
     
     # params
     POOL_WINDOW = 20 # from scanmotifs
@@ -52,10 +79,13 @@ def main():
     # set up results matrices
     heatmap_results = {}
     for activity_key in activity_keys:
-        heatmap_results[activity_key] = np.zeros(
+        heatmap_results[activity_key] = {}
+        heatmap_results[activity_key]["count"] = np.zeros(
             (len(plot_timepoint_indices[activity_key]),
              len(sig_indices),
              MAX_COUNT)) # {timepoint, pwm, count}
+        heatmap_results[activity_key]["nonlinear"] = np.zeros(
+            (len(sig_indices))) # {pwm}
         
     pwm_results = {}
     for activity_key in activity_keys:
@@ -112,23 +142,61 @@ def main():
             for count in range(1, MAX_COUNT+1):
                 if count not in activity_per_count_df.index:
                     activity_per_count_df.loc[count] = 0
-            heatmap_results[activity_key][:,i,:] = activity_per_count_df.transpose().values
-            
+            activity_per_count = activity_per_count_df.transpose().values
+            heatmap_results[activity_key]["count"][:,i,:] = activity_per_count
+
+            # here, check each to see if they are nonlinear
+            # and by nonlinear, we mean make a linear fit with x=1, x=2 and then
+            # extrapolate to highest available x val, if real is ABOVE then mark as
+            # nonlinear
+            #nonlinear_results = np.apply_along_axis(
+            #    check_nonlinear, 1, activity_per_count)
+            #print nonlinear_results
+
+    # now only keep those that have strong activation
+    for key in heatmap_results.keys():
+        threshold = np.percentile(
+            heatmap_results[key]["count"].flatten(), 90)
+        keep = np.any(heatmap_results[key]["count"] >= threshold, axis=(0,2)).astype(int)
+
+        # check manual
+        if True:
+            manual = np.zeros_like(keep)
+            for i in range(len(keep_pwm_names)):
+                for substring in manual_keep:
+                    if substring in keep_pwm_names[i]:
+                        manual[i] = 1
+            keep = np.logical_or(manual, keep).astype(int)
+                    
+        heatmap_results[key]["nonlinear"][:] = keep
+
+        print np.array(keep_pwm_names)[keep == 0]
+        print np.array(keep_pwm_names)[keep == 0].shape
+        
     # with all results collected, save out and plot
     h5_results_file = "motifs.counts_v_activity.h5"
     if not os.path.isfile(h5_results_file):
         for key in heatmap_results.keys():
             print key
-            print heatmap_results[key].shape
             with h5py.File(h5_results_file, "a") as out:
-                out.create_dataset(key, data=heatmap_results[key])
-                out[key].attrs["pwm_names"] = keep_pwm_names
+                for sub_key in heatmap_results[key].keys():
+                    save_key = "{}/{}".format(key, sub_key)
+                    out.create_dataset(save_key, data=heatmap_results[key][sub_key])
+                    out[save_key].attrs["pwm_names"] = keep_pwm_names
 
-    # plot
-    plot_cmd = "Rscript ~/git/ggr-project/figs/fig_3.homotypic/plot_by_density.R {}".format(
-        h5_results_file)
+                
+    # plot all
+    plot_cmd = "Rscript ~/git/ggr-project/figs/fig_3.homotypic/plot_by_density.R {} counts.ALL FALSE {}".format(
+        h5_results_file, " ".join(activity_keys))
     print plot_cmd
     os.system(plot_cmd)
+
+    # plot some
+    plot_cmd = "Rscript ~/git/ggr-project/figs/fig_3.homotypic/plot_by_density.R {} counts.filt TRUE {}".format(
+        h5_results_file, " ".join(activity_keys))
+    print plot_cmd
+    os.system(plot_cmd)
+
     
     return
 
