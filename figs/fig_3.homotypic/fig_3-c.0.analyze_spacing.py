@@ -237,7 +237,6 @@ def main():
         pwm_global_idx = np.where(
             [1 if pwm_name in global_name else 0
              for global_name in all_pwms])[0][0]
-        print pwm_name_clean, pwm_global_idx
 
         # open spacing distr file
         spacing_distr_file = "{}/{}.{}.distribution.spacings.txt.gz".format(tmp_dir, out_prefix, pwm_name_clean)

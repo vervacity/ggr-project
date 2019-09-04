@@ -2,6 +2,7 @@
 
 library(ggplot2)
 library(reshape2)
+library(ggsci)
 
 # args
 args <- commandArgs(trailingOnly=TRUE)
@@ -19,6 +20,13 @@ left_clip <- -50
 right_clip <- 50
 data_melt <- data_melt[data_melt$position > left_clip,]
 data_melt <- data_melt[data_melt$position < right_clip,]
+
+# colors
+if (grepl("freq", data_file)) {
+    color_fn <- scale_color_jama
+} else {
+    color_fn <- scale_color_npg
+}
 
 # plot
 xlab <- paste("Position relative to anchor motif\n(n=", num_examples, ")", sep="")
@@ -60,7 +68,8 @@ ggplot(data_melt, aes(x=position, y=value, colour=variable)) +
         scale_x_continuous(
             limits=c(left_clip, right_clip),
             breaks=seq(left_clip, right_clip, 10),
-            expand=c(0,0))
+            expand=c(0,0)) +
+        color_fn()
 ggsave(plot_file, height=1, width=2)
 
 
