@@ -117,7 +117,7 @@ plot_metric <- function(results, plot_file, title, metric_name, limits) {
         scale_color_npg() +
         scale_fill_npg() +
         scale_y_continuous(limits=limits, expand=c(0,0))
-    ggsave(plot_file, height=1.5, width=1.5, useDingbats=FALSE)
+    ggsave(plot_file, height=1.75, width=1.5, useDingbats=FALSE)
 
 }
 
@@ -125,14 +125,14 @@ plot_metric <- function(results, plot_file, title, metric_name, limits) {
 # auprc
 auprc_file <- "fig_2-b.1.ggr_auprc.pdf"
 auprc_results$train <- factor(auprc_results$train, levels=c(rand_init, pretrain))
-plot_metric(auprc_results, auprc_file, "Keratinocyte ATAC peaks", "AUPRC", c(0.1, 0.8))
+plot_metric(auprc_results, auprc_file, "Keratinocyte \nATAC peaks", "AUPRC", c(0.1, 0.8))
 
 # auroc
 auroc_file <- "fig_2-b.1.ggr_auroc.pdf"
 auroc_results$train <- factor(auroc_results$train, levels=c(rand_init, pretrain))
-plot_metric(auroc_results, auroc_file, "Keratinocyte ATAC peaks", "AUROC", c(0.5, 1.0))
+plot_metric(auroc_results, auroc_file, "Keratinocyte \nATAC peaks", "AUROC", c(0.5, 1.0))
 
 # recall
 recall_file <- "fig_2-b.1.ggr_recall.pdf"
 recall_results$train <- factor(recall_results$train, levels=c(rand_init, pretrain))
-plot_metric(recall_results, recall_file, "Keratinocyte ATAC peaks", "Recall at 25% FDR", c(0.0, 0.5))
+plot_metric(recall_results, recall_file, "Keratinocyte \nATAC peaks", "Recall at 25% FDR", c(0.0, 0.5))

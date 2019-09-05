@@ -96,19 +96,19 @@ plot_metric <- function(results, plot_file, title, metric_name, limits) {
         scale_color_npg() +
         scale_fill_npg() +
         scale_y_continuous(limits=limits, expand=c(0,0))
-    ggsave(plot_file, height=1.5, width=1.5, useDingbats=FALSE)
+    ggsave(plot_file, height=1.75, width=1.5, useDingbats=FALSE)
 
 }
 
 
 # plot auprc
 auprc_file <- "fig_2-b.0.encode_auprc.pdf"
-plot_metric(auprc_results, auprc_file, "ENCODE/Roadmap DNase peaks", "AUPRC", c(0.0,0.8))
+plot_metric(auprc_results, auprc_file, "ENCODE/Roadmap\nDNase peaks", "AUPRC", c(0.0,0.8))
 
 # auroc
 auroc_file <- "fig_2-b.0.encode_auroc.pdf"
-plot_metric(auroc_results, auroc_file, "ENCODE/Roadmap DNase peaks", "AUROC", c(0.5,1.0))
+plot_metric(auroc_results, auroc_file, "ENCODE/Roadmap\nDNase peaks", "AUROC", c(0.5,1.0))
 
 # recall
 recall_file <- "fig_2-b.0.encode_recall.pdf"
-plot_metric(recall_results, recall_file, "ENCODE/Roadmap DNase peaks", "Recall at 25% FDR", c(0,0.8))
+plot_metric(recall_results, recall_file, "ENCODE/Roadmap\nDNase peaks", "Recall at 25% FDR", c(0,0.8))

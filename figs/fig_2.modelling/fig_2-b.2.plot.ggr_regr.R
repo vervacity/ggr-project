@@ -103,7 +103,7 @@ plot_metric <- function(results, plot_file, title, metric_name, limits) {
         scale_color_npg() +
         scale_fill_npg() +
         scale_y_continuous(limits=limits, expand=c(0,0))
-    ggsave(plot_file, height=1.5, width=1.5, useDingbats=FALSE)
+    ggsave(plot_file, height=1.75, width=1.5, useDingbats=FALSE)
 
 }
 
@@ -111,14 +111,14 @@ plot_metric <- function(results, plot_file, title, metric_name, limits) {
 # mse
 mse_file <- "fig_2-b.2.ggr_mse.pdf"
 mse_results$train <- factor(mse_results$train, levels=c(rand_init, pretrain))
-plot_metric(mse_results, mse_file, "Keratinocyte ATAC signals", "MSE", c(0.4,1.2))
+plot_metric(mse_results, mse_file, "Keratinocyte \nATAC signals", "MSE", c(0.4,1.2))
 
 # plot spearman
 spearman_file <- "fig_2-b.2.ggr_spearman.pdf"
 spearman_results$train <- factor(spearman_results$train, levels=c(rand_init, pretrain))
-plot_metric(spearman_results, spearman_file, "Keratinocyte ATAC signals", "Spearman R", c(0.5,0.8))
+plot_metric(spearman_results, spearman_file, "Keratinocyte \nATAC signals", "Spearman R", c(0.5,0.8))
 
 # plot pearson
 pearson_file <- "fig_2-b.2.ggr_pearson.pdf"
 pearson_results$train <- factor(pearson_results$train, levels=c(rand_init, pretrain))
-plot_metric(pearson_results, pearson_file, "Keratinocyte ATAC signals", "Pearson R", c(0.45,0.8))
+plot_metric(pearson_results, pearson_file, "Keratinocyte \nATAC signals", "Pearson R", c(0.45,0.8))
