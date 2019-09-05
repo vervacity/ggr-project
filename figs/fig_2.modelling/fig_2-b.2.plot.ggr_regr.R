@@ -67,14 +67,13 @@ for (i in 2:length(args)) {
 # plot function
 plot_metric <- function(results, plot_file, title, metric_name, limits) {
     p <- ggplot(results, aes(x=train, y=value, colour=fold)) +
-        geom_boxplot(size=0.1, outlier.size=0, outlier.stroke=0) +
+        geom_boxplot(size=0.1, outlier.size=0, outlier.stroke=0, show.legend=FALSE) +
         geom_point(
             shape=16,
             stroke=0,
             size=0.3,
             aes(fill=fold),
-            position=position_jitterdodge(jitter.width=0.01),
-            show.legend=FALSE)
+            position=position_jitterdodge(jitter.width=0.01))
     if (metric_name == "AUPRC") {
         p <- p + geom_point(
             data=auprc_baselines,
@@ -88,7 +87,7 @@ plot_metric <- function(results, plot_file, title, metric_name, limits) {
         theme(
             text=element_text(family="ArialMT", size=6),
             plot.margin=margin(5,1,1,1),
-            plot.title=element_text(size=6, margin=margin(0,0,0,0)),
+            plot.title=element_text(size=8, margin=margin(0,0,0,0)),
             panel.background=element_blank(),
             panel.border=element_blank(),
             panel.grid=element_blank(),

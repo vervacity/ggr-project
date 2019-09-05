@@ -121,10 +121,17 @@ cluster_colors <- cluster_palette[cluster_ids]
 # plot
 plot_heatmap <- function(data, plot_file, title) {
 
+    # grid
     mylmat = rbind(c(0,0,3,0),c(4,1,2,0),c(0,0,5,0))
     mylwid = c(0.05,0.1,0.7,0.3) # vs 0.7
     mylhei = c(0.10,2,0.27)
+
+    # adjust col labels
+    labCol <- rep("", ncol(data))
+    labCol[1] <- xlab[1]
+    labCol[ncol(data)] <- xlab[ncol(data)]
     
+    # plot
     pdf(plot_file, height=3.75, width=1.25, family="ArialMT", useDingbats=FALSE)
     heatmap.2(
         as.matrix(data),
@@ -148,11 +155,12 @@ plot_heatmap <- function(data, plot_file, title) {
             list(at=parent.frame()$scale01(breaks),
                  labels = breaks)
         },
-        srtCol=45,
+        srtCol=30,
         cexCol=0.5,
         offsetCol=-0.5,
         labRow="",
-        labCol=xlab,
+        #labCol=xlab,
+        labCol=labCol,
         margins=c(0,0),
         col=my_palette,
         lmat=mylmat,
@@ -163,12 +171,10 @@ plot_heatmap <- function(data, plot_file, title) {
         sepcolor="black",
         sepwidth=c(0.0001, 0.0001),
         RowSideColors=cluster_colors)
-    title(title, adj=0.2, outer=TRUE, line=-0.5, cex.main=0.5)
+    title(title, adj=0.2, outer=TRUE, line=-0.5, font.main=1, cex.main=0.5)
     dev.off()
 
 }
-
-
 
 # plot
 plot_file <- "fig_2-d.0.actual.pdf"
