@@ -124,6 +124,12 @@ for (i in 1:length(dataset_keys)) {
         pwm_names <- pwm_names[keep==1]
     }
 
+    # remove the ones that never activated
+    max_vals <- apply(data, 2, max)
+    keep_indices <- which(max_vals > 0.5)
+    data <- data[,keep_indices,]
+    pwm_names <- pwm_names[keep_indices]
+    
     # normalize
     print(dim(data))
     max_vals <- apply(data, 2, max)
