@@ -34,7 +34,9 @@ def main():
         glob.glob("{}/*/ggr.predictions.h5".format(WORK_DIR)))
     all_results = None
     for results_file in results_files:
-    
+
+        continue
+        
         # pwm name
         orig_pwm_name = results_file.split("/")[-2]
         pwm_name = re.sub("HCLUST-\\d+_", "", orig_pwm_name)
@@ -122,7 +124,7 @@ def main():
     # did the average across the samples activate enough
     # ATAC: tasks 0,6,12
     # save all this out to hdf5 file so can plot the same way as the other file
-    h5_results_file = "motifs.sims.counts_v_activity.h5"
+    h5_results_file = "motifs.sims.dist_v_activity.h5"
     keys = ["ATAC", "H3K27ac"]
     
     task_indices = [0, 6, 12]
@@ -138,8 +140,8 @@ def main():
             pwm_name = os.path.basename(results_file).split(".")[0]
             data = pd.read_csv(results_file, sep="\t")
             # get average results
-            data_tmp = data[["prediction", "pwm_count"]]
-            data_tmp = data_tmp.groupby(["pwm_count"]).median().transpose()
+            data_tmp = data[["prediction", "pwm_dist"]]
+            data_tmp = data_tmp.groupby(["pwm_dist"]).median().transpose()
             data_tmp.index = [pwm_name]
             task_averages.append(data_tmp)
 
@@ -161,35 +163,14 @@ def main():
     # consolidate and save out
     averages = np.stack(averages, axis=0)
     sample_fracts = np.squeeze(np.stack(sample_fracts, axis=0), axis=-1)
-
-    threshold  = 1 # log2 space, so basically a 2 fold cutoff
-    
-    dont_keep_indices = np.where(
-        np.max(averages, axis=(0,2)) < 1)[0]
-    print np.array(pwm_names)[dont_keep_indices].tolist()
-
-    
-    # filters
-    keep_indices = np.where(
-        np.max(averages, axis=(0,2)) >= 1)[0]
-    averages = averages[:,keep_indices,:]
-    sample_fracts = sample_fracts[:,keep_indices]
-    keep_pwm_names = np.array(pwm_names)[keep_indices].tolist()
-
-
-    print averages.shape
-    print sample_fracts
-    
-    #quit()
     
     with h5py.File(h5_results_file, "a") as out:
         key = "ATAC/count"
         out.create_dataset(key, data=averages)
-        out[key].attrs["pwm_names"] = keep_pwm_names
+        out[key].attrs["pwm_names"] = pwm_names
         key = "ATAC/sample_count"
         out.create_dataset(key, data=sample_fracts)
-        out[key].attrs["pwm_names"] = keep_pwm_names
-        
+        out[key].attrs["pwm_names"] = pwm_names
     
     
     # H3K27ac: tasks 13,14,15
@@ -206,8 +187,8 @@ def main():
             pwm_name = os.path.basename(results_file).split(".")[0]
             data = pd.read_csv(results_file, sep="\t")
             # get average results
-            data_tmp = data[["prediction", "pwm_count"]]
-            data_tmp = data_tmp.groupby(["pwm_count"]).median().transpose()
+            data_tmp = data[["prediction", "pwm_dist"]]
+            data_tmp = data_tmp.groupby(["pwm_dist"]).median().transpose()
             data_tmp.index = [pwm_name]
             task_averages.append(data_tmp)
 
@@ -241,8 +222,8 @@ def main():
         
     
     # plot
-    plot_cmd = "Rscript ~/git/ggr-project/figs/fig_4.homotypic/plot_by_density.R {} counts.sim FALSE {}".format(
-        h5_results_file, "ATAC H3K27ac")
+    plot_cmd = "Rscript ~/git/ggr-project/figs/fig_4.homotypic/plot.results.sim.spacing.summary.R {} {}/sim.spacing FALSE {}".format(
+        h5_results_file, OUT_DIR, "ATAC H3K27ac")
     print plot_cmd
     os.system(plot_cmd)
 
