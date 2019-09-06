@@ -14,12 +14,16 @@ SIG_PWMS_FILE=ATAC_SIGNALS.NORM.pwms.keep.txt
 
 # sim data
 SIM_MULT_ALLNEGS_DIR=/mnt/lab_data/kundaje/users/dskim89/ggr/nn/analysis_homotypic.2019-09-06/sims.multiplicity.full_negatives
-#SIM_MULT_ALLNEGS_DIR=/srv/scratch/dskim89/ggr/ggr.tronn.2019-08-30.motif_density/
+SIM_MULT_DHSNEGS_DIR=/mnt/lab_data/kundaje/users/dskim89/ggr/nn/analysis_homotypic.2019-09-06/sims.multiplicity.dhs_negatives
 
 # sims: multiplicity
 OUT_DIR=sim.multiplicity.full_negatives
 mkdir -p $OUT_DIR
-$SCRIPT_DIR/analyze_sims_multiplicity.py $SIM_MULT_ALLNEGS_DIR $OUT_DIR
+#$SCRIPT_DIR/analyze_sims_multiplicity.py $SIM_MULT_ALLNEGS_DIR $OUT_DIR
+
+OUT_DIR=sim.multiplicity.dhs_negatives
+mkdir -p $OUT_DIR
+#$SCRIPT_DIR/analyze_sims_multiplicity.py $SIM_MULT_DHSNEGS_DIR $OUT_DIR
 
 
 # sims: spacing

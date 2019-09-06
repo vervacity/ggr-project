@@ -33,8 +33,6 @@ def main():
         glob.glob("{}/*/ggr.predictions.h5".format(WORK_DIR)))
     all_results = None
     for results_file in results_files:
-
-        continue
         
         # pwm name
         pwm_name = results_file.split("/")[-2]
@@ -99,11 +97,12 @@ def main():
             task_data_norm.to_csv(results_file, header=True, index=False, sep="\t", compression="gzip")
 
             # plot
-            plot_file = "{}/{}.pdf".format(more_plots_dir, task_prefix)
-            plot_cmd = "Rscript ~/git/ggr-project/figs/fig_4.homotypic/plot_sim_results.R {} {}".format(
-                results_file, plot_file)
-            print plot_cmd
-            os.system(plot_cmd)
+            if task_idx in plot_indices:
+                plot_file = "{}/{}.pdf".format(more_plots_dir, task_prefix)
+                plot_cmd = "Rscript ~/git/ggr-project/figs/fig_4.homotypic/plot.results.sim.multiplicity.R {} {}".format(
+                    results_file, plot_file)
+                print plot_cmd
+                os.system(plot_cmd)
         
         
     # and then plot out a joint picture across tasks
