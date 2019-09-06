@@ -21,7 +21,7 @@ def main():
     os.system("mkdir -p {}".format(tmp_dir))
     
     # params
-    max_count = 6
+    plot_indices = [0,6,12,13,14,15]
     
     # keys
     predictions_key = "logits.norm"
@@ -33,7 +33,9 @@ def main():
         glob.glob("{}/*/ggr.predictions.h5".format(WORK_DIR)))
     all_results = None
     for results_file in results_files:
-    
+
+        continue
+        
         # pwm name
         pwm_name = results_file.split("/")[-2]
         pwm_name = re.sub("HCLUST-\\d+_", "", pwm_name)
@@ -109,7 +111,7 @@ def main():
     # did the average across the samples activate enough
     # ATAC: tasks 0,6,12
     # save all this out to hdf5 file so can plot the same way as the other file
-    h5_results_file = "motifs.sims.counts_v_activity.h5"
+    h5_results_file = "{}/motifs.sims.counts_v_activity.h5".format(OUT_DIR)
     keys = ["ATAC", "H3K27ac"]
     
     task_indices = [0, 6, 12]
@@ -228,8 +230,8 @@ def main():
         
     
     # plot
-    plot_cmd = "Rscript ~/git/ggr-project/figs/fig_4.homotypic/plot_by_density.R {} counts.sim FALSE {}".format(
-        h5_results_file, "ATAC H3K27ac")
+    plot_cmd = "Rscript ~/git/ggr-project/figs/fig_4.homotypic/plot_by_density.R {} {}/counts.sim FALSE {}".format(
+        h5_results_file, OUT_DIR, "ATAC H3K27ac")
     print plot_cmd
     os.system(plot_cmd)
 

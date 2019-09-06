@@ -19,7 +19,7 @@ SIM_MULT_ALLNEGS_DIR=/mnt/lab_data/kundaje/users/dskim89/ggr/nn/analysis_homotyp
 # sims: multiplicity
 OUT_DIR=sim.multiplicity.full_negatives
 mkdir -p $OUT_DIR
-$SCRIPT_DIR/analyze_density.py $SIM_MULT_ALLNEGS_DIR $OUT_DIR
+$SCRIPT_DIR/analyze_sims_multiplicity.py $SIM_MULT_ALLNEGS_DIR $OUT_DIR
 
 
 # sims: spacing
