@@ -64,7 +64,7 @@ def main():
         print pwm_name_clean, pwm_global_idx
 
         # skip
-        #continue
+        continue
         #if "GRHL" not in pwm_name_clean:
         #    continue
         
