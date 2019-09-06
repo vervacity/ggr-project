@@ -9,7 +9,9 @@ plot_file <- args[2]
 
 # read in data
 data <- read.table(gzfile(data_file), header=TRUE)
-#print(head(data))
+
+# params
+dist_limits <- c(7, 25)
 
 # make factor
 data$sample_id <- factor(data$sample_id)
@@ -18,14 +20,22 @@ data$sample_id <- factor(data$sample_id)
 pwm_name <- unlist(strsplit(basename(data_file), ".", fixed=TRUE))
 pwm_name <- pwm_name[1]
 
+# determine desired span
+unique_distances <- unique(data$pwm_dist)
+span <- 3. / length(unique_distances)
+
 # plot
-ggplot(data, aes(x=pwm_count, y=prediction, group=sample_id)) +
-    geom_line(alpha=0.5, size=0.230, colour="black") +
+ggplot(data, aes(x=pwm_dist, y=prediction, group=sample_id)) +
+    #geom_line(alpha=0.5, size=0.230, colour="black") +
+    stat_smooth(
+        geom="line", se=FALSE,
+        span=span,
+        alpha=0.5, size=0.230, colour="black") +
     stat_summary(
         data=data,
-        aes(x=pwm_count, y=prediction, group=1), fun.y=median, geom='line',
+        aes(x=pwm_dist, y=prediction, group=1), fun.y=median, geom='line',
         size=0.460, colour="red") +
-    labs(title=pwm_name, x="Motif count", y="Predicted log2(FC)") +
+    labs(title=pwm_name, x="Distance between motifs (bp)", y="Predicted log2(FC)") +
     theme_bw() +
     theme(
         text=element_text(family="ArialMT"),
@@ -33,9 +43,8 @@ ggplot(data, aes(x=pwm_count, y=prediction, group=sample_id)) +
         plot.margin=margin(5,5,1,5),
         panel.background=element_blank(),
         panel.border=element_blank(),
-        panel.grid.major=element_blank(),
-        #panel.grid.major.y=element_blank(),
-        #panel.grid.major.x=element_line(size=0.115),
+        panel.grid.major.y=element_blank(),
+        panel.grid.major.x=element_line(size=0.115),
         panel.grid.minor=element_blank(),
         axis.title=element_text(size=6),
         axis.title.x=element_text(vjust=1, margin=margin(0,0,0,0)),
@@ -57,8 +66,8 @@ ggplot(data, aes(x=pwm_count, y=prediction, group=sample_id)) +
         legend.position=c(0.9, 0.9),
         strip.background=element_blank(),
         strip.text=element_blank()) +
-    scale_x_continuous(limits=c(1,6), expand=c(0,0))
-ggsave(plot_file, height=1.5, width=1, useDingbats=FALSE)
+    scale_x_continuous(limits=dist_limits, expand=c(0,0))
+ggsave(plot_file, height=1, width=2, useDingbats=FALSE)
 
 
 
