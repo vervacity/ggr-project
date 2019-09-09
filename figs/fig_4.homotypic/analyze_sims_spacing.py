@@ -35,8 +35,6 @@ def main():
     all_results = None
     for results_file in results_files:
 
-        continue
-        
         # pwm name
         orig_pwm_name = results_file.split("/")[-2]
         pwm_name = re.sub("HCLUST-\\d+_", "", orig_pwm_name)
@@ -124,7 +122,7 @@ def main():
     # did the average across the samples activate enough
     # ATAC: tasks 0,6,12
     # save all this out to hdf5 file so can plot the same way as the other file
-    h5_results_file = "motifs.sims.dist_v_activity.h5"
+    h5_results_file = "{}/motifs.sims.dist_v_activity.h5".format(OUT_DIR)
     keys = ["ATAC", "H3K27ac"]
     
     task_indices = [0, 6, 12]
