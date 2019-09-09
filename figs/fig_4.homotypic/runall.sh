@@ -42,4 +42,8 @@ LATE_MOTIFS=/mnt/lab_data/kundaje/users/dskim89/ggr/nn/inference.2019-02-05/moti
 
 OUT_DIR=multiplicity.gene_sets
 mkdir -p $OUT_DIR
-$SCRIPT_DIR/multiplicity_to_genes.py $OUT_DIR $SIG_PWMS_FILE $TSS_FILE $BACKGROUND_GENES_FILE $EARLY_MOTIFS $MID_MOTIFS $LATE_MOTIFS
+#$SCRIPT_DIR/multiplicity_to_genes.py $OUT_DIR $SIG_PWMS_FILE $TSS_FILE $BACKGROUND_GENES_FILE $EARLY_MOTIFS $MID_MOTIFS $LATE_MOTIFS
+
+OUT_DIR=spacing.gene_sets
+mkdir -p $OUT_DIR
+$SCRIPT_DIR/spacing_to_genes.py $OUT_DIR $SIG_PWMS_FILE $TSS_FILE $BACKGROUND_GENES_FILE $EARLY_MOTIFS $MID_MOTIFS $LATE_MOTIFS
