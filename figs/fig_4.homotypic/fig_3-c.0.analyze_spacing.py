@@ -15,11 +15,12 @@ def main():
     """analyze spacing
     """
     # dirs
-    tmp_dir = "tmp"
+    OUT_DIR = sys.argv[3]
+    tmp_dir = "{}/tmp".format(OUT_DIR)
     os.system("mkdir -p {}".format(tmp_dir))
-    more_plots_dir = "plots"
+    more_plots_dir = "{}/plots".format(OUT_DIR)
     os.system("mkdir -p {}".format(more_plots_dir))
-    SCRIPT_DIR = "/users/dskim89/git/ggr-project/figs/fig_3.homotypic"
+    SCRIPT_DIR = "/users/dskim89/git/ggr-project/figs/fig_4.homotypic"
     
     # inputs
     motifs_file = sys.argv[1]
@@ -41,7 +42,7 @@ def main():
     out_prefix = "fig_5-c"
 
     # read in the sig pwms
-    sig_pwms = list(pd.read_csv(sig_pwms_file, header=None).iloc[:,0])
+    sig_pwms = list(pd.read_csv(sig_pwms_file, sep="\t", header=0).iloc[:,0])
 
     # read in the list of all pwm names
     with h5py.File(motifs_file, "r") as hf:
@@ -64,7 +65,7 @@ def main():
         print pwm_name_clean, pwm_global_idx
 
         # skip
-        continue
+        #continue
         #if "GRHL" not in pwm_name_clean:
         #    continue
         
@@ -138,7 +139,7 @@ def main():
         spacing_distributions.to_csv(spacing_distr_file, sep="\t", header=True, index=False, compression="gzip")
 
         # plot
-        plot_prefix = "{}.{}".format(out_prefix, pwm_name_clean)
+        plot_prefix = "{}/{}.{}".format(OUT_DIR, out_prefix, pwm_name_clean)
         plot_cmd = "Rscript {}/fig_3-c.1.plot.spacing.indiv.R {} {} {}".format(
             SCRIPT_DIR, spacing_distr_file, pwm_aligned_array.shape[0], plot_prefix)
         print plot_cmd
@@ -153,7 +154,7 @@ def main():
             "position": positions,
             "all": all_distr})
         spacing_distributions.to_csv(spacing_distr_file, sep="\t", header=True, index=False, compression="gzip")
-        plot_prefix = "{}.{}.genomic_frequency".format(out_prefix, pwm_name_clean)
+        plot_prefix = "{}/{}.{}.genomic_frequency".format(OUT_DIR, out_prefix, pwm_name_clean)
         plot_cmd = "Rscript {}/fig_3-c.1.plot.spacing.indiv.R {} {} {}".format(
             SCRIPT_DIR, spacing_distr_file, pwm_aligned_array.shape[0], plot_prefix)
         print plot_cmd
@@ -198,8 +199,18 @@ def main():
         # use HITS vs the actual score (unclear how that would multiply with signal)
         pwm_aligned_hits = (pwm_aligned_array > 0).astype(int) # {N, 321}
         for key in signal_keys:
+            if "ATAC" in key:
+                plot_indices = [0,6,12]
+            elif "H3K27ac" in key:
+                plot_indices = [0,1,2]
+            else:
+                plot_indices = []
+            
             # do by task
             for task_idx in range(pwm_signals[key].shape[1]):
+                if task_idx not in plot_indices:
+                    continue
+                
                 task_signals = pwm_signals[key][:,task_idx] # {N}
                 task_signals = np.expand_dims(task_signals, axis=-1)
                 task_results = np.multiply(task_signals, pwm_aligned_hits) # {N, 321}
@@ -226,7 +237,7 @@ def main():
     # fourier analysis shoudl act on the aligned array
         
     # now merge all information
-    out_file = "{}.ALL.spacings.txt.gz".format(out_prefix)
+    out_file = "{}/{}.ALL.spacings.txt.gz".format(OUT_DIR, out_prefix)
     all_pwms_aligned_array = np.zeros((len(sig_pwms), 2*final_extend_len))
     for pwm_idx in range(len(sig_pwms)):
 
@@ -250,7 +261,7 @@ def main():
     all_spacings_df.to_csv(out_file, sep="\t", header=True, index=True, compression="gzip")
 
     # and plot
-    plot_prefix = "{}.ALL".format(out_prefix)
+    plot_prefix = "{}/{}.ALL".format(OUT_DIR, out_prefix)
     plot_cmd = "Rscript {}/fig_3-c.3.plot.spacing.all.R {} {}".format(
         SCRIPT_DIR, out_file, plot_prefix)
     print plot_cmd

@@ -35,6 +35,8 @@ def main():
     all_results = None
     for results_file in results_files:
 
+        continue
+        
         # pwm name
         orig_pwm_name = results_file.split("/")[-2]
         pwm_name = re.sub("HCLUST-\\d+_", "", orig_pwm_name)

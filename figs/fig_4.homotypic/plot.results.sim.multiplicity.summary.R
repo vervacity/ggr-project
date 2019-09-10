@@ -2,8 +2,11 @@
 
 library(rhdf5)
 library(gplots)
+library(ggplot2)
+library(ggridges)
 library(reshape2)
 library(RColorBrewer)
+library(ggsci)
 
 library(grid)
 library(gridGraphics)
@@ -77,7 +80,6 @@ plot_heatmap <- function(data, labelRow, plot_title) {
         lhei=mylhei,
         na.color="white",
         col=my_palette)
-        #RowSideColors=rowsidecolors)
 
     title(plot_title, adj=0.2, outer=TRUE, line=-0.5, cex.main=0.5)
 }
@@ -128,10 +130,11 @@ for (i in 1:length(dataset_keys)) {
     
     # clip
     data_melt <- melt(data)
-    clip_val <- quantile(data_melt$value, 0.90)
-    data[data > clip_val] <- clip_val
-    clip_val <- quantile(data_melt$value, 0.20)
-    data[data < clip_val] <- clip_val
+    #clip_val <- quantile(data_melt$value, 0.90)
+    #data[data > clip_val] <- clip_val
+    #clip_val <- quantile(data_melt$value, 0.10)
+    #data[data < clip_val] <- clip_val
+    data[data < 0] <- 0
     data[data == 0] <- NA
     
     # for each task
@@ -170,6 +173,57 @@ for (i in 1:length(dataset_keys)) {
                  heights=c(3), widths=c(0.25, 0.5, 0.5, 0.5))
     dev.off()
 
+    # separately, also need to plot the curves
+    data <- data[,ordering,]
+    max_curves <- data.frame()
+    for (pwm_idx in 1:length(pwm_names)) {
+        pwm_data <- aperm(data)[,pwm_idx,]
+        pwm_max <- apply(pwm_data, 1, max)
+        pwm_task_idx <- which.max(pwm_max)
+        if (length(pwm_task_idx) == 0) {
+            pwm_task_idx <- 1
+        }
+        pwm_data <- pwm_data[pwm_task_idx,]
+        max_curves <- rbind(max_curves, pwm_data)
+    }
+
+    max_curves <- data.frame(t(max_curves))
+    colnames(max_curves) <- pwm_names
+    max_curves$count <- 1:nrow(max_curves)
+    data_melt <- melt(max_curves, id.vars="count")
+
+    # plot
+    plot_file <- paste(out_prefix, ".", dataset_key, ".counts_v_activity.curves.pdf", sep="")
+    p <- ggplot(data_melt, aes(x=count, y=value, group=variable, colour=variable)) +
+        geom_line(size=0.230, show.legend=FALSE) +
+        #geom_ridgeline(size=0.115, show.legend=FALSE, colour="black") +
+        geom_hline(size=0.115, linetype="dashed", yintercept=1, colour="black") +
+        labs(x="Motif count", y="Predicted log2(FC)", title="Simulations") +
+        theme_bw() +
+        theme(
+            text=element_text(family="ArialMT"),
+            plot.title=element_text(size=8, margin=margin(b=0)),
+            plot.margin=margin(5,5,1,5),
+            panel.background=element_blank(),
+            panel.border=element_blank(),
+            panel.grid.major=element_blank(),
+            panel.grid.minor=element_blank(),
+            axis.title=element_text(size=6),
+            axis.title.x=element_text(vjust=1, margin=margin(0,0,0,0)),
+            axis.title.y=element_text(vjust=1, margin=margin(0,0,0,0)),
+            axis.text.y=element_text(size=6),
+            axis.text.x=element_text(size=6),
+            axis.line=element_line(color="black", size=0.115, lineend="square"),
+            axis.ticks=element_line(size=0.115),
+            axis.ticks.length=unit(0.01, "in")) +
+        scale_x_continuous(limits=c(1,6), expand=c(0,0))
+    if (grepl("ATAC", dataset_key)) {
+        p <- p + scale_color_d3("category20c") +
+            scale_y_continuous(limits=c(0,4), expand=c(0,0))
+    }
+    
+    ggsave(plot_file, height=1.5, width=1, useDingbats=FALSE)
+    
 }
 
 

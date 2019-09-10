@@ -184,13 +184,13 @@ def main():
 
                 
     # plot all
-    plot_cmd = "Rscript ~/git/ggr-project/figs/fig_3.homotypic/plot_by_density.R {} counts.ALL FALSE {}".format(
+    plot_cmd = "Rscript ~/git/ggr-project/figs/fig_3.homotypic/plot.results.sim.multiplicity.summary.R {} counts.ALL FALSE {}".format(
         h5_results_file, " ".join(activity_keys))
     print plot_cmd
     os.system(plot_cmd)
 
     # plot some
-    plot_cmd = "Rscript ~/git/ggr-project/figs/fig_3.homotypic/plot_by_density.R {} counts.filt TRUE {}".format(
+    plot_cmd = "Rscript ~/git/ggr-project/figs/fig_3.homotypic/plot.results.sim.multiplicity.summary.R {} counts.filt TRUE {}".format(
         h5_results_file, " ".join(activity_keys))
     print plot_cmd
     os.system(plot_cmd)

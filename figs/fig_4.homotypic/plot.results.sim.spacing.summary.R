@@ -2,6 +2,8 @@
 
 library(rhdf5)
 library(gplots)
+library(ggplot2)
+library(ggridges)
 library(reshape2)
 library(RColorBrewer)
 
@@ -132,9 +134,9 @@ for (i in 1:length(dataset_keys)) {
     
     # normalize
     print(dim(data))
-    max_vals <- apply(data, 2, max)
-    data_norm <- sweep(data, 2, max_vals, FUN="/")
-    data <- data_norm
+    #max_vals <- apply(data, 2, max)
+    #data_norm <- sweep(data, 2, max_vals, FUN="/")
+    #data <- data_norm
     data[is.na(data)] <- 0
     data[data < 0] <- 0
     
@@ -176,7 +178,7 @@ for (i in 1:length(dataset_keys)) {
     }
 
     # plot
-    plot_file <- paste(out_prefix, ".", dataset_key, ".counts_v_activity.pdf", sep="")
+    plot_file <- paste(out_prefix, ".", dataset_key, ".dist_v_activity.pdf", sep="")
     pdf(
         plot_file,
         height=3.5,
@@ -190,6 +192,110 @@ for (i in 1:length(dataset_keys)) {
                  heights=c(3), widths=c(0.25, 0.5, 0.5, 0.5))
     dev.off()
 
+    # redo plot as line plot
+    data <- data[,ordering,]
+    max_curves <- data.frame()
+    for (pwm_idx in 1:length(pwm_names)) {
+        pwm_data <- aperm(data)[,pwm_idx,]
+        pwm_max <- apply(pwm_data, 1, max)
+        pwm_task_idx <- which.max(pwm_max)
+        if (length(pwm_task_idx) == 0) {
+            pwm_task_idx <- 1
+        }
+        pwm_data <- pwm_data[pwm_task_idx,]
+        max_curves <- rbind(max_curves, pwm_data)
+    }
+
+    max_curves <- data.frame(t(max_curves))
+    colnames(max_curves) <- pwm_names
+    max_vals <- apply(max_curves, 2, max)
+    print(length(max_vals))
+    factor_pwm_names <- pwm_names[order(max_vals, decreasing=FALSE)]
+    
+    max_curves$distance <- 1:nrow(max_curves) + 5
+    data_melt <- melt(max_curves, id.vars="distance")
+
+    data_melt$variable <- factor(data_melt$variable, levels=factor_pwm_names)
+    
+    # plot
+    plot_file <- paste(out_prefix, ".", dataset_key, ".dist_v_activity.curves.pdf", sep="")
+    ggplot(data_melt, aes(x=distance, y=value, group=variable, colour=variable)) +
+        geom_line(size=0.115, show.legend=FALSE) +
+        geom_hline(size=0.115, linetype="dashed", yintercept=1, colour="black") + 
+        labs(y="Accessibility signal log2(FC)") +
+        theme_bw() +
+        theme(
+            text=element_text(family="ArialMT"),
+            plot.title=element_text(size=6, margin=margin(b=0)),
+            plot.margin=margin(5,5,1,5),
+            panel.background=element_blank(),
+            panel.border=element_blank(),
+            panel.grid.major=element_blank(),
+            #panel.grid.major.y=element_blank(),
+            #panel.grid.major.x=element_line(size=0.115),
+            panel.grid.minor=element_blank(),
+            axis.title=element_text(size=6),
+            axis.title.x=element_text(vjust=1, margin=margin(0,0,0,0)),
+            axis.title.y=element_text(vjust=1, margin=margin(0,0,0,0)),
+            #axis.title.y=element_blank(),
+            axis.text.y=element_text(size=5),
+            axis.text.x=element_text(size=5),
+            axis.line=element_line(color="black", size=0.115, lineend="square"),
+            axis.ticks=element_line(size=0.115),
+            axis.ticks.length=unit(0.01, "in"),
+            legend.background=element_blank(),
+            legend.box.background=element_rect(colour="black", fill="white", size=0.115),
+            legend.margin=margin(1,1,1,1),
+            legend.key=element_blank(),
+            legend.key.size=unit(0.1, "in"),
+            legend.box.margin=margin(0,0,0,0),
+            legend.box.spacing=unit(0.05, "in"),
+            legend.title=element_blank(),
+            legend.text=element_text(size=5),
+            legend.position=c(0.9, 0.9),
+            strip.background=element_blank(),
+            strip.text=element_blank()) +
+        scale_x_continuous(limits=c(5,28), expand=c(0,0))
+    ggsave(plot_file, height=2, width=1.5, useDingbats=FALSE)
+
+    # plot again with ggridges
+    plot_file <- paste(out_prefix, ".", dataset_key, ".dist_v_activity.curves.ggridges.pdf", sep="")
+    ggplot(data_melt, aes(x=distance, y=variable, group=variable, colour=variable, height=value)) +
+        geom_ridgeline(alpha=0.3, size=0.115, show.legend=FALSE, colour="black") +
+        labs(y="Accessibility signal log2(FC)") +
+        theme_bw() +
+        theme(
+            text=element_text(family="ArialMT"),
+            plot.title=element_text(size=6, margin=margin(b=0)),
+            plot.margin=margin(5,5,1,5),
+            panel.background=element_blank(),
+            panel.border=element_blank(),
+            panel.grid.major=element_blank(),
+            panel.grid.minor=element_blank(),
+            axis.title=element_text(size=6),
+            axis.title.x=element_text(vjust=1, margin=margin(0,0,0,0)),
+            axis.title.y=element_text(vjust=1, margin=margin(0,0,0,0)),
+            axis.text.y=element_text(size=5),
+            axis.text.x=element_text(size=5),
+            axis.line=element_line(color="black", size=0.115, lineend="square"),
+            axis.ticks=element_line(size=0.115),
+            axis.ticks.length=unit(0.01, "in"),
+            legend.background=element_blank(),
+            legend.box.background=element_rect(colour="black", fill="white", size=0.115),
+            legend.margin=margin(1,1,1,1),
+            legend.key=element_blank(),
+            legend.key.size=unit(0.1, "in"),
+            legend.box.margin=margin(0,0,0,0),
+            legend.box.spacing=unit(0.05, "in"),
+            legend.title=element_blank(),
+            legend.text=element_text(size=5),
+            legend.position=c(0.9, 0.9),
+            strip.background=element_blank(),
+            strip.text=element_blank()) +
+        scale_x_continuous(limits=c(5,28), expand=c(0,0))
+    ggsave(plot_file, height=2, width=1.5, useDingbats=FALSE)
+    
+    
 }
 
 

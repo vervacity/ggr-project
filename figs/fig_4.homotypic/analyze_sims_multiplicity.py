@@ -53,48 +53,53 @@ def main():
         num_tasks = predictions.shape[1]
         for task_idx in range(num_tasks):
 
-            # get task data
+            # results file
             task_prefix = "{}.taskidx-{}".format(
                 pwm_name, task_idx)
-            task_data = pd.DataFrame({
-                "sample_id": sample_ids,
-                "pwm_count": pwm_counts,
-                "prediction": predictions[:,task_idx]})
-            task_data_norm = None
-            
-            # for each sample, subtract background
-            for sample_idx in range(len(unique_sample_ids)):
-                sample_id = unique_sample_ids[sample_idx]
-                sample_data = task_data[task_data["sample_id"] == sample_id]
-
-                # confirm that background exists
-                if sample_data[sample_data["pwm_count"] == 0].shape[0] == 0:
-                    continue
-
-                # confirm that there is at least 1 other sample
-                if sample_data[sample_data["pwm_count"] != 0].shape[0] == 0:
-                    continue
-
-                # delete background
-                background_val = sample_data["prediction"][sample_data["pwm_count"] == 0].values[0]
-                sample_data = sample_data[sample_data["pwm_count"] > 0]
-                sample_data["prediction"] = sample_data["prediction"] - background_val
-
-                # if the sequence got worse (negative after delete), don't save out
-                if np.mean(sample_data["prediction"].values) <= 0:
-                    continue
-                
-                # save out
-                if sample_idx == 0:
-                    task_data_norm = sample_data
-                else:
-                    task_data_norm = pd.concat([task_data_norm, sample_data], axis=0)
-
-            # and save out to plot in R
-            if task_data_norm is None:
-                continue
             results_file = "{}/{}.aggregated.txt.gz".format(tmp_dir, task_prefix)
-            task_data_norm.to_csv(results_file, header=True, index=False, sep="\t", compression="gzip")
+
+            # run analysis if results file doesn't exist
+            if not os.path.isfile(results_file):
+            
+                # get task data
+                task_data = pd.DataFrame({
+                    "sample_id": sample_ids,
+                    "pwm_count": pwm_counts,
+                    "prediction": predictions[:,task_idx]})
+                task_data_norm = None
+
+                # for each sample, subtract background
+                for sample_idx in range(len(unique_sample_ids)):
+                    sample_id = unique_sample_ids[sample_idx]
+                    sample_data = task_data[task_data["sample_id"] == sample_id]
+
+                    # confirm that background exists
+                    if sample_data[sample_data["pwm_count"] == 0].shape[0] == 0:
+                        continue
+
+                    # confirm that there is at least 1 other sample
+                    if sample_data[sample_data["pwm_count"] != 0].shape[0] == 0:
+                        continue
+
+                    # delete background
+                    background_val = sample_data["prediction"][sample_data["pwm_count"] == 0].values[0]
+                    sample_data = sample_data[sample_data["pwm_count"] > 0]
+                    sample_data["prediction"] = sample_data["prediction"] - background_val
+
+                    # if the sequence got worse (negative after delete), don't save out
+                    if np.mean(sample_data["prediction"].values) <= 0:
+                        continue
+
+                    # save out
+                    if sample_idx == 0:
+                        task_data_norm = sample_data
+                    else:
+                        task_data_norm = pd.concat([task_data_norm, sample_data], axis=0)
+
+                # and save out to plot in R
+                if task_data_norm is None:
+                    continue
+                task_data_norm.to_csv(results_file, header=True, index=False, sep="\t", compression="gzip")
 
             # plot
             if task_idx in plot_indices:
@@ -229,7 +234,7 @@ def main():
         
     
     # plot
-    plot_cmd = "Rscript ~/git/ggr-project/figs/fig_4.homotypic/plot_by_density.R {} {}/counts.sim FALSE {}".format(
+    plot_cmd = "Rscript ~/git/ggr-project/figs/fig_4.homotypic/plot.results.sim.multiplicity.summary.R {} {}/counts.sim FALSE {}".format(
         h5_results_file, OUT_DIR, "ATAC H3K27ac")
     print plot_cmd
     os.system(plot_cmd)

@@ -9,14 +9,16 @@ SIG_PWMS_FILE=/mnt/lab_data/kundaje/users/dskim89/ggr/nn/inference.2019-03-12/mo
 #$SCRIPT_DIR/fig_3-b.0.plot.counts.py $MOTIFS_FILE $SIG_PWMS_FILE
 
 # genome: spacing (use all regions)
-SIG_PWMS_FILE=ATAC_SIGNALS.NORM.pwms.keep.txt
-#$SCRIPT_DIR/fig_3-c.0.analyze_spacing.py $MOTIFS_FILE $SIG_PWMS_FILE
+#SIG_PWMS_FILE=ATAC_SIGNALS.NORM.pwms.keep.txt
+OUT_DIR=genome.spacing
+mkdir -p $OUT_DIR
+#$SCRIPT_DIR/fig_3-c.0.analyze_spacing.py $MOTIFS_FILE $SIG_PWMS_FILE $OUT_DIR
 
 # sims: multiplicity
 SIM_MULT_ALLNEGS_DIR=/mnt/lab_data/kundaje/users/dskim89/ggr/nn/analysis_homotypic.2019-09-06/sims.multiplicity.full_negatives
 OUT_DIR=sim.multiplicity.full_negatives
 mkdir -p $OUT_DIR
-#$SCRIPT_DIR/analyze_sims_multiplicity.py $SIM_MULT_ALLNEGS_DIR $OUT_DIR
+$SCRIPT_DIR/analyze_sims_multiplicity.py $SIM_MULT_ALLNEGS_DIR $OUT_DIR
 
 SIM_MULT_DHSNEGS_DIR=/mnt/lab_data/kundaje/users/dskim89/ggr/nn/analysis_homotypic.2019-09-06/sims.multiplicity.dhs_negatives
 OUT_DIR=sim.multiplicity.dhs_negatives
@@ -46,4 +48,4 @@ mkdir -p $OUT_DIR
 
 OUT_DIR=spacing.gene_sets
 mkdir -p $OUT_DIR
-$SCRIPT_DIR/spacing_to_genes.py $OUT_DIR $SIG_PWMS_FILE $TSS_FILE $BACKGROUND_GENES_FILE $EARLY_MOTIFS $MID_MOTIFS $LATE_MOTIFS
+#$SCRIPT_DIR/spacing_to_genes.py $OUT_DIR $SIG_PWMS_FILE $TSS_FILE $BACKGROUND_GENES_FILE $EARLY_MOTIFS $MID_MOTIFS $LATE_MOTIFS
