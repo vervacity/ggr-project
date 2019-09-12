@@ -14,6 +14,31 @@ from tronn.util.utils import DataKeys
 from tronn.util.formats import array_to_bed
 
 
+REMOVE_SUBSTRINGS = [
+    "anatomical",
+    "ameboidal",
+    "animal organ",
+    "multicellular organism",
+    "cellular developmental",
+    "tube",
+    "regulation of",
+    "embryonic",
+    "cardiovascular",
+    "angiogenesis",
+    "blood vessel",
+    "vasculature",
+    "immune",
+    "defense",
+    "signaling",
+    "response to",
+    "movement of"]
+
+REMOVE_EXACT_STRINGS = [
+    "system process",
+    "system development",
+    "developmental process",
+    "tissue development"]
+
 
 def load_data_from_multiple_h5_files(h5_files, key, example_indices=None):
     """convenience wrapper
@@ -196,63 +221,119 @@ def main():
 
         # TODO here start splitting
         print pwm_aligned_array.shape
-
+        
         position_ranges = [
-            [7, 12],
-            [10, 12],
-            [10, 50],
-            [50, 100],
-            [100, 150]]
+            [7, 10],
+            [8, 16],
+            [15, 51],
+            [50, 101],
+            [100, 151]]
 
+        summary_df = None
         for position_range in position_ranges:
-            print position_range
+            print ">> range:", position_range
             prefix = "{}/{}.range_{}-{}".format(
-                tmp_dir, pwm_name, position_range[0], position_range[1]-1)
-            
+                tmp_dir, pwm_name_clean, position_range[0], position_range[1]-1)
             position_range = np.array(position_range)
+            
             # check positive side
             pos_position_range = position_range + mid_idx
+            #print pos_position_range
             positive_present = np.sum(
-                pwm_aligned_array[:,pos_position_range[0]:pos_position_range[1]], axis=1) != 0
+                pwm_aligned_array[:,pos_position_range[0]:pos_position_range[1]] > 0, axis=1) > 0
 
             # check negative side
             neg_position_range = -np.flip(position_range) + mid_idx
+            #print neg_position_range
             negative_present = np.sum(
-                pwm_aligned_array[:,neg_position_range[0]:neg_position_range[1]], axis=1) != 0
+                pwm_aligned_array[:,neg_position_range[0]:neg_position_range[1]] > 0, axis=1) > 0
 
             # combine
             distance_present = np.logical_or(positive_present, negative_present)
             distance_indices = np.where(distance_present)[0]
+            print "num regions:", distance_indices.shape[0]
 
+            pwm_counts = np.sum(pwm_aligned_array[distance_indices] > 0, axis=1)
+            pwm_count_indices = np.where(pwm_counts == 2)[0]
+            print pwm_count_indices.shape
+            
+            
             if distance_indices.shape[0] > MIN_REGION_COUNT:
-                thresholded_metadata = metadata[distance_indices]
+                #thresholded_metadata = metadata[distance_indices]
+                thresholded_metadata = metadata[distance_indices]#[pwm_count_indices]
                 # build the BED file
                 bed_file = "{}.bed.gz".format(prefix)
                 array_to_bed(
                     thresholded_metadata,
                     bed_file, interval_key="active", merge=True)
-                print thresholded_metadata.shape
                 
                 # track ATAC/H3K27ac?
                 
                 # then match to proximal gene set
                 # TODO - think about adjusting max dist OR use distance based links
-                gene_set_file = "{}.gene_set.txt".format(bed_file.split(".bed")[0])
+                gene_set_file = "{}.gene_set.txt.gz".format(bed_file.split(".bed")[0])
                 bed_to_gene_set_by_proximity(
                     bed_file,
                     tss_file,
                     gene_set_file,
-                    k_nearest=3,
+                    k_nearest=2,
                     max_dist=25000)
 
                 # and run gprofiler
-                gprofiler_file = "{}.go_gprofiler.txt".format(gene_set_file)
+                gprofiler_file = "{}.go_gprofiler.txt".format(gene_set_file.split(".txt.gz")[0])
                 if not os.path.isfile(gprofiler_file):
                     run_gprofiler(
                         gene_set_file,
                         background_gene_set_file,
                         tmp_dir,
                         header=True)
+
+                # read in gprofiler file and clean
+                thresholded_summary = pd.read_csv(gprofiler_file, sep="\t")
+                thresholded_summary = thresholded_summary[
+                    (thresholded_summary["domain"] == "BP") |
+                    (thresholded_summary["domain"] == "CC") |
+                    (thresholded_summary["domain"] == "rea")]
+                #thresholded_summary = thresholded_summary[thresholded_summary["domain"] == "rea"]
+                #thresholded_summary = thresholded_summary[thresholded_summary["domain"] == "BP"]
+                thresholded_summary = thresholded_summary[
+                    ["term.id", "p.value", "term.name"]]
+                thresholded_summary["range"] = "-".join(
+                    [str(val) for val in position_range.tolist()])
+                print "term count:", thresholded_summary.shape[0]
+
+                # add to summary
+                if summary_df is None:
+                    summary_df = thresholded_summary.copy()
+                else:
+                    # filter first?
+                    if thresholded_summary.shape[0] > 3:
+                        summary_df = summary_df[
+                            summary_df["term.id"].isin(thresholded_summary["term.id"].values)]
+                    summary_df = pd.concat([summary_df, thresholded_summary], axis=0)
+                    summary_df = summary_df.sort_values("term.name")
+
+        summary_df["log10pval"] = -np.log10(summary_df["p.value"].values)
+        summary_df = summary_df.drop("p.value", axis=1)
+        summary_file = "{}/{}.summary.txt.gz".format(tmp_dir, pwm_name_clean)
+        summary_df.to_csv(summary_file, sep="\t", index=False, header=True, compression="gzip")
+                
+        # remove substrings
+        for substring in REMOVE_SUBSTRINGS:
+            keep = [False if substring in term else True
+                    for term in summary_df["term.name"]]
+            keep_indices = np.where(keep)[0]
+            summary_df = summary_df.iloc[keep_indices]
+
+        # remove exact strings
+        keep = [False if term in REMOVE_EXACT_STRINGS else True
+                for term in summary_df["term.name"]]
+        keep_indices = np.where(keep)[0]
+        summary_df = summary_df.iloc[keep_indices]
+        summary_df = summary_df.sort_values(["term.name", "range"])
+        summary_file = "{}/{}.summary.filt.txt.gz".format(tmp_dir, pwm_name_clean)
+        summary_df.to_csv(summary_file, sep="\t", index=False, header=True, compression="gzip")
+        
         quit()
 
     return

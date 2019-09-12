@@ -66,8 +66,8 @@ def main():
 
         # skip
         #continue
-        #if "GRHL" not in pwm_name_clean:
-        #    continue
+        if "GRHL" not in pwm_name_clean:
+            continue
         
         # check to see which have this pwm and adjust indices
         example_indices = np.where(max_vals[:,pwm_global_idx,0] != 0)[0]

@@ -16,6 +16,8 @@ data <- read.table(gzfile(data_file), header=TRUE, sep="\t")
 # clip
 left_clip <- -50
 right_clip <- 50
+left_clip <- -70
+right_clip <- 70
 data <- data[data$variable > left_clip,]
 data <- data[data$variable < right_clip,]
 

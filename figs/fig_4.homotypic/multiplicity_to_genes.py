@@ -13,6 +13,31 @@ from ggr.analyses.bioinformatics import run_gprofiler
 from tronn.util.utils import DataKeys
 from tronn.util.formats import array_to_bed
 
+REMOVE_SUBSTRINGS = [
+    "anatomical",
+    "ameboidal",
+    "animal organ",
+    "multicellular organism",
+    "cellular developmental",
+    "tube",
+    "regulation of",
+    "embryonic",
+    "cardiovascular",
+    "angiogenesis",
+    "blood vessel",
+    "vasculature",
+    "immune",
+    "defense",
+    "signaling",
+    "response to",
+    "movement of"]
+
+REMOVE_EXACT_STRINGS = [
+    "system process",
+    "system development",
+    "developmental process",
+    "tissue development"]
+
 
 def load_data_from_multiple_h5_files(h5_files, key):
     """convenience wrapper
@@ -116,7 +141,7 @@ def main():
         keep_pwm_names.append(pwm_name)
         print sig_idx, pwm_name
 
-        if "NFKB" not in pwm_name:
+        if "TP53" not in pwm_name:
             continue
         
         # extract features
@@ -125,39 +150,38 @@ def main():
         # first mask values that aren't (mod 0.05),
         # they're edge values
         keep_mask = (np.mod(pwm_counts, 1) < tol).astype(int)
+        #print np.sum(pwm_counts != 0)
         pwm_counts *= keep_mask
+        #print np.sum(pwm_counts != 0)
+        #quit()
         
         # now go through each level
         summary_df = None
         for count_threshold in count_thresholds:
-            thresholded_counts = pwm_counts >= count_threshold
+            thresholded_counts = pwm_counts == count_threshold # vs greater than?
             thresholded_indices = np.where(thresholded_counts)[0]
 
             if thresholded_indices.shape[0] > MIN_REGION_COUNT:
                 thresholded_metadata = metadata[thresholded_indices]
+                print ">> num_regions:", thresholded_metadata.shape[0]
                 # build the BED file
                 bed_file = "{}/{}.counts.greater_equal-{}.bed.gz".format(
                     tmp_dir, pwm_name, count_threshold)
                 array_to_bed(
                     thresholded_metadata,
                     bed_file, interval_key="active", merge=True)
-
-                print thresholded_metadata.shape
-                
-                # track ATAC/H3K27ac?
                 
                 # then match to proximal gene set
-                # TODO - think about adjusting max dist OR use distance based links
-                gene_set_file = "{}.gene_set.txt".format(bed_file.split(".bed")[0])
+                gene_set_file = "{}.gene_set.txt.gz".format(bed_file.split(".bed")[0])
                 bed_to_gene_set_by_proximity(
                     bed_file,
                     tss_file,
                     gene_set_file,
-                    k_nearest=3,
+                    k_nearest=2, # 2?
                     max_dist=25000)
 
                 # and run gprofiler
-                gprofiler_file = "{}.go_gprofiler.txt".format(gene_set_file)
+                gprofiler_file = "{}.go_gprofiler.txt".format(gene_set_file.split(".txt.gz")[0])
                 if not os.path.isfile(gprofiler_file):
                     run_gprofiler(
                         gene_set_file,
@@ -165,14 +189,20 @@ def main():
                         tmp_dir,
                         header=True)
 
-                # add to summary
+                # read in gprofiler file and clean
                 thresholded_summary = pd.read_csv(gprofiler_file, sep="\t")
-                thresholded_summary = thresholded_summary[thresholded_summary["domain"] == "BP"]
+                thresholded_summary = thresholded_summary[
+                    (thresholded_summary["domain"] == "BP") |
+                    (thresholded_summary["domain"] == "CC") |
+                    (thresholded_summary["domain"] == "rea")]
+                #thresholded_summary = thresholded_summary[thresholded_summary["domain"] == "rea"]
+                #thresholded_summary = thresholded_summary[thresholded_summary["domain"] == "BP"]
                 thresholded_summary = thresholded_summary[
                     ["term.id", "p.value", "term.name"]]
                 thresholded_summary["count_threshold"] = count_threshold
-                print thresholded_summary.shape
-                
+                print "Num terms:", thresholded_summary.shape[0]
+
+                # add to summary
                 if summary_df is None:
                     summary_df = thresholded_summary.copy()
                 else:
@@ -185,22 +215,40 @@ def main():
 
         # extra filtering?
         # keep only top 10 by p.value from max count?
-        keep_num = 15
-        for count_threshold in reversed(count_thresholds):
-            print count_threshold
-            filter_data = summary_df[summary_df["count_threshold"] == count_threshold]
-            if filter_data.shape[0] == 0:
-                continue
-            filter_data = filter_data.sort_values("p.value", ascending=True)
-            keep_terms = filter_data.iloc[0:keep_num]["term.id"].values
-            summary_df = summary_df[summary_df["term.id"].isin(keep_terms)]
-            break
+        if False:
+            keep_num = 100
+            for count_threshold in reversed(count_thresholds):
+                print count_threshold
+                filter_data = summary_df[summary_df["count_threshold"] == count_threshold]
+                if filter_data.shape[0] == 0:
+                    continue
+                filter_data = filter_data.sort_values("p.value", ascending=True)
+                keep_terms = filter_data.iloc[0:keep_num]["term.id"].values
+                summary_df = summary_df[summary_df["term.id"].isin(keep_terms)]
+                break
 
         summary_df["log10pval"] = -np.log10(summary_df["p.value"].values)
         summary_df = summary_df.drop("p.value", axis=1)
         summary_file = "{}/{}.summary.txt.gz".format(tmp_dir, pwm_name)
         summary_df.to_csv(summary_file, sep="\t", index=False, header=True, compression="gzip")
+                
+        # remove substrings
+        for substring in REMOVE_SUBSTRINGS:
+            keep = [False if substring in term else True
+                    for term in summary_df["term.name"]]
+            keep_indices = np.where(keep)[0]
+            summary_df = summary_df.iloc[keep_indices]
 
+        # remove exact strings
+        keep = [False if term in REMOVE_EXACT_STRINGS else True
+                for term in summary_df["term.name"]]
+        keep_indices = np.where(keep)[0]
+        summary_df = summary_df.iloc[keep_indices]
+        summary_df = summary_df.sort_values(["term.name", "count_threshold"])
+        summary_file = "{}/{}.summary.filt.txt.gz".format(tmp_dir, pwm_name)
+        summary_df.to_csv(summary_file, sep="\t", index=False, header=True, compression="gzip")
+
+        
         # plot?
         # TODO think about how to filter down GO terms
         

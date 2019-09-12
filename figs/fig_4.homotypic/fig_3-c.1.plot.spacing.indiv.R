@@ -18,6 +18,8 @@ data_melt <- melt(data, id.vars="position")
 # clip
 left_clip <- -50
 right_clip <- 50
+left_clip <- -70
+right_clip <- 70
 data_melt <- data_melt[data_melt$position > left_clip,]
 data_melt <- data_melt[data_melt$position < right_clip,]
 
