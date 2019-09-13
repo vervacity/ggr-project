@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 
 from ggr.analyses.bioinformatics import run_gprofiler
+from ggr.analyses.linking import regions_to_genes_through_links
 
 from tronn.util.utils import DataKeys
 from tronn.util.formats import array_to_bed
@@ -58,44 +59,6 @@ def load_data_from_multiple_h5_files(h5_files, key, example_indices=None):
     return key_data
 
 
-def bed_to_gene_set_by_proximity(
-        bed_file,
-        tss_file,
-        out_file,
-        k_nearest=3,
-        max_dist=250000):
-    """assuming proximal linking captures the majority of linking
-    """
-    # bedtools closest
-    tmp_file = "tss.overlap.tmp.txt"
-    closest = "bedtools closest -d -k {} -a {} -b {} > {}".format(
-        k_nearest, bed_file, tss_file, tmp_file)
-    os.system(closest)
-
-    # load results and use distance cutoff
-    data = pd.read_csv(tmp_file, sep="\t", header=None)
-    data = data[data[9] < max_dist]
-
-    # clean up
-    data = data.sort_values([6, 9])
-    data = data.drop_duplicates(6, keep="first")
-    print "num genes:", len(set(data[6].values.tolist()))
-    
-    # split coumn and keep traj, gene name, distance
-    data["gene_id"] = data[6]
-    data["dist"] = data[9]
-    gene_set = data[["gene_id", "dist"]]
-    
-    # save out
-    gene_set.to_csv(out_file, compression="gzip", sep="\t", header=True, index=False)
-    
-    # cleanup
-    os.system("rm {}".format(tmp_file))
-    
-    return data
-
-
-
 def main():
     """analyze spacing
     """
@@ -103,7 +66,7 @@ def main():
     SCRIPT_DIR = "/users/dskim89/git/ggr-project/figs/fig_4.homotypic"
     OUT_DIR = sys.argv[1]
     sig_pwms_file = sys.argv[2]
-    tss_file = sys.argv[3]
+    links_file = sys.argv[3]
     background_gene_set_file = sys.argv[4]
     motifs_files = sys.argv[5:]
 
@@ -272,12 +235,10 @@ def main():
                 # then match to proximal gene set
                 # TODO - think about adjusting max dist OR use distance based links
                 gene_set_file = "{}.gene_set.txt.gz".format(bed_file.split(".bed")[0])
-                bed_to_gene_set_by_proximity(
+                regions_to_genes_through_links(
                     bed_file,
-                    tss_file,
-                    gene_set_file,
-                    k_nearest=2,
-                    max_dist=25000)
+                    links_file,
+                    gene_set_file)
 
                 # and run gprofiler
                 gprofiler_file = "{}.go_gprofiler.txt".format(gene_set_file.split(".txt.gz")[0])

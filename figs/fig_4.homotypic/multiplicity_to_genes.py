@@ -9,6 +9,8 @@ import numpy as np
 import pandas as pd
 
 from ggr.analyses.bioinformatics import run_gprofiler
+from ggr.analyses.linking import regions_to_genes_through_links
+
 
 from tronn.util.utils import DataKeys
 from tronn.util.formats import array_to_bed
@@ -51,57 +53,20 @@ def load_data_from_multiple_h5_files(h5_files, key):
     return key_data
 
 
-def bed_to_gene_set_by_proximity(
-        bed_file,
-        tss_file,
-        out_file,
-        k_nearest=3,
-        max_dist=250000):
-    """assuming proximal linking captures the majority of linking
-    """
-    # bedtools closest
-    tmp_file = "tss.overlap.tmp.txt"
-    closest = "bedtools closest -d -k {} -a {} -b {} > {}".format(
-        k_nearest, bed_file, tss_file, tmp_file)
-    os.system(closest)
-
-    # load results and use distance cutoff
-    data = pd.read_csv(tmp_file, sep="\t", header=None)
-    data = data[data[9] < max_dist]
-
-    # clean up
-    data = data.sort_values([6, 9])
-    data = data.drop_duplicates(6, keep="first")
-    print "num genes:", len(set(data[6].values.tolist()))
-    
-    # split coumn and keep traj, gene name, distance
-    data["gene_id"] = data[6]
-    data["dist"] = data[9]
-    gene_set = data[["gene_id", "dist"]]
-    
-    # save out
-    gene_set.to_csv(out_file, compression="gzip", sep="\t", header=True, index=False)
-    
-    # cleanup
-    os.system("rm {}".format(tmp_file))
-    
-    return data
-
-
 def main():
     """get gene sets
     """
     # inputs
     OUT_DIR = sys.argv[1]
     sig_pwms_file = sys.argv[2]
-    tss_file = sys.argv[3]
+    links_file = sys.argv[3]
     background_gene_set_file = sys.argv[4]
     motifs_files = sys.argv[5:]
+
+    # keys
     density_key = DataKeys.ORIG_SEQ_PWM_MAX_DENSITIES
     metadata_key = DataKeys.SEQ_METADATA
-    activity_keys = ["ATAC_SIGNALS.NORM", "H3K27ac_SIGNALS.NORM"]
-    
-    # make a tmp_dir
+    activiy_keys = ["ATAC_SIGNALS.NORM", "H3K27ac_SIGNALS.NORM"]
     tmp_dir = "{}/tmp".format(OUT_DIR)
     os.system("mkdir -p {}".format(tmp_dir))
     
@@ -130,7 +95,7 @@ def main():
 
     # load metadata
     metadata = load_data_from_multiple_h5_files(motifs_files, metadata_key)[:,0]
-
+    
     # analyze per pwm and save out
     keep_pwm_names = []
     for i in range(len(sig_indices)):
@@ -140,9 +105,6 @@ def main():
         pwm_name = re.sub(".UNK.0.A", "", pwm_name)
         keep_pwm_names.append(pwm_name)
         print sig_idx, pwm_name
-
-        if "TP53" not in pwm_name:
-            continue
         
         # extract features
         pwm_counts = counts[:,0,sig_idx]
@@ -150,10 +112,7 @@ def main():
         # first mask values that aren't (mod 0.05),
         # they're edge values
         keep_mask = (np.mod(pwm_counts, 1) < tol).astype(int)
-        #print np.sum(pwm_counts != 0)
         pwm_counts *= keep_mask
-        #print np.sum(pwm_counts != 0)
-        #quit()
         
         # now go through each level
         summary_df = None
@@ -173,13 +132,11 @@ def main():
                 
                 # then match to proximal gene set
                 gene_set_file = "{}.gene_set.txt.gz".format(bed_file.split(".bed")[0])
-                bed_to_gene_set_by_proximity(
+                regions_to_genes_through_links(
                     bed_file,
-                    tss_file,
-                    gene_set_file,
-                    k_nearest=2, # 2?
-                    max_dist=25000)
-
+                    links_file,
+                    gene_set_file)
+                
                 # and run gprofiler
                 gprofiler_file = "{}.go_gprofiler.txt".format(gene_set_file.split(".txt.gz")[0])
                 if not os.path.isfile(gprofiler_file):
@@ -213,20 +170,6 @@ def main():
                     summary_df = pd.concat([summary_df, thresholded_summary], axis=0)
                     summary_df = summary_df.sort_values("term.name")
 
-        # extra filtering?
-        # keep only top 10 by p.value from max count?
-        if False:
-            keep_num = 100
-            for count_threshold in reversed(count_thresholds):
-                print count_threshold
-                filter_data = summary_df[summary_df["count_threshold"] == count_threshold]
-                if filter_data.shape[0] == 0:
-                    continue
-                filter_data = filter_data.sort_values("p.value", ascending=True)
-                keep_terms = filter_data.iloc[0:keep_num]["term.id"].values
-                summary_df = summary_df[summary_df["term.id"].isin(keep_terms)]
-                break
-
         summary_df["log10pval"] = -np.log10(summary_df["p.value"].values)
         summary_df = summary_df.drop("p.value", axis=1)
         summary_file = "{}/{}.summary.txt.gz".format(tmp_dir, pwm_name)
@@ -245,17 +188,9 @@ def main():
         keep_indices = np.where(keep)[0]
         summary_df = summary_df.iloc[keep_indices]
         summary_df = summary_df.sort_values(["term.name", "count_threshold"])
-        summary_file = "{}/{}.summary.filt.txt.gz".format(tmp_dir, pwm_name)
+        summary_file = "{}/{}.summary.filt.txt.gz".format(OUT_DIR, pwm_name)
         summary_df.to_csv(summary_file, sep="\t", index=False, header=True, compression="gzip")
-
         
-        # plot?
-        # TODO think about how to filter down GO terms
-        
-        quit()
-
-    
     return
-
 
 main()
