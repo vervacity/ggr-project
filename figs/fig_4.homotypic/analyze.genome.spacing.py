@@ -11,36 +11,53 @@ import pandas as pd
 from tronn.util.utils import DataKeys
 
 
+def nonzero_colmeans(array):
+    """don't consider zeros when calculating mean
+    """
+    value_sums = np.sum(array, axis=0)
+    presence_sums = np.sum(array!=0, axis=0)
+    distr = np.true_divide(
+        value_sums, presence_sums, where=presence_sums!=0)
+    
+    return distr
+
+
 def main():
     """analyze spacing
     """
-    # dirs
-    OUT_DIR = sys.argv[3]
-    tmp_dir = "{}/tmp".format(OUT_DIR)
-    os.system("mkdir -p {}".format(tmp_dir))
-    more_plots_dir = "{}/plots".format(OUT_DIR)
-    os.system("mkdir -p {}".format(more_plots_dir))
-    SCRIPT_DIR = "/users/dskim89/git/ggr-project/figs/fig_4.homotypic"
+    # ==============================
+    # SETUP
+    # ==============================
     
     # inputs
-    motifs_file = sys.argv[1]
-    sig_pwms_file = sys.argv[2]
+    SCRIPT_DIR = sys.argv[1]
+    OUT_DIR = sys.argv[2]
+    motifs_file = sys.argv[3]
+    sig_pwms_file = sys.argv[4]
+
+    # set up dirs
+    os.system("mkdir -p {}".format(OUT_DIR))
+    TMP_DIR = "{}/tmp".format(OUT_DIR)
+    os.system("mkdir -p {}".format(TMP_DIR))
+    MORE_PLOTS_DIR = "{}/plots".format(OUT_DIR)
+    os.system("mkdir -p {}".format(MORE_PLOTS_DIR))
 
     # keys
     max_val_key = DataKeys.WEIGHTED_PWM_SCORES_POSITION_MAX_VAL
     max_idx_key = DataKeys.WEIGHTED_PWM_SCORES_POSITION_MAX_IDX
     pwm_scores_key = DataKeys.WEIGHTED_SEQ_PWM_SCORES_THRESH
     raw_pwm_scores_key = DataKeys.ORIG_SEQ_PWM_SCORES_THRESH
-    signal_keys = [
-        "ATAC_SIGNALS",
-        "H3K27ac_SIGNALS"]
+    signal_keys = ["ATAC_SIGNALS", "H3K27ac_SIGNALS"]
     
     # params
     left_clip = 420 + 12
     num_positions = 200
     final_extend_len = 160
-    out_prefix = "fig_5-c"
 
+    # ==============================
+    # LOAD DATA
+    # ==============================
+    
     # read in the sig pwms
     sig_pwms = list(pd.read_csv(sig_pwms_file, sep="\t", header=0).iloc[:,0])
 
@@ -51,11 +68,13 @@ def main():
     # read in max vals
     with h5py.File(motifs_file, "r") as hf:
         max_vals = hf[max_val_key][:] # {N, pwm, 1}
-    
+
+    # ==============================
+    # ANALYZE
+    # ==============================
+        
     # analyze each pwm
     for pwm_idx in range(len(sig_pwms)):
-
-        # name and global index
         pwm_name = sig_pwms[pwm_idx]
         pwm_name_clean = re.sub("HCLUST-\\d+_", "", pwm_name)
         pwm_name_clean = re.sub(".UNK.0.A", "", pwm_name_clean)
@@ -113,7 +132,7 @@ def main():
         mid_idx = int(pwm_aligned_array.shape[1]/2.)
         
         # save out aligned array
-        aligned_spacing_file = "{}/{}.{}.spacings.txt.gz".format(tmp_dir, out_prefix, pwm_name_clean)
+        aligned_spacing_file = "{}/genome.{}.spacings.txt.gz".format(TMP_DIR, pwm_name_clean)
         pd.DataFrame(data=pwm_aligned_array, columns=positions).to_csv(
             aligned_spacing_file, sep="\t", header=True, index=False, compression="gzip")
         
@@ -123,13 +142,16 @@ def main():
         # also integrate in positional info. For the raw pwm scores, we need to consider frequency
         # in the genome, so we do a mean across all examples (include zeros).
         # in most ideal case, the NN highlights positional info that the pwm scores could not get
-        spacing_distr_file = "{}/{}.{}.distribution.spacings.txt.gz".format(tmp_dir, out_prefix, pwm_name_clean)
-        value_sums = np.sum(pwm_aligned_array, axis=0)
-        presence_sums = np.sum(pwm_aligned_array!=0, axis=0)
-        active_distr = np.true_divide(value_sums, presence_sums, where=presence_sums!=0)
-        value_sums = np.sum(pwm_aligned_raw_array, axis=0)
-        presence_sums = np.sum(pwm_aligned_raw_array!=0, axis=0)
-        all_distr = np.true_divide(value_sums, presence_sums, where=presence_sums!=0)
+        spacing_distr_file = "{}/genome.{}.distribution.spacings.txt.gz".format(TMP_DIR, pwm_name_clean)
+        active_distr = nonzero_colmeans(pwm_aligned_array)
+        #value_sums = np.sum(pwm_aligned_array, axis=0)
+        #presence_sums = np.sum(pwm_aligned_array!=0, axis=0)
+        #active_distr = np.true_divide(value_sums, presence_sums, where=presence_sums!=0)
+        
+        all_distr = nonzero_colmeans(pwm_aligned_raw_array)
+        #value_sums = np.sum(pwm_aligned_raw_array, axis=0)
+        #presence_sums = np.sum(pwm_aligned_raw_array!=0, axis=0)
+        #all_distr = np.true_divide(value_sums, presence_sums, where=presence_sums!=0)
         active_distr[mid_idx] = 0
         all_distr[mid_idx] = 0
         spacing_distributions = pd.DataFrame({
@@ -139,27 +161,28 @@ def main():
         spacing_distributions.to_csv(spacing_distr_file, sep="\t", header=True, index=False, compression="gzip")
 
         # plot
-        plot_prefix = "{}/{}.{}".format(OUT_DIR, out_prefix, pwm_name_clean)
-        plot_cmd = "Rscript {}/fig_3-c.1.plot.spacing.indiv.R {} {} {}".format(
+        plot_prefix = "{}/genome.spacing.{}".format(OUT_DIR, pwm_name_clean)
+        plot_cmd = "{}/plot.spacing.freq.indiv.R {} {} {}".format(
             SCRIPT_DIR, spacing_distr_file, pwm_aligned_array.shape[0], plot_prefix)
         print plot_cmd
         os.system(plot_cmd)
 
         # plot of motif density by pwm hits (what could you discover by counting in genome)
-        spacing_distr_file = "{}/{}.{}.distribution.spacings.genomic_freq.txt.gz".format(
-            tmp_dir, out_prefix, pwm_name_clean)
+        spacing_distr_file = "{}/genome.{}.distribution.spacings.genomic_freq.txt.gz".format(
+            TMP_DIR, pwm_name_clean)
         all_distr = np.mean(pwm_aligned_raw_array!=0, axis=0)
         all_distr[mid_idx] = 0
         spacing_distributions = pd.DataFrame({
             "position": positions,
             "all": all_distr})
         spacing_distributions.to_csv(spacing_distr_file, sep="\t", header=True, index=False, compression="gzip")
-        plot_prefix = "{}/{}.{}.genomic_frequency".format(OUT_DIR, out_prefix, pwm_name_clean)
-        plot_cmd = "Rscript {}/fig_3-c.1.plot.spacing.indiv.R {} {} {}".format(
+        plot_prefix = "{}/genome.spacing.{}.genomic_frequency".format(OUT_DIR, pwm_name_clean)
+        plot_cmd = "{}/plot.spacing.freq.indiv.R {} {} {}".format(
             SCRIPT_DIR, spacing_distr_file, pwm_aligned_array.shape[0], plot_prefix)
         print plot_cmd
         os.system(plot_cmd)
 
+        # TODO - don't bother?
         # plot separated into plots with exact motif counts
         min_region_num = 500
         for count in range(2, 6):
@@ -171,14 +194,17 @@ def main():
             exact_count_raw_array = pwm_aligned_raw_array[exact_count_indices]
             
             # get distributions, save, and plot
-            spacing_distr_file = "{}/{}.{}.distribution.exactly_{}.spacings.txt.gz".format(
-                tmp_dir, out_prefix, pwm_name_clean, count)
-            value_sums = np.sum(exact_count_array, axis=0)
-            presence_sums = np.sum(exact_count_array!=0, axis=0)
-            active_distr = np.true_divide(value_sums, presence_sums, where=presence_sums!=0)
-            value_sums = np.sum(exact_count_raw_array, axis=0)
-            presence_sums = np.sum(exact_count_raw_array!=0, axis=0)
-            all_distr = np.true_divide(value_sums, presence_sums, where=presence_sums!=0)
+            spacing_distr_file = "{}/genome.{}.distribution.exactly_{}.spacings.txt.gz".format(
+                TMP_DIR, pwm_name_clean, count)
+            active_distr = nonzero_colmeans(exact_count_array)
+            #value_sums = np.sum(exact_count_array, axis=0)
+            #presence_sums = np.sum(exact_count_array!=0, axis=0)
+            #active_distr = np.true_divide(value_sums, presence_sums, where=presence_sums!=0)
+
+            all_distr = nonzero_colmeans(exact_count_raw_array)
+            #value_sums = np.sum(exact_count_raw_array, axis=0)
+            #presence_sums = np.sum(exact_count_raw_array!=0, axis=0)
+            #all_distr = np.true_divide(value_sums, presence_sums, where=presence_sums!=0)
             active_distr[mid_idx] = 0
             all_distr[mid_idx] = 0
             spacing_distributions = pd.DataFrame({
@@ -189,8 +215,8 @@ def main():
                 spacing_distr_file, sep="\t", header=True, index=False, compression="gzip")
 
             # plot
-            plot_prefix = "{}/{}.{}.exactly_{}".format(more_plots_dir, out_prefix, pwm_name_clean, count)
-            plot_cmd = "Rscript {}/fig_3-c.1.plot.spacing.indiv.R {} {} {}".format(
+            plot_prefix = "{}/genome.spacing.{}.exactly_{}".format(MORE_PLOTS_DIR, pwm_name_clean, count)
+            plot_cmd = "{}/plot.spacing.freq.indiv.R {} {} {}".format(
                 SCRIPT_DIR, spacing_distr_file, exact_count_array.shape[0], plot_prefix)
             print plot_cmd
             os.system(plot_cmd)
@@ -221,23 +247,24 @@ def main():
                 task_melt_df = task_melt_df[task_melt_df["value"] != 0]
 
                 # save out
-                out_file = "{}/{}.{}.{}.taskidx-{}.txt.gz".format(
-                    tmp_dir, out_prefix, pwm_name_clean, key, task_idx)
+                out_file = "{}/genome.{}.{}.taskidx-{}.txt.gz".format(
+                    TMP_DIR, pwm_name_clean, key, task_idx)
                 task_melt_df.to_csv(out_file, sep="\t", header=True, index=False, compression="gzip")
 
                 # plot
-                plot_prefix = "{}/{}.{}.{}.taskidx-{}".format(
-                    more_plots_dir, out_prefix, pwm_name_clean, key, task_idx)
-                plot_cmd = "Rscript {}/fig_3-c.2.plot.signals.indiv.R {} {}".format(
+                plot_prefix = "{}/genome.spacing.{}.{}.taskidx-{}".format(
+                    MORE_PLOTS_DIR, pwm_name_clean, key, task_idx)
+                plot_cmd = "Rscript {}/plot.spacing.signals.indiv.R {} {}".format(
                     SCRIPT_DIR, out_file, plot_prefix)
                 print plot_cmd
                 os.system(plot_cmd)
-
-    # do Fourier for specific ones?
-    # fourier analysis shoudl act on the aligned array
+                
+    # ==============================
+    # SUMMARIZE
+    # ==============================
         
     # now merge all information
-    out_file = "{}/{}.ALL.spacings.txt.gz".format(OUT_DIR, out_prefix)
+    out_file = "{}/genome.ALL.spacings.txt.gz".format(OUT_DIR)
     all_pwms_aligned_array = np.zeros((len(sig_pwms), 2*final_extend_len))
     for pwm_idx in range(len(sig_pwms)):
 
@@ -250,7 +277,7 @@ def main():
              for global_name in all_pwms])[0][0]
 
         # open spacing distr file
-        spacing_distr_file = "{}/{}.{}.distribution.spacings.txt.gz".format(tmp_dir, out_prefix, pwm_name_clean)
+        spacing_distr_file = "{}/genome.{}.distribution.spacings.txt.gz".format(TMP_DIR, pwm_name_clean)
         data = pd.read_csv(spacing_distr_file, sep="\t")
 
         # pull info
@@ -262,7 +289,7 @@ def main():
 
     # and plot
     plot_prefix = "{}/{}.ALL".format(OUT_DIR, out_prefix)
-    plot_cmd = "Rscript {}/fig_3-c.3.plot.spacing.all.R {} {}".format(
+    plot_cmd = "{}/plot.spacing.freq.summary.R {} {}".format(
         SCRIPT_DIR, out_file, plot_prefix)
     print plot_cmd
     os.system(plot_cmd)

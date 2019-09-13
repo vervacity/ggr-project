@@ -15,13 +15,11 @@ UNFILT_SCAN_FILE=$SCANMOTIFS_DIR/motifs.input_x_grad.background/ggr.scanmotifs.h
 
 # multiplicity as seen in the genome (NN-active hits)
 GENOME_MULT_DIR=genome.multiplicity
-mkdir -p $GENOME_MULT_DIR
-$SCRIPT_DIR/analyze.genome.multiplicity.py $SCRIPT_DIR $GENOME_MULT_DIR $UNFILT_SCAN_FILE $SIG_PWMS_FILE
+#$SCRIPT_DIR/analyze.genome.multiplicity.py $SCRIPT_DIR $GENOME_MULT_DIR $UNFILT_SCAN_FILE $SIG_PWMS_FILE
 
 # spacing as seen in the genome (NN-active hits)
 GENOME_SPACING_DIR=genome.spacing
-mkdir -p $GENOME_SPACING_DIR
-#$SCRIPT_DIR/analyze.genome.spacing.py $SCRIPT_DIR $GENOME_SPACING_DIR $UNFILT_SCAN_FILE $SIG_PWMS_FILE
+$SCRIPT_DIR/analyze.genome.spacing.py $SCRIPT_DIR $GENOME_SPACING_DIR $UNFILT_SCAN_FILE $SIG_PWMS_FILE
 
 # =================================================
 # SIMULATIONS: ISOLATING SINGLE MOTIF EFFECTS
