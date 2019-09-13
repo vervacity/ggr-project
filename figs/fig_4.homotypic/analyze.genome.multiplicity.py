@@ -13,6 +13,10 @@ from tronn.util.utils import DataKeys
 def main():
     """aggregate into counts
     """
+    # ==============================
+    # SETUP
+    # ==============================
+    
     # inputs
     SCRIPT_DIR = sys.argv[1]
     OUT_DIR = sys.argv[2]
@@ -34,8 +38,12 @@ def main():
     plot_timepoint_indices = {
         "ATAC_SIGNALS.NORM": [0,6,12],
         "H3K27ac_SIGNALS.NORM": [0,1,2]} # d0,3,6
-    activation_thresh = 0.6 # at what point do you consider it activated
+    activation_thresh = 0.6 # at what point do you consider it activated (in log2(FC) space)
     tol = 1e-5
+
+    # ==============================
+    # LOAD DATA
+    # ==============================
     
     # load sig pwms
     sig_pwms = list(pd.read_csv(sig_pwms_file, sep="\t", index_col=0, header=0).index)
@@ -57,6 +65,10 @@ def main():
         for activity_key in activity_keys:
             activities[activity_key] = hf[
                 activity_key][:,plot_timepoint_indices[activity_key]]
+
+    # ==============================
+    # ANALYZE
+    # ==============================
             
     # set up results matrices
     heatmap_results = {}
@@ -71,7 +83,7 @@ def main():
     pwm_results = {}
     for activity_key in activity_keys:
         pwm_results[activity_key] = {} # {N, timepoint+count}
-    
+        
     # analyze per pwm and save out
     keep_pwm_names = []
     for i in range(len(sig_indices)):
@@ -116,7 +128,7 @@ def main():
             activity_per_count = activity_per_count_df.transpose().values
             heatmap_results[activity_key]["count"][:,i,:] = activity_per_count
 
-    # now only keep those that have strong activation
+    # now filter for those that have strong activation
     for key in heatmap_results.keys():
         threshold = np.percentile(
             heatmap_results[key]["count"].flatten(), 90)
@@ -127,13 +139,16 @@ def main():
     h5_results_file = "{}/genome.multiplicity_v_activity.h5".format(TMP_DIR)
     if not os.path.isfile(h5_results_file):
         for key in heatmap_results.keys():
-            print key
             with h5py.File(h5_results_file, "a") as out:
                 for sub_key in heatmap_results[key].keys():
                     save_key = "{}/{}".format(key, sub_key)
                     out.create_dataset(save_key, data=heatmap_results[key][sub_key])
                     out[save_key].attrs["pwm_names"] = keep_pwm_names
-                
+                    
+    # ==============================
+    # PLOT
+    # ==============================
+
     # plot all
     plot_cmd = "{}/plot.results.multiplicity.summary.R {} {}/genome.multiplicity FALSE {}".format(
         SCRIPT_DIR, h5_results_file, OUT_DIR, " ".join(activity_keys))
@@ -146,6 +161,10 @@ def main():
     print plot_cmd
     os.system(plot_cmd)
 
+    # ==============================
+    # CLEANUP
+    # ==============================
+    os.system("rm -r {}".format(TMP_DIR))
     
     return
 

@@ -8,14 +8,9 @@ SCANMOTIFS_DIR=/mnt/lab_data/kundaje/users/dskim89/ggr/nn/inference.2019-02-05
 INFER_DIR=/mnt/lab_data/kundaje/users/dskim89/ggr/nn/inference.2019-03-12
 SIG_PWMS_FILE=$INFER_DIR/motifs.sig/motifs.adjust.diff.rna_filt.dmim/summary/ggr.pwms_patterns_summary.txt
 
-#MOTIFS_EXTENDED_FILE=/srv/scratch/dskim89/ggr/ggr.tronn.2019-06-17.footprinting/motifs.input_x_grad.lite/ggr.scanmotifs.h5
-
-
-
-# ============================
+# =================================================
 # GENOME: HINTS TO MULTIPLICITY/SPACING
-# ============================
-
+# =================================================
 UNFILT_SCAN_FILE=$SCANMOTIFS_DIR/motifs.input_x_grad.background/ggr.scanmotifs.h5
 
 # multiplicity as seen in the genome (NN-active hits)
@@ -23,16 +18,14 @@ GENOME_MULT_DIR=genome.multiplicity
 mkdir -p $GENOME_MULT_DIR
 $SCRIPT_DIR/analyze.genome.multiplicity.py $SCRIPT_DIR $GENOME_MULT_DIR $UNFILT_SCAN_FILE $SIG_PWMS_FILE
 
-# data
-#MOTIFS_FILE=/mnt/lab_data/kundaje/users/dskim89/ggr/nn/inference.2019-02-05/motifs.input_x_grad.background/ggr.scanmotifs.h5
-# genome: multiplicity (use all regions)
-#$SCRIPT_DIR/fig_3-b.0.plot.counts.py $MOTIFS_FILE $SIG_PWMS_FILE
+# spacing as seen in the genome (NN-active hits)
+GENOME_SPACING_DIR=genome.spacing
+mkdir -p $GENOME_SPACING_DIR
+#$SCRIPT_DIR/analyze.genome.spacing.py $SCRIPT_DIR $GENOME_SPACING_DIR $UNFILT_SCAN_FILE $SIG_PWMS_FILE
 
-# genome: spacing (use all regions)
-#SIG_PWMS_FILE=ATAC_SIGNALS.NORM.pwms.keep.txt
-OUT_DIR=genome.spacing
-mkdir -p $OUT_DIR
-#$SCRIPT_DIR/fig_3-c.0.analyze_spacing.py $MOTIFS_FILE $SIG_PWMS_FILE $OUT_DIR
+# =================================================
+# SIMULATIONS: ISOLATING SINGLE MOTIF EFFECTS
+# =================================================
 
 # sims: multiplicity
 SIM_MULT_ALLNEGS_DIR=/mnt/lab_data/kundaje/users/dskim89/ggr/nn/analysis_homotypic.2019-09-06/sims.multiplicity.full_negatives
