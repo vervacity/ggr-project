@@ -114,7 +114,7 @@ for (i in 1:length(dataset_keys)) {
     if (do_filter == "TRUE") {
         keep <- h5read(
             data_file,
-            paste(dataset_key, "/nonlinear", sep=""))
+            paste(dataset_key, "/filt", sep=""))
         data <- data[,keep==1,]
         pwm_names <- pwm_names[keep==1]
     }

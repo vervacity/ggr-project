@@ -10,31 +10,6 @@ import pandas as pd
 from tronn.util.utils import DataKeys
 
 
-def check_nonlinear(y):
-    """given 1d array, take first two values to fit line
-    """
-    # get a linear fit
-    slope = y[1] - y[2] # x is 2 - 1 = 1
-    intercept = y[1] - slope # x is 1
-    
-    # then get max val and count
-    max_idx = np.argmax(y)
-    actual = y[max_idx]
-    count_for_max = max_idx + 1
-    
-    # expected linear val
-    expected = slope * count_for_max + intercept
-
-    # if actual > expected, nonlinear
-    nonlinear = 0
-    if actual > expected:
-        #print "nonlinear"
-        nonlinear = 1
-    
-    return nonlinear
-
-
-
 def main():
     """aggregate into counts
     """
@@ -52,7 +27,6 @@ def main():
     # keys
     density_key = DataKeys.ORIG_SEQ_PWM_MAX_DENSITIES
     activity_keys = ["ATAC_SIGNALS.NORM", "H3K27ac_SIGNALS.NORM"]
-    manual_keep = ["SMAD3"]
     
     # params
     POOL_WINDOW = 20 # from scanmotifs
@@ -92,7 +66,7 @@ def main():
             (len(plot_timepoint_indices[activity_key]),
              len(sig_indices),
              MAX_COUNT)) # {timepoint, pwm, count}
-        heatmap_results[activity_key]["nonlinear"] = np.zeros(
+        heatmap_results[activity_key]["filt"] = np.zeros(
             (len(sig_indices))) # {pwm}
     pwm_results = {}
     for activity_key in activity_keys:
@@ -130,19 +104,8 @@ def main():
                 columns=plot_timepoint_indices[activity_key])
             activity_df["counts"] = pwm_counts.astype(int)
 
-            # filter
+            # filter for activity and max count
             activity_df = activity_df.iloc[activity_indices]
-
-            # save out and plot these results
-            if False:
-                pwm_example_counts_file = "{}/{}.{}.counts.per_example.txt.gz".format(tmp_dir, pwm_name, activity_key)
-                activity_df.to_csv(pwm_example_counts_file, sep="\t", compression="gzip")
-                plot_cmd = "Rscript ~/git/ggr-project/figs/fig_3.homotypic/fig_3-b.0.plot.example_counts.R {}".format(
-                    pwm_example_counts_file)
-                #print plot_cmd
-                #os.system(plot_cmd)
-
-            # filter max count
             activity_df = activity_df[activity_df["counts"] <= MAX_COUNT]
             
             # groupby, get median
@@ -158,22 +121,7 @@ def main():
         threshold = np.percentile(
             heatmap_results[key]["count"].flatten(), 90)
         keep = np.any(heatmap_results[key]["count"] >= threshold, axis=(0,2)).astype(int)
-
-        # check manual
-        if True:
-            manual = np.zeros_like(keep)
-            for i in range(len(keep_pwm_names)):
-                for substring in manual_keep:
-                    if substring in keep_pwm_names[i]:
-                        manual[i] = 1
-            keep = np.logical_or(manual, keep).astype(int)
-                    
-        heatmap_results[key]["nonlinear"][:] = keep
-
-        # save out list of keep pwms
-        #pwm_names_file = "{}.pwms.keep.txt".format(key)
-        #pd.DataFrame(
-        #    np.array(keep_pwm_names)[keep == 1]).to_csv(pwm_names_file, header=False, index=False)
+        heatmap_results[key]["filt"][:] = keep
         
     # with all results collected, save out and plot
     h5_results_file = "{}/genome.multiplicity_v_activity.h5".format(TMP_DIR)
@@ -185,7 +133,6 @@ def main():
                     save_key = "{}/{}".format(key, sub_key)
                     out.create_dataset(save_key, data=heatmap_results[key][sub_key])
                     out[save_key].attrs["pwm_names"] = keep_pwm_names
-
                 
     # plot all
     plot_cmd = "{}/plot.results.multiplicity.summary.R {} {}/genome.multiplicity FALSE {}".format(
@@ -193,7 +140,7 @@ def main():
     print plot_cmd
     os.system(plot_cmd)
 
-    # plot some
+    # plot filt
     plot_cmd = "{}/plot.results.multiplicity.summary.R {} {}/genome.multiplicity.filt TRUE {}".format(
         SCRIPT_DIR, h5_results_file, OUT_DIR, " ".join(activity_keys))
     print plot_cmd
