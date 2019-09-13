@@ -12,25 +12,37 @@ import pandas as pd
 def main():
     """analyze density sims
     """
-    # set up
-    WORK_DIR = sys.argv[1]
-    OUT_DIR = sys.argv[2]
-    more_plots_dir = "{}/plots".format(OUT_DIR)
-    os.system("mkdir -p {}".format(more_plots_dir))
-    tmp_dir = "{}/tmp".format(OUT_DIR)
-    os.system("mkdir -p {}".format(tmp_dir))
+    # ==============================
+    # SETUP
+    # ==============================
     
-    # params
-    plot_indices = [0,6,12,13,14,15]
+    # inputs
+    SCRIPT_DIR = sys.argv[1]
+    SIM_DIR = sys.argv[2]
+    OUT_DIR = sys.argv[3]
+
+    # set up dirs
+    os.system("mkdir -p {}".format(OUT_DIR))
+    TMP_DIR = "{}/tmp".format(OUT_DIR)
+    os.system("mkdir -p {}".format(TMP_DIR))
+    MORE_PLOTS_DIR = "{}/plots".format(OUT_DIR)
+    os.system("mkdir -p {}".format(MORE_PLOTS_DIR))
     
     # keys
     predictions_key = "logits.norm"
     sample_idx_key = "simul.pwm.sample_idx"
     pwm_count_key = "simul.pwm.count"
     
+    # params
+    plot_indices = [0,6,12,13,14,15]
+
+    # ==============================
+    # ANALYZE
+    # ==============================
+    
     # analyze each pwm
     results_files = sorted(
-        glob.glob("{}/*/ggr.predictions.h5".format(WORK_DIR)))
+        glob.glob("{}/*/ggr.predictions.h5".format(SIM_DIR)))
     all_results = None
     for results_file in results_files:
         
@@ -38,7 +50,6 @@ def main():
         pwm_name = results_file.split("/")[-2]
         pwm_name = re.sub("HCLUST-\\d+_", "", pwm_name)
         pwm_name = re.sub(".UNK.0.A", "", pwm_name)
-        print pwm_name
         
         # read in data
         with h5py.File(results_file, "r") as hf:
@@ -56,7 +67,7 @@ def main():
             # results file
             task_prefix = "{}.taskidx-{}".format(
                 pwm_name, task_idx)
-            results_file = "{}/{}.aggregated.txt.gz".format(tmp_dir, task_prefix)
+            results_file = "{}/{}.aggregated.txt.gz".format(TMP_DIR, task_prefix)
 
             # run analysis if results file doesn't exist
             if not os.path.isfile(results_file):
@@ -103,21 +114,19 @@ def main():
 
             # plot
             if task_idx in plot_indices:
-                plot_file = "{}/{}.pdf".format(more_plots_dir, task_prefix)
+                plot_file = "{}/{}.pdf".format(MORE_PLOTS_DIR, task_prefix)
                 plot_cmd = "Rscript ~/git/ggr-project/figs/fig_4.homotypic/plot.results.sim.multiplicity.R {} {}".format(
                     results_file, plot_file)
                 print plot_cmd
                 os.system(plot_cmd)
-        
-        
-    # and then plot out a joint picture across tasks
+                
+    # ==============================
+    # SUMMARIZE
+    # ==============================
     # build the matrix by considering: fraction of samples that activated, also
     # did the average across the samples activate enough
-    # ATAC: tasks 0,6,12
-    # save all this out to hdf5 file so can plot the same way as the other file
-    h5_results_file = "{}/motifs.sims.counts_v_activity.h5".format(OUT_DIR)
+    h5_results_file = "{}/simulations.multiplicity_v_activity.h5".format(OUT_DIR)
     keys = ["ATAC", "H3K27ac"]
-    
     task_indices = [0, 6, 12]
     averages = []
     sample_fracts = []
@@ -130,6 +139,7 @@ def main():
         for results_file in results_files:
             pwm_name = os.path.basename(results_file).split(".")[0]
             data = pd.read_csv(results_file, sep="\t")
+            
             # get average results
             data_tmp = data[["prediction", "pwm_count"]]
             data_tmp = data_tmp.groupby(["pwm_count"]).median().transpose()
@@ -142,7 +152,7 @@ def main():
             pwm_names.append(pwm_name)
 
         # save out averages
-        # TODO potentially need to do a merge, not an append
+        # TODO potentially need to do a merge, not an append <- to make sure pwm names match?
         task_averages = pd.concat(task_averages, axis=0)
         averages.append(task_averages.values)
 
@@ -155,25 +165,19 @@ def main():
     averages = np.stack(averages, axis=0)
     sample_fracts = np.squeeze(np.stack(sample_fracts, axis=0), axis=-1)
 
+    # threshold and filter
     threshold  = 1 # log2 space, so basically a 2 fold cutoff
-    
     dont_keep_indices = np.where(
         np.max(averages, axis=(0,2)) < 1)[0]
     print np.array(pwm_names)[dont_keep_indices].tolist()
-
-    
-    # filters
     keep_indices = np.where(
         np.max(averages, axis=(0,2)) >= 1)[0]
     averages = averages[:,keep_indices,:]
     sample_fracts = sample_fracts[:,keep_indices]
     keep_pwm_names = np.array(pwm_names)[keep_indices].tolist()
 
-
     print averages.shape
     print sample_fracts
-    
-    #quit()
     
     with h5py.File(h5_results_file, "a") as out:
         key = "ATAC/count"
@@ -182,8 +186,6 @@ def main():
         key = "ATAC/sample_count"
         out.create_dataset(key, data=sample_fracts)
         out[key].attrs["pwm_names"] = keep_pwm_names
-        
-    
     
     # H3K27ac: tasks 13,14,15
     task_indices = [13, 14, 15]
@@ -222,7 +224,6 @@ def main():
     # consolidate and save out
     averages = np.stack(averages, axis=0)
     sample_fracts = np.squeeze(np.stack(sample_fracts, axis=0), axis=-1)
-
     
     with h5py.File(h5_results_file, "a") as out:
         key = "H3K27ac/count"
@@ -234,8 +235,8 @@ def main():
         
     
     # plot
-    plot_cmd = "Rscript ~/git/ggr-project/figs/fig_4.homotypic/plot.results.sim.multiplicity.summary.R {} {}/counts.sim FALSE {}".format(
-        h5_results_file, OUT_DIR, "ATAC H3K27ac")
+    plot_cmd = "{}/plot.results.multiplicity.summary.R {} {}/counts.sim FALSE {}".format(
+        SCRIPT_DIR, h5_results_file, OUT_DIR, "ATAC H3K27ac")
     print plot_cmd
     os.system(plot_cmd)
 

@@ -11,39 +11,33 @@ SIG_PWMS_FILE=$INFER_DIR/motifs.sig/motifs.adjust.diff.rna_filt.dmim/summary/ggr
 # =================================================
 # GENOME: HINTS TO MULTIPLICITY/SPACING
 # =================================================
+
+# data
 UNFILT_SCAN_FILE=$SCANMOTIFS_DIR/motifs.input_x_grad.background/ggr.scanmotifs.h5
 
 # multiplicity as seen in the genome (NN-active hits)
-GENOME_MULT_DIR=genome.multiplicity
-#$SCRIPT_DIR/analyze.genome.multiplicity.py $SCRIPT_DIR $GENOME_MULT_DIR $UNFILT_SCAN_FILE $SIG_PWMS_FILE
+#$SCRIPT_DIR/analyze.genome.multiplicity.py $SCRIPT_DIR genome.multiplicity $UNFILT_SCAN_FILE $SIG_PWMS_FILE
 
 # spacing as seen in the genome (NN-active hits)
-GENOME_SPACING_DIR=genome.spacing
-$SCRIPT_DIR/analyze.genome.spacing.py $SCRIPT_DIR $GENOME_SPACING_DIR $UNFILT_SCAN_FILE $SIG_PWMS_FILE
+#$SCRIPT_DIR/analyze.genome.spacing.py $SCRIPT_DIR genome.spacing $UNFILT_SCAN_FILE $SIG_PWMS_FILE
 
 # =================================================
 # SIMULATIONS: ISOLATING SINGLE MOTIF EFFECTS
 # =================================================
 
-# sims: multiplicity
+# data
 SIM_MULT_ALLNEGS_DIR=/mnt/lab_data/kundaje/users/dskim89/ggr/nn/analysis_homotypic.2019-09-06/sims.multiplicity.full_negatives
-OUT_DIR=sim.multiplicity.full_negatives
-mkdir -p $OUT_DIR
-#$SCRIPT_DIR/analyze_sims_multiplicity.py $SIM_MULT_ALLNEGS_DIR $OUT_DIR
-
 SIM_MULT_DHSNEGS_DIR=/mnt/lab_data/kundaje/users/dskim89/ggr/nn/analysis_homotypic.2019-09-06/sims.multiplicity.dhs_negatives
-OUT_DIR=sim.multiplicity.dhs_negatives
-mkdir -p $OUT_DIR
-#$SCRIPT_DIR/analyze_sims_multiplicity.py $SIM_MULT_DHSNEGS_DIR $OUT_DIR
-
-# sims: spacing
 SIM_SPACING_ALLNEGS_DIR=/mnt/lab_data/kundaje/users/dskim89/ggr/nn/analysis_homotypic.2019-09-06/sims.spacing.full_negatives
-OUT_DIR=sim.spacing.full_negatives
-mkdir -p $OUT_DIR
-#$SCRIPT_DIR/analyze_sims_spacing.py $SIM_SPACING_ALLNEGS_DIR $OUT_DIR
-
 SIM_SPACING_DHSNEGS_DIR=/mnt/lab_data/kundaje/users/dskim89/ggr/nn/analysis_homotypic.2019-09-06/sims.spacing.dhs_negatives
-# TODO - run dhs negs version
+
+# multiplicity as seen in simulations
+$SCRIPT_DIR/analyze.simulations.multiplicity.py $SCRIPT_DIR $SIM_MULT_ALLNEGS_DIR simulations.multiplicity.full_negs
+#$SCRIPT_DIR/analyze.simulations.multiplicity.py $SCRIPT_DIR $SIM_MULT_DHSNEGS_DIR simulations.multiplicity.dhs_negs
+
+# spacing as seen in simulations
+#$SCRIPT_DIR/analyze.simulations.spacing.py $SCRIPT_DIR $SIM_SPACING_ALLNEGS_DIR simulations.spacing.full_negs
+#$SCRIPT_DIR/analyze.simulations.spacing.py $SCRIPT_DIR $SIM_SPACING_DHSNEGS_DIR simulations.spacing.dhs_negs
 
 # ============================
 # LINKING TO GENE SETS
