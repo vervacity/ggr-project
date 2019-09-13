@@ -85,8 +85,8 @@ def main():
 
         # skip
         #continue
-        if "GRHL" not in pwm_name_clean:
-            continue
+        #if "GRHL" not in pwm_name_clean:
+        #    continue
         
         # check to see which have this pwm and adjust indices
         example_indices = np.where(max_vals[:,pwm_global_idx,0] != 0)[0]
@@ -144,15 +144,8 @@ def main():
         # in most ideal case, the NN highlights positional info that the pwm scores could not get
         spacing_distr_file = "{}/genome.{}.distribution.spacings.txt.gz".format(TMP_DIR, pwm_name_clean)
         active_distr = nonzero_colmeans(pwm_aligned_array)
-        #value_sums = np.sum(pwm_aligned_array, axis=0)
-        #presence_sums = np.sum(pwm_aligned_array!=0, axis=0)
-        #active_distr = np.true_divide(value_sums, presence_sums, where=presence_sums!=0)
-        
-        all_distr = nonzero_colmeans(pwm_aligned_raw_array)
-        #value_sums = np.sum(pwm_aligned_raw_array, axis=0)
-        #presence_sums = np.sum(pwm_aligned_raw_array!=0, axis=0)
-        #all_distr = np.true_divide(value_sums, presence_sums, where=presence_sums!=0)
         active_distr[mid_idx] = 0
+        all_distr = nonzero_colmeans(pwm_aligned_raw_array)
         all_distr[mid_idx] = 0
         spacing_distributions = pd.DataFrame({
             "position": positions,
@@ -197,15 +190,8 @@ def main():
             spacing_distr_file = "{}/genome.{}.distribution.exactly_{}.spacings.txt.gz".format(
                 TMP_DIR, pwm_name_clean, count)
             active_distr = nonzero_colmeans(exact_count_array)
-            #value_sums = np.sum(exact_count_array, axis=0)
-            #presence_sums = np.sum(exact_count_array!=0, axis=0)
-            #active_distr = np.true_divide(value_sums, presence_sums, where=presence_sums!=0)
-
-            all_distr = nonzero_colmeans(exact_count_raw_array)
-            #value_sums = np.sum(exact_count_raw_array, axis=0)
-            #presence_sums = np.sum(exact_count_raw_array!=0, axis=0)
-            #all_distr = np.true_divide(value_sums, presence_sums, where=presence_sums!=0)
             active_distr[mid_idx] = 0
+            all_distr = nonzero_colmeans(exact_count_raw_array)
             all_distr[mid_idx] = 0
             spacing_distributions = pd.DataFrame({
                 "position": positions,
@@ -267,8 +253,6 @@ def main():
     out_file = "{}/genome.ALL.spacings.txt.gz".format(OUT_DIR)
     all_pwms_aligned_array = np.zeros((len(sig_pwms), 2*final_extend_len))
     for pwm_idx in range(len(sig_pwms)):
-
-        # name and global index
         pwm_name = sig_pwms[pwm_idx]
         pwm_name_clean = re.sub("HCLUST-\\d+_", "", pwm_name)
         pwm_name_clean = re.sub(".UNK.0.A", "", pwm_name_clean)
@@ -276,11 +260,9 @@ def main():
             [1 if pwm_name in global_name else 0
              for global_name in all_pwms])[0][0]
 
-        # open spacing distr file
+        # open spacing distr file and pull info
         spacing_distr_file = "{}/genome.{}.distribution.spacings.txt.gz".format(TMP_DIR, pwm_name_clean)
         data = pd.read_csv(spacing_distr_file, sep="\t")
-
-        # pull info
         all_pwms_aligned_array[pwm_idx] = data["active"].values
         
     # save out
