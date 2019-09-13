@@ -1,10 +1,30 @@
+#!/bin/bash
+
+# code
+SCRIPT_DIR=~/git/ggr-project/figs/fig_4.homotypic
 
 # data
-SCRIPT_DIR=~/git/ggr-project/figs/fig_4.homotypic
-MOTIFS_FILE=/mnt/lab_data/kundaje/users/dskim89/ggr/nn/inference.2019-02-05/motifs.input_x_grad.background/ggr.scanmotifs.h5
-#MOTIFS_EXTENDED_FILE=/srv/scratch/dskim89/ggr/ggr.tronn.2019-06-17.footprinting/motifs.input_x_grad.lite/ggr.scanmotifs.h5
-SIG_PWMS_FILE=/mnt/lab_data/kundaje/users/dskim89/ggr/nn/inference.2019-03-12/motifs.sig/motifs.adjust.diff.rna_filt.dmim/summary/ggr.pwms_patterns_summary.txt
+SCANMOTIFS_DIR=/mnt/lab_data/kundaje/users/dskim89/ggr/nn/inference.2019-02-05
+INFER_DIR=/mnt/lab_data/kundaje/users/dskim89/ggr/nn/inference.2019-03-12
+SIG_PWMS_FILE=$INFER_DIR/motifs.sig/motifs.adjust.diff.rna_filt.dmim/summary/ggr.pwms_patterns_summary.txt
 
+#MOTIFS_EXTENDED_FILE=/srv/scratch/dskim89/ggr/ggr.tronn.2019-06-17.footprinting/motifs.input_x_grad.lite/ggr.scanmotifs.h5
+
+
+
+# ============================
+# GENOME: HINTS TO MULTIPLICITY/SPACING
+# ============================
+
+UNFILT_SCAN_FILE=$SCANMOTIFS_DIR/motifs.input_x_grad.background/ggr.scanmotifs.h5
+
+# multiplicity as seen in the genome (NN-active hits)
+GENOME_MULT_DIR=genome.multiplicity
+mkdir -p $GENOME_MULT_DIR
+$SCRIPT_DIR/analyze.genome.multiplicity.py $SCRIPT_DIR $GENOME_MULT_DIR $UNFILT_SCAN_FILE $SIG_PWMS_FILE
+
+# data
+#MOTIFS_FILE=/mnt/lab_data/kundaje/users/dskim89/ggr/nn/inference.2019-02-05/motifs.input_x_grad.background/ggr.scanmotifs.h5
 # genome: multiplicity (use all regions)
 #$SCRIPT_DIR/fig_3-b.0.plot.counts.py $MOTIFS_FILE $SIG_PWMS_FILE
 
@@ -70,4 +90,4 @@ mkdir -p $SPACING_GENE_DIR
 # build a manual file to aggregate information
 OUT_DIR=enrichment.summaries
 mkdir -p $OUT_DIR
-$SCRIPT_DIR/summarize_enrichment_results.py $OUT_DIR $SIG_PWMS_FILE $MULTIPLICITY_GENE_DIR $SPACING_GENE_DIR
+#$SCRIPT_DIR/summarize_enrichment_results.py $OUT_DIR $SIG_PWMS_FILE $MULTIPLICITY_GENE_DIR $SPACING_GENE_DIR

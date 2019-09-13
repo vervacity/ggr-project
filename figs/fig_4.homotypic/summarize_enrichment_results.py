@@ -35,6 +35,9 @@ def main():
         pwm_name = re.sub(".UNK.0.A", "", pwm_name)
         print sig_idx, pwm_name
 
+        if "TP53" not in pwm_name:
+            continue
+        
         # summary files
         multiplicity_summary = "{}/{}.summary.filt.txt.gz".format(multiplicity_dir, pwm_name)
         spacing_summary = "{}/tmp/{}.summary.filt.txt.gz".format(spacing_dir, pwm_name)
