@@ -120,7 +120,7 @@ def main():
 
         # skip
         #continue
-        if "TP53" not in pwm_name_clean:
+        if "GRHL" not in pwm_name_clean:
             continue
         
         # check to see which have this pwm and adjust indices

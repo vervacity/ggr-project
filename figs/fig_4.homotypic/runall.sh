@@ -58,13 +58,16 @@ EARLY_MOTIFS=/mnt/lab_data/kundaje/users/dskim89/ggr/nn/inference.2019-02-05/mot
 MID_MOTIFS=/mnt/lab_data/kundaje/users/dskim89/ggr/nn/inference.2019-02-05/motifs.input_x_grad.mid/ggr.scanmotifs.h5
 LATE_MOTIFS=/mnt/lab_data/kundaje/users/dskim89/ggr/nn/inference.2019-02-05/motifs.input_x_grad.late/ggr.scanmotifs.h5
 
-OUT_DIR=multiplicity.gene_sets
-mkdir -p $OUT_DIR
-$SCRIPT_DIR/multiplicity_to_genes.py $OUT_DIR $SIG_PWMS_FILE $LINKS_FILE $BACKGROUND_GENES_FILE $EARLY_MOTIFS $MID_MOTIFS $LATE_MOTIFS
+MULTIPLICITY_GENE_DIR=multiplicity.gene_sets
+mkdir -p $MULTIPLICITY_GENE_DIR
+#$SCRIPT_DIR/multiplicity_to_genes.py $MULTIPLICITY_GENE_DIR $SIG_PWMS_FILE $LINKS_FILE $BACKGROUND_GENES_FILE $EARLY_MOTIFS $MID_MOTIFS $LATE_MOTIFS
 
-OUT_DIR=spacing.gene_sets
-mkdir -p $OUT_DIR
-#$SCRIPT_DIR/spacing_to_genes.py $OUT_DIR $SIG_PWMS_FILE $TSS_FILE $BACKGROUND_GENES_FILE $EARLY_MOTIFS $MID_MOTIFS $LATE_MOTIFS
+SPACING_GENE_DIR=spacing.gene_sets
+mkdir -p $SPACING_GENE_DIR
+#$SCRIPT_DIR/spacing_to_genes.py $SPACING_GENE_DIR $SIG_PWMS_FILE $LINKS_FILE $BACKGROUND_GENES_FILE $EARLY_MOTIFS $MID_MOTIFS $LATE_MOTIFS
 
 # TODO merge results
 # build a manual file to aggregate information
+OUT_DIR=enrichment.summaries
+mkdir -p $OUT_DIR
+$SCRIPT_DIR/summarize_enrichment_results.py $OUT_DIR $SIG_PWMS_FILE $MULTIPLICITY_GENE_DIR $SPACING_GENE_DIR
