@@ -145,11 +145,40 @@ def setup_proximity_links(
 def setup_interaction_links(interaction_file, tss_file):
     """takes links from interaction format and associates them with genes
     """
+    # TODO once we have ABC distance links
     
     return
 
 
+def regions_to_genes_through_links(region_file, links_file, out_file):
+    """intersect regions with link file to get to gene set
+    """
+    assert out_file.endswith(".gz")
+    
+    # intersect
+    tmp_out_file = "links.overlap.tmp.txt.gz"
+    intersect_cmd = (
+        "bedtools intersect -u -a {} -b {} | "
+        "gzip -c > {}").format(
+            links_file, region_file, tmp_out_file)
+    print intersect_cmd
+    os.system(intersect_cmd)
 
+    # read in results
+    results = pd.read_csv(tmp_out_file, sep="\t", header=None)
+    mapping = results[3].str.split(";", n=2, expand=True)
+
+    genes = ",".join(mapping[1].values.tolist()).split(",")
+    genes = sorted(list(set(genes)))
+    results = pd.DataFrame({"gene_id": genes})
+
+    # save out
+    results.to_csv(out_file, sep="\t", compression="gzip", header=True, index=False)
+
+    # clean up
+    os.system("rm {}".format(tmp_out_file))
+
+    return
 
 
 def traj_bed_to_gene_set_by_proximity(
