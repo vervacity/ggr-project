@@ -10,7 +10,149 @@ import pandas as pd
 
 from scipy.stats import pearsonr
 
-def bed_to_gene_set_by_proximity(
+
+def link_by_distance(
+        bed_file,
+        tss_file,
+        out_file,
+        k_nearest=3,
+        max_dist=25000):
+    """bed file to tss file
+    """
+    # bedtools closest
+    tmp_file = "tss.overlap.tmp.txt"
+    closest = "bedtools closest -d -k {} -a {} -b {} > {}".format(
+        k_nearest, bed_file, tss_file, tmp_file)
+    os.system(closest)
+
+    # load results and use distance cutoff
+    data = pd.read_csv(tmp_file, sep="\t", header=None)
+    data = data[data[9] < max_dist]
+
+    # clean up: remove chrom/start/stop of TSS
+    remove_cols = [3, 4, 5]
+    data = data.drop(data.columns[remove_cols], axis=1)
+    
+    # groupby to collapse on region
+    data[9] = data[9].astype(str)
+    data = data.groupby([0,1,2,7,8])[6].apply(",".join).reset_index()
+    data = data[[0,1,2,6,7,8]]
+    data[6] = data[0].map(str) + ":" + data[1].map(str) + "-" + data[2].map(str) + ";" + data[6]
+
+    # save out
+    data.to_csv(out_file, compression="gzip", sep="\t", header=False, index=False)
+    
+    # cleanup
+    os.system("rm {}".format(tmp_file))
+    
+    return
+
+
+def setup_proximity_links(
+        ref_region_file,
+        tss_file,
+        out_links_file,
+        region_signal_file=None,
+        rna_signal_file=None,
+        k_nearest=3,
+        max_dist=25000,
+        corr_coeff_thresh=0,
+        pval_thresh=0.10,
+        is_ggr=True):
+    """actually, just set up links here?
+    then can have a BED file with gene IDs
+    """
+    assert out_links_file.endswith(".gz")
+    
+    # first setup proximal links
+    link_by_distance(
+        ref_region_file, tss_file, out_links_file,
+        k_nearest=k_nearest, max_dist=max_dist)
+    
+    # then read in proximal links, region signal mat, rna signal mat
+    # if signal files are given
+    if region_signal_file is not None:
+        assert rna_signal_file is not None
+
+        # read in links
+        links = pd.read_csv(out_links_file, sep="\t", header=None)
+        mappings = links[3].str.split(";", n=2, expand=True)
+        links["region_id"] = mappings[0]
+        links["genes"] = mappings[1]
+        print links.shape
+        
+        # read in region signals
+        region_signals = pd.read_csv(region_signal_file, sep="\t", header=0)
+        if is_ggr:
+            region_signals = region_signals.drop("d05", axis=1)
+        
+        # read in rna signals
+        rna_signals = pd.read_csv(rna_signal_file, sep="\t", header=0)
+
+        # then for each row, correlate gene to atac
+        filtered_links = []
+        for region_idx in range(links.shape[0]):
+
+            if region_idx % 5000 == 0:
+                print region_idx
+            
+            region_id = links["region_id"].iloc[region_idx]
+            region_linked_genes = links["genes"].iloc[region_idx].split(",")
+            region_signal = region_signals.loc[region_id,:]
+
+            filtered_genes = []
+            for gene_idx in range(len(region_linked_genes)):
+                gene_id = region_linked_genes[gene_idx]
+                try:
+                    gene_signal = rna_signals.loc[gene_id,:]
+                except KeyError:
+                    continue
+                
+                # correlate
+                corr_coeff, pval = pearsonr(
+                    region_signal.values, gene_signal.values)
+
+                # filters
+                if corr_coeff < corr_coeff_thresh:
+                    continue
+
+                if pval > pval_thresh:
+                    continue
+
+                # append if passed filter
+                filtered_genes.append(gene_id)
+
+            # first confirm there are any genes left
+            if len(filtered_genes) == 0:
+                continue
+
+            # pull links, replace genes, and save out
+            link = links.iloc[region_idx].copy()
+            link["genes"] = ",".join(filtered_genes)
+            filtered_links.append(link)
+
+        # concat
+        filtered_links = pd.concat(filtered_links, axis=1).transpose()
+        filtered_links[3] = filtered_links["region_id"].map(str) + ";" + filtered_links["genes"].map(str)
+        filtered_links = filtered_links.drop(["region_id", "genes"], axis=1)
+        
+        # and save this out
+        filtered_links.to_csv(out_links_file, sep="\t", compression="gzip", header=False, index=False)
+
+    return
+
+
+def setup_interaction_links(interaction_file, tss_file):
+    """takes links from interaction format and associates them with genes
+    """
+    
+    return
+
+
+
+
+
+def traj_bed_to_gene_set_by_proximity(
         bed_file,
         tss_file,
         out_file,
@@ -175,5 +317,58 @@ def build_confusion_matrix(traj_bed_files, gene_sets, gene_clusters_file, out_fi
     plot_cmd = "plot.confusion_matrix.R {} {}".format(
         out_file, plot_file)
     print plot_cmd
+    
+    return
+
+
+
+def get_replicate_consistent_links(links_files, out_prefix):
+    """get replicate consistent links
+    """
+    # format link files
+    rep1_tmp_file = "{}.b1_tmp.txt.gz".format(out_prefix)
+    if not os.path.isfile(rep1_tmp_file):
+        reformat = (
+            "zcat {} | "
+            "awk -F ',' '{{ print $1\"\t\"$2 }}' | "
+            "awk -F '\t' '{{ print $1\":\"$2\"-\"$3\",\"$4\"\t\"$5 }}' | "
+            "gzip -c > {}").format(links_files[0], rep1_tmp_file)
+        print reformat
+        os.system(reformat)
+
+    rep2_tmp_file = "{}.b2_tmp.txt.gz".format(out_prefix)
+    if not os.path.isfile(rep2_tmp_file):
+        reformat = (
+            "zcat {} | "
+            "awk -F ',' '{{ print $1\"\t\"$2 }}' | "
+            "awk -F '\t' '{{ print $1\":\"$2\"-\"$3\",\"$4\"\t\"$5 }}' | "
+            "gzip -c > {}").format(links_files[1], rep2_tmp_file)
+        print reformat
+        os.system(reformat)
+    
+    # load in reps and merge to make a table
+    out_mat_file = "{}.reps.mat.txt.gz".format(out_prefix)
+    if False:
+        rep1 = pd.read_csv(rep1_tmp_file, sep="\t", header=None, index_col=0)
+        rep2 = pd.read_csv(rep2_tmp_file, sep="\t", header=None, index_col=0)
+
+        # normalize by num contacts?
+        
+        
+        replicates = rep1.merge(rep2, how="inner", left_index=True, right_index=True)
+        # normalize and filter?
+
+        
+        replicates.to_csv(out_mat_file, sep="\t", compression="gzip", header=False)
+
+    # only keep those with good ABC scores?
+        
+        
+    # plot in R
+    plot_file = "{}.reps.scatter.pdf".format(out_prefix)
+    plot_cmd = "Rscript /users/dskim89/git/ggr-project/R/plot.links.rep_consistency.R {} {}".format(
+        out_mat_file, plot_file)
+    print plot_cmd
+    os.system(plot_cmd)
     
     return
