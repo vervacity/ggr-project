@@ -18,7 +18,7 @@ def main():
     
     # inputs
     SCRIPT_DIR = sys.argv[1]
-    WORK_DIR = sys.argv[2]
+    SIM_DIR = sys.argv[2]
     OUT_DIR = sys.argv[3]
     prefix = "simulations.spacing"
     
@@ -147,7 +147,7 @@ def main():
     sample_fracts = []
     for task_idx in task_indices:
         results_files = sorted(
-            glob.glob("{}/*taskidx-{}*".format(tmp_dir, task_idx)))
+            glob.glob("{}/*taskidx-{}*".format(TMP_DIR, task_idx)))
         task_averages = []
         task_sample_fracts = []
         pwm_names = []
@@ -195,7 +195,7 @@ def main():
     sample_fracts = []
     for task_idx in task_indices:
         results_files = sorted(
-            glob.glob("{}/*taskidx-{}*".format(tmp_dir, task_idx)))
+            glob.glob("{}/*taskidx-{}*".format(TMP_DIR, task_idx)))
         task_averages = []
         task_sample_fracts = []
         pwm_names = []
