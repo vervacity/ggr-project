@@ -20,7 +20,8 @@ def main():
     SCRIPT_DIR = sys.argv[1]
     WORK_DIR = sys.argv[2]
     OUT_DIR = sys.argv[3]
-
+    prefix = "simulations.spacing"
+    
     # set up dirs
     os.system("mkdir -p {}".format(OUT_DIR))
     TMP_DIR = "{}/tmp".format(OUT_DIR)
@@ -73,8 +74,8 @@ def main():
         for task_idx in range(num_tasks):
 
             # results_file
-            task_prefix = "{}.taskidx-{}".format(
-                pwm_name, task_idx)
+            task_prefix = "{}.{}.taskidx-{}".format(
+                prefix, pwm_name, task_idx)
             results_file = "{}/{}.aggregated.txt.gz".format(TMP_DIR, task_prefix)
 
             # run analysis if results file doesn't exist
@@ -129,7 +130,7 @@ def main():
             # plot
             if task_idx in plot_indices:
                 plot_file = "{}/{}.pdf".format(MORE_PLOTS_DIR, task_prefix)
-                plot_cmd = "{}/plot.results.sim.spacing.R {} {}".format(
+                plot_cmd = "{}/plot.spacing.simulations.indiv.R {} {}".format(
                     SCRIPT_DIR, results_file, plot_file)
                 print plot_cmd
                 os.system(plot_cmd)
@@ -237,7 +238,7 @@ def main():
         
     
     # plot
-    plot_cmd = "{}/plot.results.sim.spacing.summary.R {} {}/sim.spacing FALSE {}".format(
+    plot_cmd = "{}/plot.spacing.simulations.summary.R {} {}/simulations.spacing FALSE {}".format(
         SCRIPT_DIR, h5_results_file, OUT_DIR, "ATAC H3K27ac")
     print plot_cmd
     os.system(plot_cmd)
