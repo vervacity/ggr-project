@@ -50,6 +50,7 @@ def main():
         pwm_name = results_file.split("/")[-2]
         pwm_name = re.sub("HCLUST-\\d+_", "", pwm_name)
         pwm_name = re.sub(".UNK.0.A", "", pwm_name)
+        print pwm_name
         
         # read in data
         with h5py.File(results_file, "r") as hf:

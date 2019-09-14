@@ -3,9 +3,12 @@
 # code
 SCRIPT_DIR=~/git/ggr-project/figs/fig_4.homotypic
 
-# data
+# dirs
+GGR_DIR=/mnt/lab_data/kundaje/users/dskim89/ggr/integrative/v1.0.0a
 SCANMOTIFS_DIR=/mnt/lab_data/kundaje/users/dskim89/ggr/nn/inference.2019-02-05
 INFER_DIR=/mnt/lab_data/kundaje/users/dskim89/ggr/nn/inference.2019-03-12
+
+# files
 SIG_PWMS_FILE=$INFER_DIR/motifs.sig/motifs.adjust.diff.rna_filt.dmim/summary/ggr.pwms_patterns_summary.txt
 
 # =================================================
@@ -19,7 +22,7 @@ UNFILT_SCAN_FILE=$SCANMOTIFS_DIR/motifs.input_x_grad.background/ggr.scanmotifs.h
 #$SCRIPT_DIR/analyze.genome.multiplicity.py $SCRIPT_DIR genome.multiplicity $UNFILT_SCAN_FILE $SIG_PWMS_FILE
 
 # spacing as seen in the genome (NN-active hits)
-$SCRIPT_DIR/analyze.genome.spacing.py $SCRIPT_DIR genome.spacing $UNFILT_SCAN_FILE $SIG_PWMS_FILE
+#$SCRIPT_DIR/analyze.genome.spacing.py $SCRIPT_DIR genome.spacing $UNFILT_SCAN_FILE $SIG_PWMS_FILE
 
 # =================================================
 # SIMULATIONS: ISOLATING SINGLE MOTIF EFFECTS
@@ -44,7 +47,6 @@ SIM_SPACING_DHSNEGS_DIR=/mnt/lab_data/kundaje/users/dskim89/ggr/nn/analysis_homo
 # =================================================
 
 # data
-GGR_DIR=/mnt/lab_data/kundaje/users/dskim89/ggr/integrative/v1.0.0a
 ATAC_MASTER_BED=$GGR_DIR/data/ggr.atac.idr.master.bed.gz
 TSS_BED=$GGR_DIR/annotations/ggr.rna.tss.expressed.bed.gz
 ATAC_SIGNAL_MAT=$GGR_DIR/data/ggr.atac.ends.counts.pooled.rlog.mat.txt.gz
@@ -56,8 +58,6 @@ OUT_DIR=linking
 LINKS_FILE=$OUT_DIR/links.bed.gz
 
 # genome: multiplicity 1-3 motifs and gene sets (use dynamic regions)
-SIG_PWMS_FILE=/mnt/lab_data/kundaje/users/dskim89/ggr/nn/inference.2019-03-12/motifs.sig/motifs.adjust.diff.rna_filt.dmim/summary/ggr.pwms_patterns_summary.txt
-#TSS_FILE=/mnt/lab_data/kundaje/users/dskim89/ggr/integrative/v1.0.0a/annotations/ggr.rna.tss.expressed.bed.gz
 BACKGROUND_GENES_FILE=/mnt/lab_data/kundaje/users/dskim89/ggr/integrative/v1.0.0a/data/ggr.rna.counts.pc.expressed.mat.txt.gz
 EARLY_MOTIFS=/mnt/lab_data/kundaje/users/dskim89/ggr/nn/inference.2019-02-05/motifs.input_x_grad.early/ggr.scanmotifs.h5
 MID_MOTIFS=/mnt/lab_data/kundaje/users/dskim89/ggr/nn/inference.2019-02-05/motifs.input_x_grad.mid/ggr.scanmotifs.h5
