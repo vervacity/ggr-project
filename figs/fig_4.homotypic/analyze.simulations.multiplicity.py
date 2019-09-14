@@ -115,8 +115,8 @@ def main():
             # plot
             if task_idx in plot_indices:
                 plot_file = "{}/{}.pdf".format(MORE_PLOTS_DIR, task_prefix)
-                plot_cmd = "Rscript ~/git/ggr-project/figs/fig_4.homotypic/plot.results.sim.multiplicity.R {} {}".format(
-                    results_file, plot_file)
+                plot_cmd = "{}/plot.results.multiplicity.R {} {}".format(
+                    SCRIPT_DIR, results_file, plot_file)
                 print plot_cmd
                 os.system(plot_cmd)
                 
@@ -132,7 +132,7 @@ def main():
     sample_fracts = []
     for task_idx in task_indices:
         results_files = sorted(
-            glob.glob("{}/*taskidx-{}*".format(tmp_dir, task_idx)))
+            glob.glob("{}/*taskidx-{}*".format(TMP_DIR, task_idx)))
         task_averages = []
         task_sample_fracts = []
         pwm_names = []
@@ -152,7 +152,8 @@ def main():
             pwm_names.append(pwm_name)
 
         # save out averages
-        # TODO potentially need to do a merge, not an append <- to make sure pwm names match?
+        # note that groupby has sort=True by default, so should be ordered
+        # so can concatenate in list without needing to merge on name
         task_averages = pd.concat(task_averages, axis=0)
         averages.append(task_averages.values)
 
@@ -193,7 +194,7 @@ def main():
     sample_fracts = []
     for task_idx in task_indices:
         results_files = sorted(
-            glob.glob("{}/*taskidx-{}*".format(tmp_dir, task_idx)))
+            glob.glob("{}/*taskidx-{}*".format(TMP_DIR, task_idx)))
         task_averages = []
         task_sample_fracts = []
         pwm_names = []
@@ -212,7 +213,6 @@ def main():
             pwm_names.append(pwm_name)
 
         # save out averages
-        # TODO potentially need to do a merge, not an append
         task_averages = pd.concat(task_averages, axis=0)
         averages.append(task_averages.values)
 
@@ -235,7 +235,7 @@ def main():
         
     
     # plot
-    plot_cmd = "{}/plot.results.multiplicity.summary.R {} {}/counts.sim FALSE {}".format(
+    plot_cmd = "{}/plot.results.multiplicity.summary.R {} {}/simulations.multiplicity FALSE {}".format(
         SCRIPT_DIR, h5_results_file, OUT_DIR, "ATAC H3K27ac")
     print plot_cmd
     os.system(plot_cmd)

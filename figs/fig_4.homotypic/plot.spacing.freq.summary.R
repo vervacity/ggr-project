@@ -21,6 +21,7 @@ smoothen <- function(data) {
 # args
 args <- commandArgs(trailingOnly=TRUE)
 data_file <- args[1]
+plot_file <- args[2]
 
 # load data
 data <- read.table(
@@ -136,9 +137,8 @@ plot_heatmap <- function(data, plot_title) {
 }
 
 
-plot_file <- "test.pdf"
 pdf(plot_file, height=3.5, width=1.3, useDingbats=FALSE, family="ArialMT")
-plot_heatmap(data, "test")
+plot_heatmap(data, "Summary")
 dev.off()
 
 

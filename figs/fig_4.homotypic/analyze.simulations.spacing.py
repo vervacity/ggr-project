@@ -12,13 +12,21 @@ import pandas as pd
 def main():
     """analyze density sims
     """
-    # set up
-    WORK_DIR = sys.argv[1]
-    OUT_DIR = sys.argv[2]
-    more_plots_dir = "{}/plots".format(OUT_DIR)
-    os.system("mkdir -p {}".format(more_plots_dir))
-    tmp_dir = "{}/tmp".format(OUT_DIR)
-    os.system("mkdir -p {}".format(tmp_dir))
+    # ==============================
+    # SETUP
+    # ==============================
+    
+    # inputs
+    SCRIPT_DIR = sys.argv[1]
+    WORK_DIR = sys.argv[2]
+    OUT_DIR = sys.argv[3]
+
+    # set up dirs
+    os.system("mkdir -p {}".format(OUT_DIR))
+    TMP_DIR = "{}/tmp".format(OUT_DIR)
+    os.system("mkdir -p {}".format(TMP_DIR))
+    MORE_PLOTS_DIR = "{}/plots".format(OUT_DIR)
+    os.system("mkdir -p {}".format(MORE_PLOTS_DIR))
     
     # keys
     predictions_key = "logits.norm"
@@ -28,21 +36,23 @@ def main():
 
     # params
     plot_indices = [0,6,12,13,14,15]
+
+    # ==============================
+    # ANALYZE
+    # ==============================
     
     # analyze each pwm
     results_files = sorted(
-        glob.glob("{}/*/ggr.predictions.h5".format(WORK_DIR)))
+        glob.glob("{}/*/ggr.predictions.h5".format(SIM_DIR)))
     all_results = None
     for results_file in results_files:
-
-        continue
         
         # pwm name
         orig_pwm_name = results_file.split("/")[-2]
         pwm_name = re.sub("HCLUST-\\d+_", "", orig_pwm_name)
         pwm_name = re.sub(".UNK.0.A", "", pwm_name)
-        print pwm_name
 
+        # TODO analyze directionality? <- but then will need to find these in genome...
         # for now, only analyze FWD pwm
         keep_grammar_string = ",".join(
             ["{}+".format(orig_pwm_name),
@@ -60,73 +70,77 @@ def main():
         
         # divide by task and analyze per task
         num_tasks = predictions.shape[1]
-        for task_idx in range(num_tasks):  # TODO - just plot specific ones?
+        for task_idx in range(num_tasks):
 
-            # get task data
+            # results_file
             task_prefix = "{}.taskidx-{}".format(
                 pwm_name, task_idx)
-            task_data = pd.DataFrame({
-                "sample_id": sample_ids,
-                "pwm_dist": pwm_dist,
-                "prediction": predictions[:,task_idx],
-                "grammar_string": grammar_string})
-            task_data_norm = None
-            
-            # for each sample, subtract background
-            for sample_idx in range(len(unique_sample_ids)):
-                sample_id = unique_sample_ids[sample_idx]
-                sample_data = task_data[task_data["sample_id"] == sample_id]
+            results_file = "{}/{}.aggregated.txt.gz".format(TMP_DIR, task_prefix)
 
-                # confirm that background exists
-                if sample_data[sample_data["grammar_string"] == "BACKGROUND"].shape[0] == 0:
+            # run analysis if results file doesn't exist
+            if not os.path.isfile(results_file):
+
+                # get task data
+                task_data = pd.DataFrame({
+                    "sample_id": sample_ids,
+                    "pwm_dist": pwm_dist,
+                    "prediction": predictions[:,task_idx],
+                    "grammar_string": grammar_string})
+                task_data_norm = None
+
+                # for each sample, subtract background
+                for sample_idx in range(len(unique_sample_ids)):
+                    sample_id = unique_sample_ids[sample_idx]
+                    sample_data = task_data[task_data["sample_id"] == sample_id]
+
+                    # confirm that background exists
+                    if sample_data[sample_data["grammar_string"] == "BACKGROUND"].shape[0] == 0:
+                        continue
+
+                    # confirm that there is at least 1 other sample
+                    if sample_data[sample_data["grammar_string"] != "BACKGROUND"].shape[0] == 0:
+                        continue
+
+                    # delete background
+                    background_val = sample_data["prediction"][sample_data["grammar_string"] == "BACKGROUND"].values[0]
+                    sample_data = sample_data[sample_data["grammar_string"] != "BACKGROUND"]
+                    sample_data["prediction"] = sample_data["prediction"] - background_val
+
+                    # if the sequence got worse (negative after delete), don't save out
+                    if np.mean(sample_data["prediction"].values) <= 0:
+                        continue
+
+                    # for now, only keep FWD pwm setup
+                    if True:
+                        sample_data = sample_data[sample_data["grammar_string"] == keep_grammar_string]
+                        sample_data = sample_data.drop(["grammar_string"], axis=1)
+
+                    # save out
+                    if sample_idx == 0:
+                        task_data_norm = sample_data
+                    else:
+                        task_data_norm = pd.concat([task_data_norm, sample_data], axis=0)
+
+                # and save out to plot in R
+                if task_data_norm is None:
                     continue
-
-                # confirm that there is at least 1 other sample
-                if sample_data[sample_data["grammar_string"] != "BACKGROUND"].shape[0] == 0:
-                    continue
-
-                # delete background
-                background_val = sample_data["prediction"][sample_data["grammar_string"] == "BACKGROUND"].values[0]
-                sample_data = sample_data[sample_data["grammar_string"] != "BACKGROUND"]
-                sample_data["prediction"] = sample_data["prediction"] - background_val
-
-                # if the sequence got worse (negative after delete), don't save out
-                if np.mean(sample_data["prediction"].values) <= 0:
-                    continue
-
-                # for now, only keep FWD pwm setup
-                if True:
-                    sample_data = sample_data[sample_data["grammar_string"] == keep_grammar_string]
-                    sample_data = sample_data.drop(["grammar_string"], axis=1)
-                    
-                # save out
-                if sample_idx == 0:
-                    task_data_norm = sample_data
-                else:
-                    task_data_norm = pd.concat([task_data_norm, sample_data], axis=0)
-
-            # and save out to plot in R
-            if task_data_norm is None:
-                continue
-            results_file = "{}/{}.aggregated.txt.gz".format(tmp_dir, task_prefix)
-            task_data_norm.to_csv(results_file, header=True, index=False, sep="\t", compression="gzip")
+                task_data_norm.to_csv(results_file, header=True, index=False, sep="\t", compression="gzip")
 
             # plot
             if task_idx in plot_indices:
-                plot_file = "{}/{}.pdf".format(more_plots_dir, task_prefix)
-                plot_cmd = "Rscript ~/git/ggr-project/figs/fig_4.homotypic/plot.results.sim.spacing.R {} {}".format(
-                    results_file, plot_file)
+                plot_file = "{}/{}.pdf".format(MORE_PLOTS_DIR, task_prefix)
+                plot_cmd = "{}/plot.results.sim.spacing.R {} {}".format(
+                    SCRIPT_DIR, results_file, plot_file)
                 print plot_cmd
                 os.system(plot_cmd)
-        
-    # and then plot out a joint picture across tasks
+
+    # ==============================
+    # SUMMARIZE
+    # ==============================
     # build the matrix by considering: fraction of samples that activated, also
     # did the average across the samples activate enough
-    # ATAC: tasks 0,6,12
-    # save all this out to hdf5 file so can plot the same way as the other file
-    h5_results_file = "{}/motifs.sims.dist_v_activity.h5".format(OUT_DIR)
+    h5_results_file = "{}/simulations.spacing_v_activity.h5".format(OUT_DIR)
     keys = ["ATAC", "H3K27ac"]
-    
     task_indices = [0, 6, 12]
     averages = []
     sample_fracts = []
@@ -151,7 +165,8 @@ def main():
             pwm_names.append(pwm_name)
 
         # save out averages
-        # TODO potentially need to do a merge, not an append
+        # note that groupby has sort=True by default, so should be ordered
+        # so can concatenate in list without needing to merge on name
         task_averages = pd.concat(task_averages, axis=0)
         averages.append(task_averages.values)
 
@@ -222,8 +237,8 @@ def main():
         
     
     # plot
-    plot_cmd = "Rscript ~/git/ggr-project/figs/fig_4.homotypic/plot.results.sim.spacing.summary.R {} {}/sim.spacing FALSE {}".format(
-        h5_results_file, OUT_DIR, "ATAC H3K27ac")
+    plot_cmd = "{}/plot.results.sim.spacing.summary.R {} {}/sim.spacing FALSE {}".format(
+        SCRIPT_DIR, h5_results_file, OUT_DIR, "ATAC H3K27ac")
     print plot_cmd
     os.system(plot_cmd)
 
