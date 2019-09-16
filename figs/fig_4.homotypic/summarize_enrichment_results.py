@@ -20,6 +20,7 @@ def main():
     # TODO manual file for specific summaries
     
     # dirs
+    os.system("mkdir -p {}".format(OUT_DIR))
     tmp_dir = "{}/tmp".format(OUT_DIR)
     os.system("mkdir -p {}".format(tmp_dir))
     
@@ -34,9 +35,6 @@ def main():
         pwm_name = re.sub("HCLUST-\\d+_", "", pwm_name)
         pwm_name = re.sub(".UNK.0.A", "", pwm_name)
         print sig_idx, pwm_name
-
-        if "TP53" not in pwm_name:
-            continue
         
         # summary files
         multiplicity_summary = "{}/{}.summary.filt.txt.gz".format(multiplicity_dir, pwm_name)
@@ -54,7 +52,6 @@ def main():
         os.system(plot_cmd)
         
         # if present in manual file, read in and select correct multiplicity and spacing
-        quit()
 
     return
 

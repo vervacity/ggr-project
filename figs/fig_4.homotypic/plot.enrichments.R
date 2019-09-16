@@ -111,4 +111,4 @@ ggplot(data, aes(y=term.name)) +
         aes(x=range, size=log10pval)) +
     facet_grid(. ~ category, scales="free_x", space="free_x") +
     theme_bw()        
-ggsave("test.pdf", width=6, height=6)
+ggsave(plot_file, width=6, height=6)

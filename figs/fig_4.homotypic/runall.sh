@@ -40,7 +40,7 @@ SIM_SPACING_DHSNEGS_DIR=/mnt/lab_data/kundaje/users/dskim89/ggr/nn/analysis_homo
 
 # spacing as seen in simulations
 #$SCRIPT_DIR/analyze.simulations.spacing.py $SCRIPT_DIR $SIM_SPACING_ALLNEGS_DIR simulations.spacing.full_negs
-$SCRIPT_DIR/analyze.simulations.spacing.py $SCRIPT_DIR $SIM_SPACING_DHSNEGS_DIR simulations.spacing.dhs_negs
+#$SCRIPT_DIR/analyze.simulations.spacing.py $SCRIPT_DIR $SIM_SPACING_DHSNEGS_DIR simulations.spacing.dhs_negs
 
 # =================================================
 # BACK TO GENOME: USE MULTIPLICITY/SPACING FOR FUNCTION
@@ -63,13 +63,12 @@ EARLY_MOTIFS=/mnt/lab_data/kundaje/users/dskim89/ggr/nn/inference.2019-02-05/mot
 MID_MOTIFS=/mnt/lab_data/kundaje/users/dskim89/ggr/nn/inference.2019-02-05/motifs.input_x_grad.mid/ggr.scanmotifs.h5
 LATE_MOTIFS=/mnt/lab_data/kundaje/users/dskim89/ggr/nn/inference.2019-02-05/motifs.input_x_grad.late/ggr.scanmotifs.h5
 
-MULTIPLICITY_GENE_DIR=multiplicity.gene_sets
-#$SCRIPT_DIR/multiplicity_to_genes.py $MULTIPLICITY_GENE_DIR $SIG_PWMS_FILE $LINKS_FILE $BACKGROUND_GENES_FILE $EARLY_MOTIFS $MID_MOTIFS $LATE_MOTIFS
+MULTIPLICITY_GENE_DIR=genome.multiplicity.gene_sets
+#$SCRIPT_DIR/analyze.genome.multiplicity.genes.py $MULTIPLICITY_GENE_DIR $SIG_PWMS_FILE $LINKS_FILE $BACKGROUND_GENES_FILE $EARLY_MOTIFS $MID_MOTIFS $LATE_MOTIFS
 
-SPACING_GENE_DIR=spacing.gene_sets
+SPACING_GENE_DIR=genome.spacing.gene_sets
 #$SCRIPT_DIR/spacing_to_genes.py $SPACING_GENE_DIR $SIG_PWMS_FILE $LINKS_FILE $BACKGROUND_GENES_FILE $EARLY_MOTIFS $MID_MOTIFS $LATE_MOTIFS
 
 # TODO merge results
 # build a manual file to aggregate information
-OUT_DIR=enrichment.summaries
-#$SCRIPT_DIR/summarize_enrichment_results.py $OUT_DIR $SIG_PWMS_FILE $MULTIPLICITY_GENE_DIR $SPACING_GENE_DIR
+$SCRIPT_DIR/summarize_enrichment_results.py grammar.homotypic.enrichments $SIG_PWMS_FILE $MULTIPLICITY_GENE_DIR $SPACING_GENE_DIR

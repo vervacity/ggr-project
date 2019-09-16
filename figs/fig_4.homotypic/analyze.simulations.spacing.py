@@ -52,6 +52,7 @@ def main():
         orig_pwm_name = results_file.split("/")[-2]
         pwm_name = re.sub("HCLUST-\\d+_", "", orig_pwm_name)
         pwm_name = re.sub(".UNK.0.A", "", pwm_name)
+        print pwm_name
 
         # TODO analyze directionality? <- but then will need to find these in genome...
         # for now, only analyze FWD pwm
