@@ -2,12 +2,12 @@
 """
 
 import os
-
-from collections import Counter
+import gzip
 
 import numpy as np
 import pandas as pd
 
+from collections import Counter
 from scipy.stats import pearsonr
 
 
@@ -85,7 +85,7 @@ def setup_proximity_links(
         region_signals = pd.read_csv(region_signal_file, sep="\t", header=0)
         if is_ggr:
             region_signals = region_signals.drop("d05", axis=1)
-        
+            
         # read in rna signals
         rna_signals = pd.read_csv(rna_signal_file, sep="\t", header=0)
 
@@ -99,12 +99,17 @@ def setup_proximity_links(
             region_id = links["region_id"].iloc[region_idx]
             region_linked_genes = links["genes"].iloc[region_idx].split(",")
             region_signal = region_signals.loc[region_id,:]
-
-            filtered_genes = []
+            region_signal_str = ",".join(
+                ["{:0.3f}".format(val) for val in region_signal.values])
+            
+            #filtered_genes = []
+            filtered_genes = {}
             for gene_idx in range(len(region_linked_genes)):
                 gene_id = region_linked_genes[gene_idx]
                 try:
                     gene_signal = rna_signals.loc[gene_id,:]
+                    gene_signal_str = ",".join(
+                        ["{:0.3f}".format(val) for val in gene_signal.values])
                 except KeyError:
                     continue
                 
@@ -120,21 +125,24 @@ def setup_proximity_links(
                     continue
 
                 # append if passed filter
-                filtered_genes.append(gene_id)
-
+                filtered_genes[gene_id] = gene_signal_str
+                
             # first confirm there are any genes left
-            if len(filtered_genes) == 0:
+            if len(filtered_genes.keys()) == 0:
                 continue
-
+            
             # pull links, replace genes, and save out
             link = links.iloc[region_idx].copy()
-            link["genes"] = ",".join(filtered_genes)
+            link["region_signal"] = region_signal_str
+            link["genes"] = ",".join([
+                "{}:[{}]".format(gene_id, filtered_genes[gene_id])
+                for gene_id in filtered_genes.keys()])
             filtered_links.append(link)
 
         # concat
         filtered_links = pd.concat(filtered_links, axis=1).transpose()
-        filtered_links[3] = filtered_links["region_id"].map(str) + ";" + filtered_links["genes"].map(str)
-        filtered_links = filtered_links.drop(["region_id", "genes"], axis=1)
+        filtered_links[3] = "region_id=" + filtered_links["region_id"].map(str) + ";region_signal=[" + filtered_links["region_signal"].map(str) + "];genes=" + filtered_links["genes"].map(str)
+        filtered_links = filtered_links.drop(["region_id", "region_signal", "genes"], axis=1)
         
         # and save this out
         filtered_links.to_csv(out_links_file, sep="\t", compression="gzip", header=False, index=False)
@@ -164,16 +172,59 @@ def regions_to_genes_through_links(region_file, links_file, out_file):
     print intersect_cmd
     os.system(intersect_cmd)
 
+    # summaries
+    region_signals = []
+    rna_signals = []
+    gene_ids = []
+    
     # read in results
     results = pd.read_csv(tmp_out_file, sep="\t", header=None)
-    mapping = results[3].str.split(";", n=2, expand=True)
+    print results
 
-    genes = ",".join(mapping[1].values.tolist()).split(",")
-    genes = sorted(list(set(genes)))
-    results = pd.DataFrame({"gene_id": genes})
+    # extract data from metadata field
+    for result_idx in range(results.shape[0]):
+        # make a metadata dict
+        metadata = results[3][result_idx].split(";")
+        metadata = dict([key_val.split("=") for key_val in metadata])
+        
+        # adjust region signals
+        metadata["region_signal"] = [
+            float(val)
+            for val in metadata["region_signal"].strip("[").strip("]").split(",")]
+        
+        # adjust gene signals
+        metadata["genes"] = metadata["genes"].split("],")
+        genes = {}
+        for gene_str_idx in range(len(metadata["genes"])):
+            gene_id, signal = metadata["genes"][gene_str_idx].split(":")
+            signal = [
+                float(val)
+                for val in signal.strip("[").strip("]").split(",")]
+            genes[gene_id] = signal
+        metadata["genes"] = genes
 
+        # add to summaries
+        region_signals.append(np.array(metadata["region_signal"]))
+        for gene_id in metadata["genes"].keys():
+            rna_signals.append(np.array(metadata["genes"][gene_id]))
+
+        # keep genes
+        gene_ids.append(metadata["genes"].keys())
+            
+    # summarize
+    region_signal_mean = np.mean(np.stack(region_signals, axis=0), axis=0)
+    rna_signal_mean = np.mean(np.stack(rna_signals, axis=0), axis=0)
+    gene_ids = np.concatenate(gene_ids, axis=0)
+    gene_ids = sorted(list(set(gene_ids.tolist())))
+    results = pd.DataFrame({"gene_id": gene_ids})
+    
     # save out
-    results.to_csv(out_file, sep="\t", compression="gzip", header=True, index=False)
+    with gzip.open(out_file, "w") as out:
+        comment_line = "#region_signal={};rna_signal={}\n".format(
+            ",".join(["{:0.3f}".format(val) for val in region_signal_mean.tolist()]),
+            ",".join(["{:0.3f}".format(val) for val in rna_signal_mean.tolist()]))
+        out.write(comment_line)
+    results.to_csv(out_file, mode="a", sep="\t", compression="gzip", header=True, index=False)
 
     # clean up
     os.system("rm {}".format(tmp_out_file))

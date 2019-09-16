@@ -55,7 +55,8 @@ RNA_SIGNAL_MAT=$GGR_DIR/results/rna/timeseries/matrices/ggr.rna.counts.pc.expres
 # set up links
 OUT_DIR=linking
 #$SCRIPT_DIR/setup_links.py $ATAC_MASTER_BED $TSS_BED $ATAC_SIGNAL_MAT $RNA_SIGNAL_MAT $OUT_DIR
-LINKS_FILE=$OUT_DIR/links.bed.gz
+#LINKS_FILE=$OUT_DIR/links.bed.gz
+LINKS_FILE=$OUT_DIR/links.proximity.k-2.d-25000.bed.gz 
 
 # genome: multiplicity 1-3 motifs and gene sets (use dynamic regions)
 BACKGROUND_GENES_FILE=/mnt/lab_data/kundaje/users/dskim89/ggr/integrative/v1.0.0a/data/ggr.rna.counts.pc.expressed.mat.txt.gz
@@ -64,12 +65,11 @@ MID_MOTIFS=/mnt/lab_data/kundaje/users/dskim89/ggr/nn/inference.2019-02-05/motif
 LATE_MOTIFS=/mnt/lab_data/kundaje/users/dskim89/ggr/nn/inference.2019-02-05/motifs.input_x_grad.late/ggr.scanmotifs.h5
 
 MULTIPLICITY_GENE_DIR=genome.multiplicity.gene_sets
-#$SCRIPT_DIR/analyze.genome.multiplicity.genes.py $MULTIPLICITY_GENE_DIR $SIG_PWMS_FILE $LINKS_FILE $BACKGROUND_GENES_FILE $EARLY_MOTIFS $MID_MOTIFS $LATE_MOTIFS
+$SCRIPT_DIR/analyze.genome.multiplicity.genes.py $MULTIPLICITY_GENE_DIR $SIG_PWMS_FILE $LINKS_FILE $BACKGROUND_GENES_FILE $EARLY_MOTIFS $MID_MOTIFS $LATE_MOTIFS
 
 SPACING_GENE_DIR=genome.spacing.gene_sets
 #$SCRIPT_DIR/spacing_to_genes.py $SPACING_GENE_DIR $SIG_PWMS_FILE $LINKS_FILE $BACKGROUND_GENES_FILE $EARLY_MOTIFS $MID_MOTIFS $LATE_MOTIFS
 
 # merge results
 # uses a manually curated file to aggregate information
-GRAMMARS=grammars.homotypic.manually_curated.txt
-$SCRIPT_DIR/summarize_enrichment_results.py grammar.homotypic.enrichments $SIG_PWMS_FILE $MULTIPLICITY_GENE_DIR $SPACING_GENE_DIR $GRAMMARS
+#$SCRIPT_DIR/summarize_enrichment_results.py grammar.homotypic.enrichments $SIG_PWMS_FILE $MULTIPLICITY_GENE_DIR $SPACING_GENE_DIR $GRAMMARS

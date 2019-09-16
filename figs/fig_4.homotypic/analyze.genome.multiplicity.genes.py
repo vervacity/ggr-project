@@ -152,8 +152,6 @@ def main():
                     (thresholded_summary["domain"] == "BP") |
                     (thresholded_summary["domain"] == "CC") |
                     (thresholded_summary["domain"] == "rea")]
-                #thresholded_summary = thresholded_summary[thresholded_summary["domain"] == "rea"]
-                #thresholded_summary = thresholded_summary[thresholded_summary["domain"] == "BP"]
                 thresholded_summary = thresholded_summary[
                     ["term.id", "p.value", "term.name"]]
                 thresholded_summary["count_threshold"] = count_threshold
@@ -170,6 +168,7 @@ def main():
                     summary_df = pd.concat([summary_df, thresholded_summary], axis=0)
                     summary_df = summary_df.sort_values("term.name")
 
+        # clean up summary
         summary_df["log10pval"] = -np.log10(summary_df["p.value"].values)
         summary_df = summary_df.drop("p.value", axis=1)
         summary_file = "{}/{}.summary.txt.gz".format(tmp_dir, pwm_name)

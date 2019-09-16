@@ -26,7 +26,8 @@ def main():
     pval_thresh = 1 #0.10
     
     # set up links
-    links_file = "{}/links.bed.gz".format(OUT_DIR)
+    links_file = "{}/links.proximity.k-{}.d-{}.bed.gz".format(
+        OUT_DIR, k_nearest, max_dist)
     setup_proximity_links(
         ref_regions_bed_file,
         tss_file,
