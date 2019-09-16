@@ -69,6 +69,7 @@ MULTIPLICITY_GENE_DIR=genome.multiplicity.gene_sets
 SPACING_GENE_DIR=genome.spacing.gene_sets
 #$SCRIPT_DIR/spacing_to_genes.py $SPACING_GENE_DIR $SIG_PWMS_FILE $LINKS_FILE $BACKGROUND_GENES_FILE $EARLY_MOTIFS $MID_MOTIFS $LATE_MOTIFS
 
-# TODO merge results
-# build a manual file to aggregate information
-$SCRIPT_DIR/summarize_enrichment_results.py grammar.homotypic.enrichments $SIG_PWMS_FILE $MULTIPLICITY_GENE_DIR $SPACING_GENE_DIR
+# merge results
+# uses a manually curated file to aggregate information
+GRAMMARS=grammars.homotypic.manually_curated.txt
+$SCRIPT_DIR/summarize_enrichment_results.py grammar.homotypic.enrichments $SIG_PWMS_FILE $MULTIPLICITY_GENE_DIR $SPACING_GENE_DIR $GRAMMARS
