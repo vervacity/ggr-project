@@ -39,8 +39,8 @@ SIM_SPACING_DHSNEGS_DIR=/mnt/lab_data/kundaje/users/dskim89/ggr/nn/analysis_homo
 #$SCRIPT_DIR/analyze.simulations.multiplicity.py $SCRIPT_DIR $SIM_MULT_DHSNEGS_DIR simulations.multiplicity.dhs_negs
 
 # spacing as seen in simulations
-$SCRIPT_DIR/analyze.simulations.spacing.py $SCRIPT_DIR $SIM_SPACING_ALLNEGS_DIR simulations.spacing.full_negs
-#$SCRIPT_DIR/analyze.simulations.spacing.py $SCRIPT_DIR $SIM_SPACING_DHSNEGS_DIR simulations.spacing.dhs_negs
+#$SCRIPT_DIR/analyze.simulations.spacing.py $SCRIPT_DIR $SIM_SPACING_ALLNEGS_DIR simulations.spacing.full_negs
+$SCRIPT_DIR/analyze.simulations.spacing.py $SCRIPT_DIR $SIM_SPACING_DHSNEGS_DIR simulations.spacing.dhs_negs
 
 # =================================================
 # BACK TO GENOME: USE MULTIPLICITY/SPACING FOR FUNCTION

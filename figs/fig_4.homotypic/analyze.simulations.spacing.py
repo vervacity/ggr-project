@@ -152,7 +152,7 @@ def main():
         task_sample_fracts = []
         pwm_names = []
         for results_file in results_files:
-            pwm_name = os.path.basename(results_file).split(".")[0]
+            pwm_name = os.path.basename(results_file).split(".")[2]
             data = pd.read_csv(results_file, sep="\t")
             # get average results
             data_tmp = data[["prediction", "pwm_dist"]]
@@ -200,7 +200,7 @@ def main():
         task_sample_fracts = []
         pwm_names = []
         for results_file in results_files:
-            pwm_name = os.path.basename(results_file).split(".")[0]
+            pwm_name = os.path.basename(results_file).split(".")[2]
             data = pd.read_csv(results_file, sep="\t")
             # get average results
             data_tmp = data[["prediction", "pwm_dist"]]
