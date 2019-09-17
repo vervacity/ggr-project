@@ -523,15 +523,117 @@ def reconcile_interaction_mat(data):
 
 
 
+def reconcile_interactions(links_files, out_dir, method="pooled"):
+    """reconcile interactions so that they'll have the same IDs
+    """
+    # adjust for just regions, to intersect in next step
+    adj_links_files = []
+    for links_file in links_files:
+        adj_links_file = "{}/{}.unique.bed.gz".format(
+            out_dir,
+            os.path.basename(links_file).split(".bed")[0].split(".txt")[0])
+        adjust_cmd = (
+            "zcat {} | "
+            "awk -F '\t' '{{ print $1\"\t\"$2\"\t\"$3 }}' | "
+            "sort -k1,1 -k2,2n | "
+            "uniq | "
+            "gzip -c > {}").format(
+                links_file, adj_links_file)
+        print adjust_cmd
+        #os.system(adjust_cmd)
+        adj_links_files.append(adj_links_file)
+
+    # reconcile
+    reconciled_files = []
+    if method == "pooled":
+        # if matching to pooled links, intersect each rep
+        # with pooled file to get mapping,
+        # then adjust IDs
+        pooled_file = adj_links_files[0]
+        reconciled_files.append(links_files[0])
+        for link_file_idx in range(1, len(adj_links_files)):
+            # intersect w pooled file to get mapping
+            links_file = adj_links_files[link_file_idx]
+            tmp_file = "{}/{}.mapping.txt.gz".format(
+                out_dir,
+                os.path.basename(links_file).split(".bed")[0].split(".txt")[0])
+            intersect_cmd = (
+                "bedtools intersect -wao -a {} -b {} | "
+                "awk -F '\t' '{{ print $1\":\"$2\"-\"$3\"\t\"$4\":\"$5\"-\"$6\"\t\"$7 }}' | "
+                "gzip -c > {}").format(
+                    links_file, pooled_file, tmp_file)
+            print intersect_cmd
+            #os.system(intersect_cmd)
+
+            # read in the mapping
+            mapping = {}
+            best_overlap_lens = {}
+            with gzip.open(tmp_file, "r") as fp:
+                for line in fp:
+                    fields = line.strip().split("\t")
+                    # check if actually null mapping here?
+                    try:
+                        best_overlap_len = best_overlap_lens[fields[0]]
+                        if int(fields[2]) < best_overlap_len:
+                            mapping[fields[0]] = fields[1]
+                            best_overlap_lens[fields[0]] = int(fields[2])
+                    except:
+                        mapping[fields[0]] = fields[1]
+                        best_overlap_lens[fields[0]] = int(fields[2])
+
+            reconcile_file = "{}/{}.matched.txt.gz".format(
+                out_dir,
+                os.path.basename(links_file).split(".bed")[0].split(".txt")[0])
+            with gzip.open(links_files[link_file_idx], "r") as fp:
+                with gzip.open(reconcile_file, "w") as out:
+                    for line in fp:
+                        fields = line.strip().split("\t")
+                        start_id = "{}:{}-{}".format(
+                            fields[0], fields[1], fields[2])
+                        end_id = fields[3].split(",")[0]
+                        signal_val = fields[3].split(",")[1]
+                        
+                        # adjust start end of interaction
+                        # but only adjust if there is a mapping val
+                        if mapping[start_id] != "-1":
+                            start_id = mapping[start_id]
+                        
+                        # adjust stop end of interaction
+                        if mapping[end_id] != ".:-1--1":
+                            end_id = mapping[end_id]
+
+                        # new line
+                        adj_line = "{}\t{}\t{}\t{},{}\t{}\n".format(
+                            start_id.split(":")[0],
+                            start_id.split(":")[1].split("-")[0],
+                            start_id.split(":")[1].split("-")[1],
+                            end_id,
+                            signal_val,
+                            fields[4],
+                            fields[5])
+                        
+                        # write out
+                        out.write(adj_line)
+
+            reconciled_files.append(reconcile_file)
+            
+    # TODO clean up
+    
+            
+    return reconciled_files
+
+
+
 def get_replicate_consistent_links(
         pooled_file, links_files, out_prefix):
     """get replicate consistent links
     """
-    # FIRST, get consensus region IDs - perform overlaps and get union?
-    # get union and replace IDs. then keep a dict that tracks ID to new ID,
-    # so that can consistently re-ID everything...
-    # master regions - use POOL as master, then intersect both with pool.
+    # out dir
+    out_dir = os.path.dirname(out_prefix)
     
+    # map to pooled space
+    matched_links_files = reconcile_interactions(
+        [pooled_file] + links_files, out_dir, method="pooled")
     
     # format link files
     pooled_tmp_file = "{}.pooled.tmp.txt.gz".format(out_prefix)

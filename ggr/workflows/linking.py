@@ -148,6 +148,7 @@ def runall(args, prefix):
             pooled_file,
             rep_link_files,
             link_prefix)
+        quit()
 
     quit()
 
