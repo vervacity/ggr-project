@@ -428,9 +428,12 @@ def reformat_interaction_file(interaction_file, out_file, remove_dups=True):
                         fields[1], fields[0], fields[2])
                     if reciprocal not in seen_ids:
                         # check that first is always smaller than second
-                        first_start = int(fields[0].split(":")[1].split("-")[0])
-                        second_start = int(fields[1].split(":")[1].split("-")[0])
-                        assert first_start <= second_start, line
+                        try:
+                            first_start = int(fields[0].split(":")[1].split("-")[0])
+                            second_start = int(fields[1].split(":")[1].split("-")[0])
+                        except:
+                            print line
+                        #assert first_start <= second_start, line
                         # and write out
                         out.write(line)
                         seen_ids.add(line)
@@ -540,7 +543,7 @@ def reconcile_interactions(links_files, out_dir, method="pooled"):
             "gzip -c > {}").format(
                 links_file, adj_links_file)
         print adjust_cmd
-        #os.system(adjust_cmd)
+        os.system(adjust_cmd)
         adj_links_files.append(adj_links_file)
 
     # reconcile
@@ -563,8 +566,8 @@ def reconcile_interactions(links_files, out_dir, method="pooled"):
                 "gzip -c > {}").format(
                     links_file, pooled_file, tmp_file)
             print intersect_cmd
-            #os.system(intersect_cmd)
-
+            os.system(intersect_cmd)
+            
             # read in the mapping
             mapping = {}
             best_overlap_lens = {}
@@ -574,7 +577,7 @@ def reconcile_interactions(links_files, out_dir, method="pooled"):
                     # check if actually null mapping here?
                     try:
                         best_overlap_len = best_overlap_lens[fields[0]]
-                        if int(fields[2]) < best_overlap_len:
+                        if int(fields[2]) > best_overlap_len:
                             mapping[fields[0]] = fields[1]
                             best_overlap_lens[fields[0]] = int(fields[2])
                     except:
@@ -595,13 +598,13 @@ def reconcile_interactions(links_files, out_dir, method="pooled"):
                         
                         # adjust start end of interaction
                         # but only adjust if there is a mapping val
-                        if mapping[start_id] != "-1":
+                        if mapping[start_id] != ".:-1--1":
                             start_id = mapping[start_id]
                         
                         # adjust stop end of interaction
                         if mapping[end_id] != ".:-1--1":
                             end_id = mapping[end_id]
-
+                            
                         # new line
                         adj_line = "{}\t{}\t{}\t{},{}\t{}\n".format(
                             start_id.split(":")[0],
@@ -615,17 +618,22 @@ def reconcile_interactions(links_files, out_dir, method="pooled"):
                         # write out
                         out.write(adj_line)
 
+            # save to list
             reconciled_files.append(reconcile_file)
-            
-    # TODO clean up
-    
+                        
+            # clean up
+            os.system("rm {} {}".format(links_file, tmp_file))
+
+        # clean up
+        os.system("rm {}".format(pooled_file))
             
     return reconciled_files
 
 
 
 def get_replicate_consistent_links(
-        pooled_file, links_files, out_prefix):
+        pooled_file, links_files, out_prefix,
+        colnames=["pooled", "rep1", "rep2"]):
     """get replicate consistent links
     """
     # out dir
@@ -636,45 +644,35 @@ def get_replicate_consistent_links(
         [pooled_file] + links_files, out_dir, method="pooled")
     
     # format link files
-    pooled_tmp_file = "{}.pooled.tmp.txt.gz".format(out_prefix)
-    #reformat_interaction_file(pooled_file, pooled_tmp_file)
-
-    rep1_tmp_file = "{}.b1.tmp.txt.gz".format(out_prefix)
-    #reformat_interaction_file(links_files[0], rep1_tmp_file)
-
-    rep2_tmp_file = "{}.b2.tmp.txt.gz".format(out_prefix)
-    #reformat_interaction_file(links_files[1], rep2_tmp_file)
-
-    # load in reps and merge to make a table
+    interaction_files = []
+    for links_file in matched_links_files:
+        print links_file
+        tmp_file = "{}/{}.interaction_ids.tmp.txt.gz".format(
+            out_dir,
+            os.path.basename(links_file).split(".bed")[0].split(".txt")[0])
+        reformat_interaction_file(links_file, tmp_file)
+        interaction_files.append(tmp_file)
+    print interaction_files
+        
+    # merge to make a table
     out_mat_file = "{}.reps.mat.txt.gz".format(out_prefix)
-    if True:
-        pooled = pd.read_csv(pooled_tmp_file, sep="\t", header=None, index_col=None)
-        pooled.index = pooled[0].map(str) + "_x_" + pooled[1].map(str)
-        pooled["pooled"] = pooled[2]
-        pooled = pooled.drop([0,1,2], axis=1)
-        
-        rep1 = pd.read_csv(rep1_tmp_file, sep="\t", header=None, index_col=None)
-        rep1.index = rep1[0].map(str) + "_x_" + rep1[1].map(str)
-        rep1["rep1"] = rep1[2]
-        rep1 = rep1.drop([0,1,2], axis=1)
-        
-        rep2 = pd.read_csv(rep2_tmp_file, sep="\t", header=None, index_col=None)
-        rep2.index = rep2[0].map(str) + "_x_" + rep2[1].map(str)
-        rep2["rep2"] = rep2[2]
-        rep2 = rep2.drop([0,1,2], axis=1)
+    summary = None
+    for interaction_file_idx in range(len(interaction_files)):
+        interaction_file = interaction_files[interaction_file_idx]
+        data = pd.read_csv(interaction_file, sep="\t", header=None, index_col=None)
+        data.index = data[0].map(str) + "_x_" + data[1].map(str)
+        data[colnames[interaction_file_idx]] = data[2]
+        data = data.drop([0,1,2], axis=1)
 
-        print pooled.shape, rep1.shape, rep2.shape
-        
-        summary = rep1.merge(rep2, how="outer", left_index=True, right_index=True)
-        summary = summary.merge(pooled, how="outer", left_index=True, right_index=True)
+        if summary is None:
+            summary = data.copy()
+        else:
+            summary = summary.merge(data, how="outer", left_index=True, right_index=True)
 
-        # reconcile differences
-        reconcile_interaction_mat(summary)
+    # save out
+    summary.to_csv(out_mat_file, sep="\t", compression="gzip", header=True)
 
-        # save out
-        summary.to_csv(out_mat_file, sep="\t", compression="gzip", header=True)
-
-    quit()
+    #quit()
     # only keep those with good ABC scores?
         
     # plot in R
