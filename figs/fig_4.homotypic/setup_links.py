@@ -20,10 +20,10 @@ def main():
     OUT_DIR = sys.argv[5]
 
     # params
-    k_nearest = 2
+    k_nearest = 3
     max_dist = 25000 # Gasperini et al Cell 2019
-    corr_coeff_thresh = -100 #0
-    pval_thresh = 1 #0.10
+    corr_coeff_thresh = 0 #0
+    pval_thresh = 0.1 #0.10
     
     # set up links
     links_file = "{}/links.proximity.k-{}.d-{}.bed.gz".format(

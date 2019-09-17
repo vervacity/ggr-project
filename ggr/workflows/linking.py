@@ -14,8 +14,9 @@ from ggr.util.bed_utils import id_to_bed
 
 from ggr.analyses.bioinformatics import run_gprofiler
 from ggr.analyses.linking import build_correlation_matrix
-from ggr.analyses.linking import bed_to_gene_set_by_proximity
+from ggr.analyses.linking import traj_bed_to_gene_set_by_proximity
 from ggr.analyses.linking import build_confusion_matrix
+from ggr.analyses.linking import get_replicate_consistent_links
 
 
 def runall(args, prefix):
@@ -60,8 +61,7 @@ def runall(args, prefix):
     # run analysis
     correlation_matrix_file = "{}/{}.correlation_mat.txt.gz".format(
         atac_linking_dir, prefix)
-    #if not os.path.isfile(correlation_matrix_file):
-    if True:
+    if not os.path.isfile(correlation_matrix_file):
         build_correlation_matrix(
             atac_clusters_file,
             atac_mat_file,
@@ -111,8 +111,7 @@ def runall(args, prefix):
     # collect into a confusion matrix
     cluster_file = args.outputs["results"]["rna"]["timeseries"]["dp_gp"]["clusters.reproducible.hard.reordered.list"]
     confusion_matrix_file = "{}/{}.confusion_mat.txt.gz".format(atac_linking_dir, prefix)
-    #if not os.path.isfile(confusion_matrix_file):
-    if True:
+    if not os.path.isfile(confusion_matrix_file):
         build_confusion_matrix(
             traj_bed_files,
             gene_set_files,
@@ -120,8 +119,76 @@ def runall(args, prefix):
             confusion_matrix_file)
 
     # TODO split this by TFs vs non TFs <- make annotation TSS files
+
+    # -------------------------------------------
+    # ANALYSIS - get replicate consistent distance based links (ABC method)
+    # input: ABC distance-based links
+    # output: replicate consistent links
+    # -------------------------------------------
+    logger.info("ANALYSIS: build replicate consistent HiChIP link set")
+
+    # set up
+    link_dir = args.inputs["hichip"][args.cluster]["data_dir"]
+    link_days = ["d0", "d3", "d6"]
+    replicated_link_dir = "{}/abc_links".format(results_dir)
+    os.system("mkdir -p {}".format(replicated_link_dir))
+    
+    for link_day in link_days:
+        pooled_file = glob.glob(
+            "{}/*{}*pooled*.txt.gz".format(link_dir, link_day))
+        assert len(pooled_file) == 1
+        pooled_file = pooled_file[0]
+        rep_link_files = sorted(
+            glob.glob("{}/*{}*b*.gz".format(link_dir, link_day)))
+        link_prefix = "{}/{}.{}".format(
+            replicated_link_dir,
+            prefix,
+            link_day)
+        get_replicate_consistent_links(
+            pooled_file,
+            rep_link_files,
+            link_prefix)
+
+    quit()
+
+    
+    # -------------------------------------------
+    # ANALYSIS - get replicate consistent HiChIP based links (ABC method)
+    # input: ABC links
+    # output: replicate consistent links
+    # -------------------------------------------
+    logger.info("ANALYSIS: build replicate consistent HiChIP link set")
+
+    # set up
+    link_dir = args.inputs["hichip"][args.cluster]["data_dir"]
+    link_days = ["d0", "d3", "d6"]
+    replicated_link_dir = "{}/abc_links".format(results_dir)
+    os.system("mkdir -p {}".format(replicated_link_dir))
+    
+    # get replicate consistent links
+    if True:
+        for link_day in link_days:
+            rep_link_files = sorted(
+                glob.glob("{}/*{}*b*txt.gz".format(link_dir, link_day)))
+            link_prefix = "{}/{}.{}".format(
+                replicated_link_dir,
+                prefix,
+                os.path.basename(rep_link_files[0]).split("_b1.txt")[0])
+            get_replicate_consistent_links(rep_link_files, link_prefix)
+
+        # then merge all reps to get total
+        
+        
+        # copy over to data dir
+
+
+        
+        
+        
+    quit()
     
 
+    
     # and then rerun select enrichments?
     
 

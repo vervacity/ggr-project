@@ -102,7 +102,6 @@ def setup_proximity_links(
             region_signal_str = ",".join(
                 ["{:0.3f}".format(val) for val in region_signal.values])
             
-            #filtered_genes = []
             filtered_genes = {}
             for gene_idx in range(len(region_linked_genes)):
                 gene_id = region_linked_genes[gene_idx]
@@ -179,7 +178,6 @@ def regions_to_genes_through_links(region_file, links_file, out_file):
     
     # read in results
     results = pd.read_csv(tmp_out_file, sep="\t", header=None)
-    print results
 
     # extract data from metadata field
     for result_idx in range(results.shape[0]):
@@ -212,8 +210,8 @@ def regions_to_genes_through_links(region_file, links_file, out_file):
         gene_ids.append(metadata["genes"].keys())
             
     # summarize
-    region_signal_mean = np.mean(np.stack(region_signals, axis=0), axis=0)
-    rna_signal_mean = np.mean(np.stack(rna_signals, axis=0), axis=0)
+    region_signal_mean = np.median(np.stack(region_signals, axis=0), axis=0)
+    rna_signal_mean = np.median(np.stack(rna_signals, axis=0), axis=0)
     gene_ids = np.concatenate(gene_ids, axis=0)
     gene_ids = sorted(list(set(gene_ids.tolist())))
     results = pd.DataFrame({"gene_id": gene_ids})
@@ -402,47 +400,180 @@ def build_confusion_matrix(traj_bed_files, gene_sets, gene_clusters_file, out_fi
 
 
 
-def get_replicate_consistent_links(links_files, out_prefix):
+def reformat_interaction_file(interaction_file, out_file, remove_dups=True):
+    """make it easier to work with interaction file
+    """
+    assert interaction_file.endswith(".gz")
+    assert out_file.endswith(".gz")
+    
+    # reformat
+    reformat = (
+        "zcat {} | "
+        "awk -F ',' '{{ print $1\"\t\"$2 }}' | "
+        "awk -F '\t' '{{ print $1\":\"$2\"-\"$3\"\t\"$4\"\t\"$5 }}' | "
+        "gzip -c > {}").format(interaction_file, out_file)
+    print reformat
+    os.system(reformat)
+
+    # and reduce
+    if remove_dups:
+        tmp_file = "{}.tmp.txt.gz".format(out_file.split(".txt.gz")[0])
+        os.system("mv {} {}".format(out_file, tmp_file))
+        seen_ids = set()
+        with gzip.open(tmp_file, "r") as fp:
+            with gzip.open(out_file, "w") as out:
+                for line in fp:
+                    fields = line.strip().split("\t")
+                    reciprocal = "{}\t{}\t{}\n".format(
+                        fields[1], fields[0], fields[2])
+                    if reciprocal not in seen_ids:
+                        # check that first is always smaller than second
+                        first_start = int(fields[0].split(":")[1].split("-")[0])
+                        second_start = int(fields[1].split(":")[1].split("-")[0])
+                        assert first_start <= second_start, line
+                        # and write out
+                        out.write(line)
+                        seen_ids.add(line)
+        # remove tmp
+        os.system("rm {}".format(tmp_file))
+        
+    return None
+
+
+def _get_chrom_start_stop(region_id):
+    """quick wrapper to get region id
+    """
+    chrom = region_id.split(":")[0]
+    start = region_id.split(":")[1].split("-")[0]
+    stop = region_id.split(":")[1].split("-")[1]
+    split_id = [chrom, start, stop]
+    
+    return split_id
+
+def _is_overlap(region_a, region_b):
+    """check for overlap
+    """
+    region_a_fields = _get_chrom_start_stop(region_a)
+    region_b_fields = _get_chrom_start_stop(region_b)
+
+    print region_a_fields
+    print region_b_fields
+    
+    if region_a_fields[0] != region_b_fields[0]:
+        # chrom must match
+        return False
+    elif (region_b_fields[1] <= region_a_fields[1]) and (region_b_fields[2] >= region_a_fields[1]):
+        # if region b starts earlier, then must end later than region a start
+        return True
+    elif (region_b_fields[1] >= region_a_fields[1]) and (region_b_fields[1] <= region_a_fields[2]):
+        # if region b starts later, then must start earlier than region a end
+        return True
+    else:
+        return False
+
+
+def interaction_merge(data):
+    """
+    """
+    
+
+    
+    return
+    
+
+def reconcile_interaction_mat(data):
+    """determine which interactions are actually same and condense
+    """
+    # sort and split ids
+    data = data.sort_index()
+    interactions = data.index.to_series().str.split("_x_", n=2, expand=True)
+    data["interaction_start"] = interactions[0]
+    data["interaction_end"] = interactions[1]
+
+    # go through each row
+    current_rows = []
+    current_start = None
+    for example_idx in range(data.shape[0]):
+        example_start = data["interaction_start"].iloc[example_idx]
+        example_row = data.iloc[example_idx]
+        print example_row
+        
+        # if current rows is empty, just put it in there
+        if current_start is None:
+            current_start = example_start
+            current_rows.append(example_row)
+            continue
+
+        # if start region is in range of current rows, add
+        if _is_overlap(current_start, example_start):
+            current_rows.append(example_row)
+        else:
+            # new row, save out
+            # and also check to make sure end parts match up too
+            current_rows = pd.concat(current_rows, axis=1).transpose()
+            
+            print current_rows
+            quit()
+            
+            # and replace
+            current_start = example_start
+            current_rows = [example_row]
+    
+    return
+
+
+
+def get_replicate_consistent_links(
+        pooled_file, links_files, out_prefix):
     """get replicate consistent links
     """
-    # format link files
-    rep1_tmp_file = "{}.b1_tmp.txt.gz".format(out_prefix)
-    if not os.path.isfile(rep1_tmp_file):
-        reformat = (
-            "zcat {} | "
-            "awk -F ',' '{{ print $1\"\t\"$2 }}' | "
-            "awk -F '\t' '{{ print $1\":\"$2\"-\"$3\",\"$4\"\t\"$5 }}' | "
-            "gzip -c > {}").format(links_files[0], rep1_tmp_file)
-        print reformat
-        os.system(reformat)
-
-    rep2_tmp_file = "{}.b2_tmp.txt.gz".format(out_prefix)
-    if not os.path.isfile(rep2_tmp_file):
-        reformat = (
-            "zcat {} | "
-            "awk -F ',' '{{ print $1\"\t\"$2 }}' | "
-            "awk -F '\t' '{{ print $1\":\"$2\"-\"$3\",\"$4\"\t\"$5 }}' | "
-            "gzip -c > {}").format(links_files[1], rep2_tmp_file)
-        print reformat
-        os.system(reformat)
+    # FIRST, get consensus region IDs - perform overlaps and get union?
+    # get union and replace IDs. then keep a dict that tracks ID to new ID,
+    # so that can consistently re-ID everything...
+    # master regions - use POOL as master, then intersect both with pool.
     
+    
+    # format link files
+    pooled_tmp_file = "{}.pooled.tmp.txt.gz".format(out_prefix)
+    #reformat_interaction_file(pooled_file, pooled_tmp_file)
+
+    rep1_tmp_file = "{}.b1.tmp.txt.gz".format(out_prefix)
+    #reformat_interaction_file(links_files[0], rep1_tmp_file)
+
+    rep2_tmp_file = "{}.b2.tmp.txt.gz".format(out_prefix)
+    #reformat_interaction_file(links_files[1], rep2_tmp_file)
+
     # load in reps and merge to make a table
     out_mat_file = "{}.reps.mat.txt.gz".format(out_prefix)
-    if False:
-        rep1 = pd.read_csv(rep1_tmp_file, sep="\t", header=None, index_col=0)
-        rep2 = pd.read_csv(rep2_tmp_file, sep="\t", header=None, index_col=0)
-
-        # normalize by num contacts?
+    if True:
+        pooled = pd.read_csv(pooled_tmp_file, sep="\t", header=None, index_col=None)
+        pooled.index = pooled[0].map(str) + "_x_" + pooled[1].map(str)
+        pooled["pooled"] = pooled[2]
+        pooled = pooled.drop([0,1,2], axis=1)
         
+        rep1 = pd.read_csv(rep1_tmp_file, sep="\t", header=None, index_col=None)
+        rep1.index = rep1[0].map(str) + "_x_" + rep1[1].map(str)
+        rep1["rep1"] = rep1[2]
+        rep1 = rep1.drop([0,1,2], axis=1)
         
-        replicates = rep1.merge(rep2, how="inner", left_index=True, right_index=True)
-        # normalize and filter?
+        rep2 = pd.read_csv(rep2_tmp_file, sep="\t", header=None, index_col=None)
+        rep2.index = rep2[0].map(str) + "_x_" + rep2[1].map(str)
+        rep2["rep2"] = rep2[2]
+        rep2 = rep2.drop([0,1,2], axis=1)
 
+        print pooled.shape, rep1.shape, rep2.shape
         
-        replicates.to_csv(out_mat_file, sep="\t", compression="gzip", header=False)
+        summary = rep1.merge(rep2, how="outer", left_index=True, right_index=True)
+        summary = summary.merge(pooled, how="outer", left_index=True, right_index=True)
 
+        # reconcile differences
+        reconcile_interaction_mat(summary)
+
+        # save out
+        summary.to_csv(out_mat_file, sep="\t", compression="gzip", header=True)
+
+    quit()
     # only keep those with good ABC scores?
-        
         
     # plot in R
     plot_file = "{}.reps.scatter.pdf".format(out_prefix)
