@@ -1,0 +1,13 @@
+{
+    "kundaje": {
+	"distance": {
+	    "data_dir": "/mnt/lab_data/kundaje/projects/skin/data/abc_linking/distance"
+	},
+	"hic.keratinocyte": {
+	    "data_dir": "/mnt/lab_data/kundaje/projects/skin/data/abc_linking/hic.keratinocyte"
+	},
+	"hichip": {
+	    "data_dir": "/mnt/lab_data/kundaje/projects/skin/data/abc_linking/hichip"
+	}
+    }
+}

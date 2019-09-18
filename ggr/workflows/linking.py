@@ -125,14 +125,48 @@ def runall(args, prefix):
     # input: ABC distance-based links
     # output: replicate consistent links
     # -------------------------------------------
+    logger.info("ANALYSIS: build replicate consistent distance-based link set")
+
+    # set up
+    link_dir = args.inputs["conformation"][args.cluster]["distance"]["data_dir"]
+    link_days = ["d0", "d3", "d6"]
+    replicated_link_dir = "{}/abc.distance".format(results_dir)
+    os.system("mkdir -p {}".format(replicated_link_dir))
+    
+    for link_day in link_days:
+        continue
+        pooled_file = glob.glob(
+            "{}/*{}*pooled*.txt.gz".format(link_dir, link_day))
+        assert len(pooled_file) == 1
+        pooled_file = pooled_file[0]
+        rep_link_files = sorted(
+            glob.glob("{}/*{}*b*.gz".format(link_dir, link_day)))
+        link_prefix = "{}/{}.{}".format(
+            replicated_link_dir,
+            prefix,
+            link_day)
+        get_replicate_consistent_links(
+            pooled_file,
+            rep_link_files,
+            link_prefix)
+
+    # TODO copy over to data dir?
+
+    # -------------------------------------------
+    # ANALYSIS - get replicate consistent HiC based links (ABC method)
+    # input: ABC HiC links
+    # output: replicate consistent links
+    # -------------------------------------------
     logger.info("ANALYSIS: build replicate consistent HiChIP link set")
 
     # set up
-    link_dir = args.inputs["hichip"][args.cluster]["data_dir"]
-    link_days = ["d0", "d3", "d6"]
-    replicated_link_dir = "{}/abc_links".format(results_dir)
+    link_dir = args.inputs["conformation"][args.cluster]["hic.keratinocyte"]["data_dir"]
+    #link_days = ["d0", "d3", "d6"]
+    link_days = ["d3", "d6"]
+    replicated_link_dir = "{}/abc.hic.keratinocyte".format(results_dir)
     os.system("mkdir -p {}".format(replicated_link_dir))
     
+    # get replicate consistent links
     for link_day in link_days:
         pooled_file = glob.glob(
             "{}/*{}*pooled*.txt.gz".format(link_dir, link_day))
@@ -148,43 +182,6 @@ def runall(args, prefix):
             pooled_file,
             rep_link_files,
             link_prefix)
-        quit()
-
-    quit()
-
-    
-    # -------------------------------------------
-    # ANALYSIS - get replicate consistent HiChIP based links (ABC method)
-    # input: ABC links
-    # output: replicate consistent links
-    # -------------------------------------------
-    logger.info("ANALYSIS: build replicate consistent HiChIP link set")
-
-    # set up
-    link_dir = args.inputs["hichip"][args.cluster]["data_dir"]
-    link_days = ["d0", "d3", "d6"]
-    replicated_link_dir = "{}/abc_links".format(results_dir)
-    os.system("mkdir -p {}".format(replicated_link_dir))
-    
-    # get replicate consistent links
-    if True:
-        for link_day in link_days:
-            rep_link_files = sorted(
-                glob.glob("{}/*{}*b*txt.gz".format(link_dir, link_day)))
-            link_prefix = "{}/{}.{}".format(
-                replicated_link_dir,
-                prefix,
-                os.path.basename(rep_link_files[0]).split("_b1.txt")[0])
-            get_replicate_consistent_links(rep_link_files, link_prefix)
-
-        # then merge all reps to get total
-        
-        
-        # copy over to data dir
-
-
-        
-        
         
     quit()
     

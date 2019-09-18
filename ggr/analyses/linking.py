@@ -398,6 +398,34 @@ def build_confusion_matrix(traj_bed_files, gene_sets, gene_clusters_file, out_fi
     
     return
 
+def fix_invalid_records(interaction_file, out_file):
+    """adjust records for start/stop problems
+    """
+    with gzip.open(interaction_file, "r") as fp:
+        with gzip.open(out_file, "w") as out:
+            for line in fp:
+                fields = line.strip().split("\t")
+                
+                # check interaction start
+                start = int(fields[1])
+                stop = int(fields[2])
+                if start > stop:
+                    fields[1] = str(stop)
+                    fields[2] = str(start)
+
+                # check interaction end
+                name_fields = fields[3].split(",")
+                start = int(name_fields[0].split(":")[1].split("-")[0])
+                stop = int(name_fields[0].split("-")[1])
+                if start > stop:
+                    name_fields[0] = "{}:{}-{}".format(
+                        name_fields[0].split(":")[0], stop, start)
+                fields[3] = ",".join(name_fields)
+                    
+                # save out
+                out.write("{}\n".format("\t".join(fields)))
+                
+    return
 
 
 def reformat_interaction_file(interaction_file, out_file, remove_dups=True):
@@ -443,95 +471,21 @@ def reformat_interaction_file(interaction_file, out_file, remove_dups=True):
     return None
 
 
-def _get_chrom_start_stop(region_id):
-    """quick wrapper to get region id
-    """
-    chrom = region_id.split(":")[0]
-    start = region_id.split(":")[1].split("-")[0]
-    stop = region_id.split(":")[1].split("-")[1]
-    split_id = [chrom, start, stop]
-    
-    return split_id
-
-def _is_overlap(region_a, region_b):
-    """check for overlap
-    """
-    region_a_fields = _get_chrom_start_stop(region_a)
-    region_b_fields = _get_chrom_start_stop(region_b)
-
-    print region_a_fields
-    print region_b_fields
-    
-    if region_a_fields[0] != region_b_fields[0]:
-        # chrom must match
-        return False
-    elif (region_b_fields[1] <= region_a_fields[1]) and (region_b_fields[2] >= region_a_fields[1]):
-        # if region b starts earlier, then must end later than region a start
-        return True
-    elif (region_b_fields[1] >= region_a_fields[1]) and (region_b_fields[1] <= region_a_fields[2]):
-        # if region b starts later, then must start earlier than region a end
-        return True
-    else:
-        return False
-
-
-def interaction_merge(data):
-    """
-    """
-    
-
-    
-    return
-    
-
-def reconcile_interaction_mat(data):
-    """determine which interactions are actually same and condense
-    """
-    # sort and split ids
-    data = data.sort_index()
-    interactions = data.index.to_series().str.split("_x_", n=2, expand=True)
-    data["interaction_start"] = interactions[0]
-    data["interaction_end"] = interactions[1]
-
-    # go through each row
-    current_rows = []
-    current_start = None
-    for example_idx in range(data.shape[0]):
-        example_start = data["interaction_start"].iloc[example_idx]
-        example_row = data.iloc[example_idx]
-        print example_row
-        
-        # if current rows is empty, just put it in there
-        if current_start is None:
-            current_start = example_start
-            current_rows.append(example_row)
-            continue
-
-        # if start region is in range of current rows, add
-        if _is_overlap(current_start, example_start):
-            current_rows.append(example_row)
-        else:
-            # new row, save out
-            # and also check to make sure end parts match up too
-            current_rows = pd.concat(current_rows, axis=1).transpose()
-            
-            print current_rows
-            quit()
-            
-            # and replace
-            current_start = example_start
-            current_rows = [example_row]
-    
-    return
-
-
-
 def reconcile_interactions(links_files, out_dir, method="pooled"):
     """reconcile interactions so that they'll have the same IDs
     """
+    # fix ids (start/stop)
+    fixed_links_files = []
+    for links_file in links_files:
+        fixed_links_file = "{}/{}.fixed.txt.gz".format(
+            out_dir,
+            os.path.basename(links_file).split(".bed")[0].split(".txt")[0])
+        fix_invalid_records(links_file, fixed_links_file)
+        fixed_links_files.append(fixed_links_file)
+    
     # adjust for just regions, to intersect in next step
     adj_links_files = []
-    for links_file in links_files:
+    for links_file in fixed_links_files:
         adj_links_file = "{}/{}.unique.bed.gz".format(
             out_dir,
             os.path.basename(links_file).split(".bed")[0].split(".txt")[0])
@@ -672,14 +626,15 @@ def get_replicate_consistent_links(
     # save out
     summary.to_csv(out_mat_file, sep="\t", compression="gzip", header=True)
 
-    #quit()
-    # only keep those with good ABC scores?
-        
     # plot in R
     plot_file = "{}.reps.scatter.pdf".format(out_prefix)
     plot_cmd = "Rscript /users/dskim89/git/ggr-project/R/plot.links.rep_consistency.R {} {}".format(
         out_mat_file, plot_file)
     print plot_cmd
     os.system(plot_cmd)
+
+    # and set threshold for consistency
+    
+    
     
     return
