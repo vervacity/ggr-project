@@ -4,6 +4,8 @@ import os
 import glob
 import logging
 
+import pandas as pd
+
 from ggr.util.utils import run_shell_cmd
 from ggr.analyses.bioinformatics import run_gprofiler
 from ggr.analyses.filtering import filter_for_ids
@@ -26,22 +28,6 @@ from ggr.analyses.utils import plot_PCA
 from ggr.analyses.motifs import add_expressed_genes_to_metadata
 
 from ggr.workflows.timeseries import run_timeseries_workflow
-
-
-def run_rna_qc_workflow(args, params, out_dir, tmp_dir, prefix):
-    """run QC
-    """
-
-    # PCA
-
-    # correlation
-
-
-    # heatmap of highly variable genes?
-
-    
-
-    return
 
 
 def run_expressed_threshold_workflow(args, prefix, mat_key="rna.counts.pc.mat"):
@@ -185,7 +171,7 @@ def runall(args, prefix):
         geneset_file = args.inputs["annot"][args.cluster]["gsea_gene_sets"]
     
     # ----------------------------------------------------
-    # ANALYSIS 0 - create data matrices of expected counts
+    # ANALYSIS - create data matrices of expected counts
     #  from RSEM quant files. Remove media influenced
     #  timepoints.
     # input: RSEM files
@@ -219,7 +205,7 @@ def runall(args, prefix):
                 colname=colname)
             
     # ----------------------------------------------------
-    # ANALYSIS 1 - filter for just protein coding genes
+    # ANALYSIS - filter for just protein coding genes
     # input: count matrix
     # output: count matrix of just protein coding
     # ----------------------------------------------------
@@ -239,7 +225,7 @@ def runall(args, prefix):
                 out_data[pc_handle])
 
     # ----------------------------------------------------
-    # ANALYSIS 2 - filter for empirically ON genes
+    # ANALYSIS - filter for empirically ON genes
     # input: count matrix of protein coding
     # output: count matrix of ON genes 
     # ----------------------------------------------------
@@ -272,7 +258,7 @@ def runall(args, prefix):
             expressed_tss_file)
         
     # ----------------------------------------------------
-    # ANALYSIS 3 - run timeseries analysis on these genes
+    # ANALYSIS - run timeseries analysis on these genes
     # input: count matrix of expressed protein coding genes
     # output: gene trajectories
     # ----------------------------------------------------
@@ -315,7 +301,39 @@ def runall(args, prefix):
             plot_dir,
             os.path.basename(gene_mat_files[0]).split(".rep")[0])
         plot_PCA(gene_mat_files, pca_file)
-    
+
+
+    # also output timepoint specific TSS files for expressed genes
+    days = ["d00", "d30", "d60"]
+    mat_file = out_data["rna.counts.pc.expressed.timeseries_adj.pooled.rlog.mat"]
+    rna_rlog_thresh = args.inputs["params"]["rna_empirical_rlog_thresh"]
+    for day in days:
+        tss_key = "tss.expressed_{}".format(day)
+        tss_file = "{}/{}.tss.expressed_{}.bed.gz".format(
+            data_dir, prefix, day)
+        out_data[tss_key] = tss_file
+
+        if not os.path.isfile(tss_file):
+            tmp_dir = os.path.dirname(mat_file)
+            
+            # make a gene list
+            gene_list = "{}/{}.expressed_{}.genes.txt.gz".format(
+                tmp_dir, prefix, day)
+            data = pd.read_csv(mat_file, sep="\t")[day]
+            data = data[data > rna_rlog_thresh]
+            data = data.reset_index()
+            data["index"].to_csv(
+                gene_list, header=False, index=False, compression="gzip")
+            
+            # convert gene list to TSS
+            convert_gene_list_to_tss(
+                gene_list,
+                args.outputs["annotations"]["tss.pc.bed"],
+                tss_file)
+            
+            # delete gene list
+            os.system("rm {}".format(gene_list))
+        
     # ----------------------------------------------------
     # ANALYSIS - run GSEA on timepoint comparisons to get
     # enrichments across time
@@ -326,8 +344,7 @@ def runall(args, prefix):
         args.outputs["results"][results_dirname]["timeseries"]["dir"])
     args.outputs["results"][results_dirname]["timeseries"]["gsea"] = {
         "dir": gsea_dir}
-    #if not os.path.isdir(gsea_dir):
-    if True:
+    if not os.path.isdir(gsea_dir):
         run_shell_cmd("mkdir -p {}".format(gsea_dir))
         deseq_files = sorted(glob.glob(
             "{}/deseq2/*over_d00_resultsAll.txt.gz".format(
