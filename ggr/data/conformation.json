@@ -1,13 +1,16 @@
 {
     "kundaje": {
 	"distance": {
-	    "data_dir": "/mnt/lab_data/kundaje/projects/skin/data/abc_linking/distance"
+	    "data_dir": "/mnt/lab_data/kundaje/projects/skin/data/linking/distance"
+	},
+	"hic.celltype_avg": {
+	    "data_dir": "/mnt/lab_data/kundaje/projects/skin/data/linking/hic.celltype_avg"
 	},
 	"hic.keratinocyte": {
-	    "data_dir": "/mnt/lab_data/kundaje/projects/skin/data/abc_linking/hic.keratinocyte"
+	    "data_dir": "/mnt/lab_data/kundaje/projects/skin/data/linking/hic.keratinocyte"
 	},
 	"hichip": {
-	    "data_dir": "/mnt/lab_data/kundaje/projects/skin/data/abc_linking/hichip"
+	    "data_dir": "/mnt/lab_data/kundaje/projects/skin/data/linking/hichip"
 	}
     }
 }

@@ -12,11 +12,49 @@ from ggr.util.utils import parallel_copy
 from ggr.util.bed_utils import merge_regions
 from ggr.util.bed_utils import id_to_bed
 
+from ggr.analyses.linking import setup_proximity_links
+
 from ggr.analyses.bioinformatics import run_gprofiler
 from ggr.analyses.linking import build_correlation_matrix
 from ggr.analyses.linking import traj_bed_to_gene_set_by_proximity
 from ggr.analyses.linking import build_confusion_matrix
 from ggr.analyses.linking import get_replicate_consistent_links
+
+
+
+def run_replicate_consistent_links_workflow(
+        args,
+        prefix,
+        results_dir,
+        link_key="distance",
+        out_dir="abc.distance"):
+    """take in ABC links and get replicate consistent link set
+    """
+    # set up
+    link_dir = args.inputs["conformation"][args.cluster][link_key]["data_dir"]
+    link_days = ["d0", "d3", "d6"]
+    replicated_link_dir = "{}/{}".format(results_dir, out_dir)
+    os.system("mkdir -p {}".format(replicated_link_dir))
+
+    # go through each day
+    for link_day in link_days:
+        pooled_file = glob.glob(
+            "{}/*{}*pooled*.txt.gz".format(link_dir, link_day))
+        print pooled_file
+        assert len(pooled_file) == 1
+        pooled_file = pooled_file[0]
+        rep_link_files = sorted(
+            glob.glob("{}/*{}*b*.gz".format(link_dir, link_day)))
+        link_prefix = "{}/{}.{}".format(
+            replicated_link_dir,
+            prefix,
+            link_day)
+        get_replicate_consistent_links(
+            pooled_file,
+            rep_link_files,
+            link_prefix)
+
+    return args
 
 
 def runall(args, prefix):
@@ -36,7 +74,62 @@ def runall(args, prefix):
     args.outputs["results"][results_dirname] = {"dir": results_dir}
     run_shell_cmd("mkdir -p {}".format(results_dir))
     out_results = args.outputs["results"][results_dirname]
+    
+    # -------------------------------------------
+    # ANALYSIS - naive proximity linking
+    # input: ATAC regions and TSS file
+    # output: linking by naive proximity
+    # -------------------------------------------
+    logger.info("ANALYSIS: naive proximity linking")
+    k_nearest = 3
+    max_dist = 25000 # Gasperini et al Cell 2019
+    corr_coeff_thresh = 0 #0
+    pval_thresh = 0.1 #0.10
+    
+    # set up links <- do it day specific?
+    links_file = "{}/links.proximity.k-{}.d-{}.bed.gz".format(
+        OUT_DIR, k_nearest, max_dist)
+    setup_proximity_links(
+        ref_regions_bed_file,
+        tss_file,
+        links_file,
+        region_signal_file=ref_regions_signal_file,
+        rna_signal_file=rna_signal_file,
+        k_nearest=k_nearest,
+        max_dist=max_dist,
+        corr_coeff_thresh=corr_coeff_thresh,
+        pval_thresh=pval_thresh)
 
+
+    quit()
+    
+    # -------------------------------------------
+    # ANALYSIS - different styles of ABC linking
+    # input: ABC links
+    # output: replicate consistent link sets
+    # -------------------------------------------
+    logger.info("ANALYSIS: build replicate consistent ABC links - distance-based")
+    if False:
+        run_replicate_consistent_links_workflow(
+            args,
+            prefix,
+            results_dir,
+            link_key="distance",
+            out_dir="abc.distance")
+
+    logger.info("ANALYSIS: build replicate consistent ABC links - cell type avg HiC")
+    run_replicate_consistent_links_workflow(
+        args,
+        prefix,
+        results_dir,
+        link_key="hic.celltype_avg",
+        out_dir="abc.hic.celltype_avg")
+
+
+    quit()
+
+
+    
     # -------------------------------------------
     # ANALYSIS - get correlation matrix between ATAC and RNA
     # input: atac clusters/data, rna clusters/data
@@ -125,8 +218,26 @@ def runall(args, prefix):
     # input: ABC distance-based links
     # output: replicate consistent links
     # -------------------------------------------
-    logger.info("ANALYSIS: build replicate consistent distance-based link set")
+    logger.info("ANALYSIS: build replicate consistent ABC links - distance-based")
+    if False:
+        run_replicate_consistent_links_workflow(
+            args,
+            prefix,
+            results_dir,
+            link_key="distance",
+            out_dir="abc.distance")
 
+    logger.info("ANALYSIS: build replicate consistent ABC links - cell type avg HiC")
+    run_replicate_consistent_links_workflow(
+        args,
+        prefix,
+        results_dir,
+        link_key="hic.celltype_avg",
+        out_dir="abc.hic.celltype_avg")
+
+    
+    quit()
+    
     # set up
     link_dir = args.inputs["conformation"][args.cluster]["distance"]["data_dir"]
     link_days = ["d0", "d3", "d6"]
@@ -134,9 +245,9 @@ def runall(args, prefix):
     os.system("mkdir -p {}".format(replicated_link_dir))
     
     for link_day in link_days:
-        continue
         pooled_file = glob.glob(
             "{}/*{}*pooled*.txt.gz".format(link_dir, link_day))
+        print pooled_file
         assert len(pooled_file) == 1
         pooled_file = pooled_file[0]
         rep_link_files = sorted(
@@ -150,8 +261,11 @@ def runall(args, prefix):
             rep_link_files,
             link_prefix)
 
-    # TODO copy over to data dir?
 
+        
+    # TODO copy over to data dir?
+    quit()
+    
     # -------------------------------------------
     # ANALYSIS - get replicate consistent HiC based links (ABC method)
     # input: ABC HiC links

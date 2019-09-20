@@ -398,17 +398,28 @@ def build_confusion_matrix(traj_bed_files, gene_sets, gene_clusters_file, out_fi
     
     return
 
+
 def fix_invalid_records(interaction_file, out_file):
     """adjust records for start/stop problems
     """
     with gzip.open(interaction_file, "r") as fp:
         with gzip.open(out_file, "w") as out:
             for line in fp:
+                # check for broken lines
+                assert line.startswith("chr")
+                
+                # get fields
                 fields = line.strip().split("\t")
+
+                # check for broken lines
+                assert len(fields) == 6
                 
                 # check interaction start
-                start = int(fields[1])
-                stop = int(fields[2])
+                try:
+                    start = int(fields[1])
+                    stop = int(fields[2])
+                except:
+                    continue
                 if start > stop:
                     fields[1] = str(stop)
                     fields[2] = str(start)
@@ -499,7 +510,7 @@ def reconcile_interactions(links_files, out_dir, method="pooled"):
         print adjust_cmd
         os.system(adjust_cmd)
         adj_links_files.append(adj_links_file)
-
+    
     # reconcile
     reconciled_files = []
     if method == "pooled":
@@ -574,12 +585,6 @@ def reconcile_interactions(links_files, out_dir, method="pooled"):
 
             # save to list
             reconciled_files.append(reconcile_file)
-                        
-            # clean up
-            os.system("rm {} {}".format(links_file, tmp_file))
-
-        # clean up
-        os.system("rm {}".format(pooled_file))
             
     return reconciled_files
 
@@ -590,24 +595,26 @@ def get_replicate_consistent_links(
         colnames=["pooled", "rep1", "rep2"]):
     """get replicate consistent links
     """
-    # out dir
+    # out dir, tmp_dir
     out_dir = os.path.dirname(out_prefix)
+    tmp_dir = "{}/tmp".format(out_dir)
+    os.system("mkdir -p {}".format(tmp_dir))
     
     # map to pooled space
     matched_links_files = reconcile_interactions(
-        [pooled_file] + links_files, out_dir, method="pooled")
+        [pooled_file] + links_files, tmp_dir, method="pooled")
     
     # format link files
     interaction_files = []
     for links_file in matched_links_files:
         print links_file
         tmp_file = "{}/{}.interaction_ids.tmp.txt.gz".format(
-            out_dir,
+            tmp_dir,
             os.path.basename(links_file).split(".bed")[0].split(".txt")[0])
         reformat_interaction_file(links_file, tmp_file)
         interaction_files.append(tmp_file)
     print interaction_files
-        
+    
     # merge to make a table
     out_mat_file = "{}.reps.mat.txt.gz".format(out_prefix)
     summary = None
@@ -618,14 +625,17 @@ def get_replicate_consistent_links(
         data[colnames[interaction_file_idx]] = data[2]
         data = data.drop([0,1,2], axis=1)
 
+        # merge. use intersection since the peak needs to be present
+        # in pooled AND rep1 AND rep2
         if summary is None:
             summary = data.copy()
         else:
-            summary = summary.merge(data, how="outer", left_index=True, right_index=True)
+            summary = summary.merge(
+                data, how="inner", left_index=True, right_index=True)
 
     # save out
     summary.to_csv(out_mat_file, sep="\t", compression="gzip", header=True)
-
+    
     # plot in R
     plot_file = "{}.reps.scatter.pdf".format(out_prefix)
     plot_cmd = "Rscript /users/dskim89/git/ggr-project/R/plot.links.rep_consistency.R {} {}".format(
@@ -634,7 +644,10 @@ def get_replicate_consistent_links(
     os.system(plot_cmd)
 
     # and set threshold for consistency
+    # how to do this?
     
+
+    # clean up tmp files
     
     
     return
