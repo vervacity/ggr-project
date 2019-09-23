@@ -209,6 +209,8 @@ def runall(args, prefix):
     # input: ABC links
     # output: replicate consistent link sets
     # -------------------------------------------
+
+    # distance based ABC
     logger.info("ANALYSIS: build replicate consistent ABC links - distance-based")
     abc_dist_dir = "abc.distance"
     if not os.path.isdir("{}/{}".format(results_dir, abc_dist_dir)):
@@ -220,19 +222,16 @@ def runall(args, prefix):
             out_dir=abc_dist_dir)
 
     # and reconcile across timepoints
-    links_files = sorted(
-        glob.glob("{}/{}/*interactions.txt.gz".format(
-            results_dir, abc_dist_dir)))
-    print links_files
     all_links_file = "{}/{}/{}.links.abc.distance.ALL.txt.gz".format(
         results_dir, abc_dist_dir, prefix)
     if not os.path.isfile(all_links_file):
+        links_files = sorted(
+            glob.glob("{}/{}/*interactions.txt.gz".format(
+                results_dir, abc_dist_dir)))
         get_timepoint_consistent_links(
             links_files, all_links_file, method="union")
 
-    quit()
-
-        
+    # average hiC based ABC
     logger.info("ANALYSIS: build replicate consistent ABC links - cell type avg HiC")
     abc_avg_hic_dir = "abc.hic.celltype_avg"
     if not os.path.isdir("{}/{}".format(results_dir, abc_avg_hic_dir)):
@@ -243,6 +242,15 @@ def runall(args, prefix):
             link_key="hic.celltype_avg",
             out_dir=abc_avg_hic_dir)
 
+    # and reconcile across timepoints
+    all_links_file = "{}/{}/{}.links.abc.distance.ALL.txt.gz".format(
+        results_dir, abc_avg_hic_dir, prefix)
+    if not os.path.isfile(all_links_file):
+        links_files = sorted(
+            glob.glob("{}/{}/*interactions.txt.gz".format(
+                results_dir, abc_avg_hic_dir)))
+        get_timepoint_consistent_links(
+            links_files, all_links_file, method="union")
 
     quit()
 

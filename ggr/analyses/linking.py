@@ -626,8 +626,10 @@ def reconcile_interactions(
         # with pooled file to get mapping,
         # then adjust IDs
         master_regions_file = adj_links_files[0]
+        reconciled_files.append(fixed_links_files[0])
+        # remove pooled files
+        fixed_links_files = fixed_links_files[1:]
         adj_links_files = adj_links_files[1:]
-        reconciled_files.append(master_regions_file)
     elif method == "union":
         master_regions_file = "{}/master.union.bed.gz".format(out_dir)
         union_cmd = (
@@ -674,7 +676,8 @@ def reconcile_interactions(
         reconcile_file = "{}/{}.matched.txt.gz".format(
             out_dir,
             os.path.basename(links_file).split(".bed")[0].split(".txt")[0])
-        with gzip.open(links_files[link_file_idx], "r") as fp:
+        #with gzip.open(links_files[link_file_idx], "r") as fp:
+        with gzip.open(fixed_links_files[link_file_idx], "r") as fp:
             with gzip.open(reconcile_file, "w") as out:
                 for line in fp:
                     fields = line.strip().split("\t")
@@ -797,7 +800,9 @@ def _convert_to_interaction_format(mat_file, out_file, score_val="pooled"):
     data = pd.read_csv(mat_file, sep="\t", index_col=0)
 
     # which method to score with
-    if score_val == "max":
+    if score_val == "pooled":
+        pass
+    elif score_val == "max":
         data = data.fillna(0)
         data["pooled"] = data.values.max(axis=1)
     else:
@@ -842,7 +847,9 @@ def get_replicate_consistent_links(
     # map to pooled space
     matched_links_files = reconcile_interactions(
         [pooled_file] + links_files, tmp_dir, method="pooled")
-
+    print matched_links_files
+    print "here"
+    
     # format link files
     interaction_files = []
     for links_file in matched_links_files:
@@ -855,7 +862,6 @@ def get_replicate_consistent_links(
     print interaction_files
 
     # merge to make a table
-
     summary = None
     for interaction_file_idx in range(len(interaction_files)):
         interaction_file = interaction_files[interaction_file_idx]
