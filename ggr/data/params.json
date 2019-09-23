@@ -63,9 +63,19 @@
     "linking": {
 	"proximity": {
 	    "k_nearest": 3,
+	    "max_dist": 25000
+	},
+	"proximity.corr": {
+	    "k_nearest": 3,
 	    "max_dist": 25000,
 	    "corr_coeff_thresh": 0,
-	    "pval_thresh": 0.1
+	    "pval_thresh": 0.50
+	},
+	"proximity.corr.dynamic": {
+	    "k_nearest": 3,
+	    "max_dist": 25000,
+	    "corr_coeff_thresh": 0,
+	    "pval_thresh": 0.50
 	}
     }
     

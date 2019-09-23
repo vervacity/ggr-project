@@ -12,32 +12,37 @@ from scipy.stats import pearsonr
 
 
 def link_by_distance(
-        bed_file,
-        tss_file,
+        regions_file,
+        target_regions_file,
         out_file,
         k_nearest=3,
-        max_dist=25000):
-    """bed file to tss file
+        max_dist=25000,
+        annotate_gene_ids=True):
+    """normally use for regulatory regions to TSS
+    if annotate_gene_ids, keep track of which genes are linked
     """
     # bedtools closest
     tmp_file = "tss.overlap.tmp.txt"
     closest = "bedtools closest -d -k {} -a {} -b {} > {}".format(
-        k_nearest, bed_file, tss_file, tmp_file)
+        k_nearest, regions_file, target_regions_file, tmp_file)
     os.system(closest)
 
     # load results and use distance cutoff
     data = pd.read_csv(tmp_file, sep="\t", header=None)
     data = data[data[9] < max_dist]
 
-    # clean up: remove chrom/start/stop of TSS
-    remove_cols = [3, 4, 5]
-    data = data.drop(data.columns[remove_cols], axis=1)
+    # build a score on the distance vals with an exponential decay
+    # such that the median (or half life) of the scoring fn is 25000
+    # see Gasperini Cell 2019
+    decay_factor = 25000. / np.log(2) # median = decay_factor * ln(2)
+    data["score"] = np.exp(-data[9] / decay_factor)
     
-    # groupby to collapse on region
-    data[9] = data[9].astype(str)
-    data = data.groupby([0,1,2,7,8])[6].apply(",".join).reset_index()
-    data = data[[0,1,2,6,7,8]]
-    data[6] = data[0].map(str) + ":" + data[1].map(str) + "-" + data[2].map(str) + ";" + data[6]
+    # adjust to interaction format
+    data["name"] = data[3].map(str) + ":" + data[4].map(str) + "-" + data[5].map(str) + "," + data["score"].map(str)
+    if annotate_gene_ids:
+        data["name"] = data["name"].map(str) + "," + data[6]
+    keep_cols = [0, 1, 2, "name", 7, 8]
+    data = data[keep_cols]
 
     # save out
     data.to_csv(out_file, compression="gzip", sep="\t", header=False, index=False)
@@ -48,7 +53,97 @@ def link_by_distance(
     return
 
 
-def setup_proximity_links(
+def link_by_distance_and_corr(
+        regions_file,
+        target_regions_file,
+        out_file,
+        regions_signal_file,
+        target_regions_signal_file,
+        k_nearest=3,
+        max_dist=25000,
+        corr_coeff_thresh=0,
+        pval_thresh=0.50,
+        annotate_gene_ids=True,
+        is_ggr=False):
+    """link by distance and then filter for correlation
+    """
+    # link by distance
+    tmp_file = "{}.tmp.txt.gz".format(out_file.split(".txt")[0])
+    link_by_distance(
+        regions_file,
+        target_regions_file,
+        tmp_file,
+        k_nearest=3,
+        max_dist=max_dist,
+        annotate_gene_ids=True)
+
+    # read in signals
+    region_signals = pd.read_csv(
+        regions_signal_file, sep="\t", header=0, index_col=0)
+    if is_ggr:
+        region_signals = region_signals.drop("d05", axis=1)
+    target_region_signals = pd.read_csv(
+        target_regions_signal_file, sep="\t", header=0, index_col=0)
+    
+    # read in links
+    links = pd.read_csv(tmp_file, sep="\t", header=None)
+    end_link_info = links[3].str.split(",", expand=True)
+    if annotate_gene_ids:
+        links["target_id"] = end_link_info[2]
+    else:
+        links["target_id"] = end_link_info[0]
+    
+    # go through links
+    filtered_links = []
+    for region_idx in range(links.shape[0]):
+        
+        if region_idx % 5000 == 0:
+            print region_idx
+
+        # get interaction, region id, target id
+        interaction = links.iloc[region_idx].copy()
+        region_id = "{}:{}-{}".format(
+            interaction[0],
+            interaction[1],
+            interaction[2])
+        target_id = interaction["target_id"]
+
+        # get signals
+        try:
+            region_signal = region_signals.loc[region_id,:]
+            target_region_signal = target_region_signals.loc[target_id]
+        except KeyError:
+            continue
+
+        # correlate
+        corr_coeff, pval = pearsonr(
+            region_signal.values, target_region_signal.values)
+
+        # filter
+        if corr_coeff < corr_coeff_thresh:
+            continue
+        if pval > pval_thresh:
+            continue
+        
+        # append if passed filter
+        filtered_links.append(interaction)
+
+    # concat, clean up
+    filtered_links = pd.concat(filtered_links, axis=1).transpose()
+    filtered_links[3] = filtered_links[3].str.split(",ENSG", expand=True).iloc[:,0]
+    filtered_links = filtered_links.drop("target_id", axis=1)
+    
+    # and save this out
+    filtered_links.to_csv(out_file, sep="\t", compression="gzip", header=False, index=False)
+
+    # clean up
+    os.system("rm {}".format(tmp_file))
+    
+    return
+
+
+
+def setup_proximity_links_OLD(
         ref_region_file,
         tss_file,
         out_links_file,
@@ -589,6 +684,106 @@ def reconcile_interactions(links_files, out_dir, method="pooled"):
     return reconciled_files
 
 
+def run_interaction_idr_test(mat_file, out_file, idr_thresh=0.10):
+    """convert to narrowpeak format files, run IDR,
+    filter for consistent peaks
+    """
+    # make tmp files
+    rep1_tmp_file = "{}.rep1.bed.gz".format(mat_file.split(".txt")[0])
+    rep2_tmp_file = "{}.rep2.bed.gz".format(mat_file.split(".txt")[0])
+
+    # read in data and adjust
+    data = pd.read_csv(mat_file, sep="\t", index_col=0)
+    data["region_id"] = data.index
+    interactions = data["region_id"].str.split("_x_", n=2, expand=True)
+    # CHROM HACK: to ensure uniqueness, use to map back also
+    data["chrom"] = ["chr{}".format(str(val)) for val in range(data.shape[0])] 
+    data["start"] = interactions[0].str.split(
+        ":", n=2, expand=True)[1].str.split("-", n=2, expand=True)[0]
+    data["stop"] = interactions[0].str.split(
+        ":", n=2, expand=True)[1].str.split("-", n=2, expand=True)[1]
+    data["interaction"] = interactions[1].map(str) + "," + data["pooled"].map(str)
+
+    # rep1
+    rep1_cols = ["chrom", "start", "stop", "interaction", "rep1"]
+    rep1 = data[rep1_cols].copy()
+    rep1["strand"] = "."
+    rep1["plotStart"] = rep1["start"]
+    rep1["plotEnd"] = rep1["stop"]
+    rep1["rgb"] = 100
+    rep1.to_csv(rep1_tmp_file, sep="\t", header=None, index=None, compression="gzip")
+
+    # rep2
+    rep2_cols = ["chrom", "start", "stop", "interaction", "rep2"]
+    rep2 = data[rep2_cols].copy()
+    rep2["strand"] = "."
+    rep2["plotStart"] = rep2["start"]
+    rep2["plotEnd"] = rep2["stop"]
+    rep2["rgb"] = 100
+    rep2.to_csv(rep2_tmp_file, sep="\t", header=None, index=None, compression="gzip")
+
+    # IDR
+    idr_tmp_file = "{}.idr_results.tmp".format(out_file.split(".gz")[0])
+    idr_cmd = (
+        "idr --samples {} {} "
+        "--input-file-type bed "
+        "--rank 5 "
+        "-o {} "
+        "--idr-threshold {} "
+        "--plot").format(
+            rep1_tmp_file, rep2_tmp_file,
+            idr_tmp_file,
+            idr_thresh)
+    print idr_cmd
+    os.system(idr_cmd)
+
+    # read in IDR file and use IDs to filter mat file
+    idr_results = pd.read_csv(idr_tmp_file, sep="\t", header=None)
+    data_filt = data[data["chrom"].isin(idr_results.iloc[:,0])]
+    
+    # clean up and save out
+    drop_cols = ["chrom", "start", "stop", "region_id", "interaction"]
+    data_filt = data_filt.drop(drop_cols, axis=1)
+    data_filt.to_csv(out_file, sep="\t", compression="gzip", header=True, index=True)
+
+    # plot
+    plot_file = "{}.after_idr.scatter.pdf".format(out_file.split(".txt")[0])
+    plot_cmd = "Rscript /users/dskim89/git/ggr-project/R/plot.links.rep_consistency.R {} {}".format(
+        out_file, plot_file)
+    print plot_cmd
+    os.system(plot_cmd)
+
+    # clean up (delete tmp)
+    os.system("rm {} {}".format(rep1_tmp_file, rep2_tmp_file))
+    
+    return None
+
+
+def _convert_to_interaction_format(mat_file, out_file):
+    """convert to interaction format
+    """
+    # read in data
+    data = pd.read_csv(mat_file, sep="\t", index_col=0)
+    data["region_id"] = data.index
+    interactions = data["region_id"].str.split("_x_", n=2, expand=True)
+    data["chrom"] = interactions[0].str.split(
+        ":", n=2, expand=True)[0]
+    data["start"] = interactions[0].str.split(
+        ":", n=2, expand=True)[1].str.split("-", n=2, expand=True)[0]
+    data["stop"] = interactions[0].str.split(
+        ":", n=2, expand=True)[1].str.split("-", n=2, expand=True)[1]
+    data["interaction"] = interactions[1].map(str) + "," + data["pooled"].map(str)
+
+    # clean up
+    keep_cols = ["chrom", "start", "stop", "interaction", "pooled"]
+    data = data[keep_cols]
+    data["strand"] = "."
+
+    # save out
+    data.to_csv(out_file, sep="\t", compression="gzip", header=False, index=False)
+    
+    return
+
 
 def get_replicate_consistent_links(
         pooled_file, links_files, out_prefix,
@@ -599,11 +794,14 @@ def get_replicate_consistent_links(
     out_dir = os.path.dirname(out_prefix)
     tmp_dir = "{}/tmp".format(out_dir)
     os.system("mkdir -p {}".format(tmp_dir))
+
+    # merge reps/pooled
+    out_mat_file = "{}.reps.mat.txt.gz".format(out_prefix)
     
     # map to pooled space
     matched_links_files = reconcile_interactions(
         [pooled_file] + links_files, tmp_dir, method="pooled")
-    
+
     # format link files
     interaction_files = []
     for links_file in matched_links_files:
@@ -614,9 +812,9 @@ def get_replicate_consistent_links(
         reformat_interaction_file(links_file, tmp_file)
         interaction_files.append(tmp_file)
     print interaction_files
-    
+
     # merge to make a table
-    out_mat_file = "{}.reps.mat.txt.gz".format(out_prefix)
+
     summary = None
     for interaction_file_idx in range(len(interaction_files)):
         interaction_file = interaction_files[interaction_file_idx]
@@ -645,9 +843,12 @@ def get_replicate_consistent_links(
 
     # and set threshold for consistency
     # how to do this?
+    # convert to peak files and compute IDR?
+    mat_filt_file = "{}.filt.mat.txt.gz".format(out_mat_file.split(".mat")[0])
+    run_interaction_idr_test(out_mat_file, mat_filt_file)
     
-
-    # clean up tmp files
-    
+    # and save out as interaction format
+    interaction_file = "{}.interactions.txt.gz".format(mat_filt_file.split(".mat")[0])
+    _convert_to_interaction_format(mat_filt_file, interaction_file)
     
     return

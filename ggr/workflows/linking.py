@@ -12,14 +12,14 @@ from ggr.util.utils import parallel_copy
 from ggr.util.bed_utils import merge_regions
 from ggr.util.bed_utils import id_to_bed
 
-from ggr.analyses.linking import setup_proximity_links
+from ggr.analyses.linking import link_by_distance
+from ggr.analyses.linking import link_by_distance_and_corr
 
 from ggr.analyses.bioinformatics import run_gprofiler
 from ggr.analyses.linking import build_correlation_matrix
 from ggr.analyses.linking import traj_bed_to_gene_set_by_proximity
 from ggr.analyses.linking import build_confusion_matrix
 from ggr.analyses.linking import get_replicate_consistent_links
-
 
 
 def run_replicate_consistent_links_workflow(
@@ -81,27 +81,103 @@ def runall(args, prefix):
     # output: linking by naive proximity
     # -------------------------------------------
     logger.info("ANALYSIS: naive proximity linking")
-    k_nearest = 3
-    max_dist = 25000 # Gasperini et al Cell 2019
-    corr_coeff_thresh = 0 #0
-    pval_thresh = 0.1 #0.10
+    days = ["d00", "d30", "d60"]
     
-    # set up links <- do it day specific?
-    links_file = "{}/links.proximity.k-{}.d-{}.bed.gz".format(
-        OUT_DIR, k_nearest, max_dist)
-    setup_proximity_links(
-        ref_regions_bed_file,
-        tss_file,
-        links_file,
-        region_signal_file=ref_regions_signal_file,
-        rna_signal_file=rna_signal_file,
-        k_nearest=k_nearest,
-        max_dist=max_dist,
-        corr_coeff_thresh=corr_coeff_thresh,
-        pval_thresh=pval_thresh)
+    # dirs
+    proximity_links_dir = "{}/proximity".format(results_dir)
+    proximity_corr_links_dir = "{}/proximity.corr".format(results_dir)
+    proximity_corr_dynamic_links_dir = "{}/proximity.corr.dynamic".format(results_dir)
+    run_shell_cmd("mkdir -p {} {} {}".format(
+        proximity_links_dir,
+        proximity_corr_links_dir,
+        proximity_corr_dynamic_links_dir))
+    
+    # naive proximity
+    method_type = "proximity"
+    k_nearest = args.inputs["params"]["linking"][method_type]["k_nearest"]
+    max_dist = args.inputs["params"]["linking"][method_type]["max_dist"]
+    for day in days:
+        day_links_file = "{}/links.proximity.{}.k-{}.max_d-{}.txt.gz".format(
+            proximity_links_dir, day, k_nearest, max_dist)
+        if not os.path.isfile(day_links_file):
+            # get tss file
+            day_tss_file = args.outputs["data"]["tss.expressed_{}".format(day)]
+            
+            # get region file that has master region IDs (intersect with master file)
+            day_orig_bed_file = glob.glob("{}/*{}*.gz".format(
+                args.outputs["results"]["atac"]["timepoint_region_dir"],
+                day))[0]
+            day_regions_file = "{}/regions.{}.bed.gz".format(proximity_links_dir, day)
+            intersect_cmd = (
+                "bedtools intersect -u -a {} -b {} | "
+                "gzip -c > {}").format(
+                    args.outputs["data"]["atac.master.bed"],
+                    day_orig_bed_file,
+                    day_regions_file)
+            run_shell_cmd(intersect_cmd)
+            
+            # set up naive proximity links
+            link_by_distance(
+                day_regions_file,
+                day_tss_file,
+                day_links_file,
+                k_nearest=k_nearest,
+                max_dist=max_dist,
+                annotate_gene_ids=False)
 
+    # proximity with corr: params
+    method_type = "proximity.corr"
+    k_nearest = args.inputs["params"]["linking"][method_type]["k_nearest"]
+    max_dist = args.inputs["params"]["linking"][method_type]["max_dist"]
+    corr_coeff_thresh = args.inputs["params"]["linking"][method_type]["corr_coeff_thresh"]
+    pval_thresh = args.inputs["params"]["linking"][method_type]["pval_thresh"]
+    for day in days:
+        day_links_file = "{}/links.proximity.{}.k-{}.max_d-{}.corr-{}.txt.gz".format(
+            proximity_corr_links_dir, day, k_nearest, max_dist, corr_coeff_thresh)
+        if not os.path.isfile(day_links_file):
+            # get inputs
+            day_tss_file = args.outputs["data"]["tss.expressed_{}".format(day)]
+            day_regions_file = "{}/regions.{}.bed.gz".format(proximity_links_dir, day)
+            
+            # set up proximity links w correlation filter
+            link_by_distance_and_corr(
+                day_regions_file,
+                day_tss_file,
+                day_links_file,
+                args.outputs["data"]["atac.counts.pooled.rlog.mat"],
+                args.outputs["data"]["rna.counts.pc.expressed.timeseries_adj.pooled.rlog.mat"],
+                k_nearest=k_nearest,
+                max_dist=max_dist,
+                corr_coeff_thresh=corr_coeff_thresh,
+                pval_thresh=pval_thresh,
+                is_ggr=True)
 
-    quit()
+    # proximity with corr: ONLY dynamic
+    method_type = "proximity.corr.dynamic"
+    k_nearest = args.inputs["params"]["linking"][method_type]["k_nearest"]
+    max_dist = args.inputs["params"]["linking"][method_type]["max_dist"]
+    corr_coeff_thresh = args.inputs["params"]["linking"][method_type]["corr_coeff_thresh"]
+    pval_thresh = args.inputs["params"]["linking"][method_type]["pval_thresh"]
+    for day in days:
+        day_links_file = "{}/links.proximity.{}.k-{}.max_d-{}.corr-{}.txt.gz".format(
+            proximity_corr_dynamic_links_dir, day, k_nearest, max_dist, corr_coeff_thresh)
+        if not os.path.isfile(day_links_file):
+            # get inputs
+            day_tss_file = args.outputs["data"]["tss.expressed_{}".format(day)]
+            day_regions_file = "{}/regions.{}.bed.gz".format(proximity_links_dir, day)
+            
+            # set up proximity links w correlation filter
+            link_by_distance_and_corr(
+                day_regions_file,
+                day_tss_file,
+                day_links_file,
+                args.outputs["data"]["atac.counts.pooled.rlog.dynamic.mat"],
+                args.outputs["data"]["rna.counts.pc.expressed.timeseries_adj.pooled.rlog.dynamic.mat"],
+                k_nearest=k_nearest,
+                max_dist=max_dist,
+                corr_coeff_thresh=corr_coeff_thresh,
+                pval_thresh=pval_thresh,
+                is_ggr=True)
     
     # -------------------------------------------
     # ANALYSIS - different styles of ABC linking
@@ -109,14 +185,15 @@ def runall(args, prefix):
     # output: replicate consistent link sets
     # -------------------------------------------
     logger.info("ANALYSIS: build replicate consistent ABC links - distance-based")
-    if False:
-        run_replicate_consistent_links_workflow(
-            args,
-            prefix,
-            results_dir,
-            link_key="distance",
-            out_dir="abc.distance")
-
+    
+    run_replicate_consistent_links_workflow(
+        args,
+        prefix,
+        results_dir,
+        link_key="distance",
+        out_dir="abc.distance")
+    quit()
+    
     logger.info("ANALYSIS: build replicate consistent ABC links - cell type avg HiC")
     run_replicate_consistent_links_workflow(
         args,
@@ -129,6 +206,10 @@ def runall(args, prefix):
     quit()
 
 
+    # TODO - for each of these link sets, get correlation matrix
+    # between ATAC and RNA
+    # input: atac clusters, rna clusters/data
+    
     
     # -------------------------------------------
     # ANALYSIS - get correlation matrix between ATAC and RNA
