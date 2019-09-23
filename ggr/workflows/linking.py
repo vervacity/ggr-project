@@ -12,10 +12,11 @@ from ggr.util.utils import parallel_copy
 from ggr.util.bed_utils import merge_regions
 from ggr.util.bed_utils import id_to_bed
 
+from ggr.analyses.bioinformatics import run_gprofiler
+
 from ggr.analyses.linking import link_by_distance
 from ggr.analyses.linking import link_by_distance_and_corr
-
-from ggr.analyses.bioinformatics import run_gprofiler
+from ggr.analyses.linking import get_timepoint_consistent_links
 from ggr.analyses.linking import build_correlation_matrix
 from ggr.analyses.linking import traj_bed_to_gene_set_by_proximity
 from ggr.analyses.linking import build_confusion_matrix
@@ -96,6 +97,7 @@ def runall(args, prefix):
     method_type = "proximity"
     k_nearest = args.inputs["params"]["linking"][method_type]["k_nearest"]
     max_dist = args.inputs["params"]["linking"][method_type]["max_dist"]
+    links_files = []
     for day in days:
         day_links_file = "{}/links.proximity.{}.k-{}.max_d-{}.txt.gz".format(
             proximity_links_dir, day, k_nearest, max_dist)
@@ -124,13 +126,21 @@ def runall(args, prefix):
                 k_nearest=k_nearest,
                 max_dist=max_dist,
                 annotate_gene_ids=False)
+        links_files.append(day_links_file)
 
-    # proximity with corr: params
+    # and reconcile across timepoints
+    all_links_file = "{}/links.proximity.ALL.k-{}.max_d-{}.txt.gz".format(
+        proximity_links_dir, k_nearest, max_dist)
+    if not os.path.isfile(all_links_file):
+        get_timepoint_consistent_links(links_files, all_links_file, method="union")
+
+    # proximity with corr
     method_type = "proximity.corr"
     k_nearest = args.inputs["params"]["linking"][method_type]["k_nearest"]
     max_dist = args.inputs["params"]["linking"][method_type]["max_dist"]
     corr_coeff_thresh = args.inputs["params"]["linking"][method_type]["corr_coeff_thresh"]
     pval_thresh = args.inputs["params"]["linking"][method_type]["pval_thresh"]
+    links_files = []
     for day in days:
         day_links_file = "{}/links.proximity.{}.k-{}.max_d-{}.corr-{}.txt.gz".format(
             proximity_corr_links_dir, day, k_nearest, max_dist, corr_coeff_thresh)
@@ -151,6 +161,13 @@ def runall(args, prefix):
                 corr_coeff_thresh=corr_coeff_thresh,
                 pval_thresh=pval_thresh,
                 is_ggr=True)
+        links_files.append(day_links_file)
+
+    # and reconcile across timepoints
+    all_links_file = "{}/links.proximity.ALL.k-{}.max_d-{}.corr-{}.txt.gz".format(
+        proximity_corr_links_dir, k_nearest, max_dist, corr_coeff_thresh)
+    if not os.path.isfile(all_links_file):
+        get_timepoint_consistent_links(links_files, all_links_file, method="union")
 
     # proximity with corr: ONLY dynamic
     method_type = "proximity.corr.dynamic"
@@ -158,6 +175,7 @@ def runall(args, prefix):
     max_dist = args.inputs["params"]["linking"][method_type]["max_dist"]
     corr_coeff_thresh = args.inputs["params"]["linking"][method_type]["corr_coeff_thresh"]
     pval_thresh = args.inputs["params"]["linking"][method_type]["pval_thresh"]
+    links_files = []
     for day in days:
         day_links_file = "{}/links.proximity.{}.k-{}.max_d-{}.corr-{}.txt.gz".format(
             proximity_corr_dynamic_links_dir, day, k_nearest, max_dist, corr_coeff_thresh)
@@ -178,29 +196,52 @@ def runall(args, prefix):
                 corr_coeff_thresh=corr_coeff_thresh,
                 pval_thresh=pval_thresh,
                 is_ggr=True)
-    
+        links_files.append(day_links_file)
+
+    # and reconcile across timepoints
+    all_links_file = "{}/links.proximity.ALL.k-{}.max_d-{}.corr-{}.txt.gz".format(
+        proximity_corr_dynamic_links_dir, k_nearest, max_dist, corr_coeff_thresh)
+    if not os.path.isfile(all_links_file):
+        get_timepoint_consistent_links(links_files, all_links_file, method="union")
+            
     # -------------------------------------------
     # ANALYSIS - different styles of ABC linking
     # input: ABC links
     # output: replicate consistent link sets
     # -------------------------------------------
     logger.info("ANALYSIS: build replicate consistent ABC links - distance-based")
-    
-    run_replicate_consistent_links_workflow(
-        args,
-        prefix,
-        results_dir,
-        link_key="distance",
-        out_dir="abc.distance")
+    abc_dist_dir = "abc.distance"
+    if not os.path.isdir("{}/{}".format(results_dir, abc_dist_dir)):
+        run_replicate_consistent_links_workflow(
+            args,
+            prefix,
+            results_dir,
+            link_key="distance",
+            out_dir=abc_dist_dir)
+
+    # and reconcile across timepoints
+    links_files = sorted(
+        glob.glob("{}/{}/*interactions.txt.gz".format(
+            results_dir, abc_dist_dir)))
+    print links_files
+    all_links_file = "{}/{}/{}.links.abc.distance.ALL.txt.gz".format(
+        results_dir, abc_dist_dir, prefix)
+    if not os.path.isfile(all_links_file):
+        get_timepoint_consistent_links(
+            links_files, all_links_file, method="union")
+
     quit()
-    
+
+        
     logger.info("ANALYSIS: build replicate consistent ABC links - cell type avg HiC")
-    run_replicate_consistent_links_workflow(
-        args,
-        prefix,
-        results_dir,
-        link_key="hic.celltype_avg",
-        out_dir="abc.hic.celltype_avg")
+    abc_avg_hic_dir = "abc.hic.celltype_avg"
+    if not os.path.isdir("{}/{}".format(results_dir, abc_avg_hic_dir)):
+        run_replicate_consistent_links_workflow(
+            args,
+            prefix,
+            results_dir,
+            link_key="hic.celltype_avg",
+            out_dir=abc_avg_hic_dir)
 
 
     quit()

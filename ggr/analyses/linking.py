@@ -11,16 +11,78 @@ from collections import Counter
 from scipy.stats import pearsonr
 
 
+def _add_mirrored_interactions(interaction_file, out_file):
+    """if have an interaction file with just one side of the interaction,
+    add in the mirrored version
+    """
+    # read in data
+    data = pd.read_csv(interaction_file, sep="\t", header=None)
+
+    # pull out relevant info
+    interactions = data[3].str.split(",", n=2, expand=True)
+    chrom = interactions[0].str.split(":", n=2, expand=True)[0]
+    start = interactions[0].str.split(
+        ":", n=2, expand=True)[1].str.split("-", n=2, expand=True)[0]
+    stop = interactions[0].str.split(
+        ":", n=2, expand=True)[1].str.split("-", n=2, expand=True)[1]
+    score = interactions[1]
+
+    # flip
+    data_flip = data.copy()
+    data_flip[3] = data[0].map(str) + ":" + data[1].map(str) + "-" + data[2].map(str) + "," + score.map(str)
+    data_flip[0] = chrom
+    data_flip[1] = start
+    data_flip[2] = stop
+    
+    # concat
+    data = pd.concat([data, data_flip], axis=0)
+
+    # save out, sort, finalize
+    tmp_file = "{}.unsorted.txt.gz".format(out_file.split(".txt")[0])
+    data.to_csv(tmp_file, sep="\t", compression="gzip", header=False, index=False)
+    sort_cmd = (
+        "zcat {} | "
+        "sort -k1,1 -k2,2n | "
+        "uniq | "
+        "gzip -c > {}").format(
+            tmp_file, out_file)
+    print sort_cmd
+    os.system(sort_cmd)
+
+    # clean up
+    os.system("rm {}".format(tmp_file))
+    
+    return None
+
+
+def _split_interaction_name_field(interactions):
+    """take the interaction field "chr:start-stop,score"
+    and return component parts as pandas Series
+    """
+    interactions = interactions.str.split(",", n=2, expand=True)
+    chrom = interactions[0].str.split(":", n=2, expand=True)[0]
+    start = interactions[0].str.split(
+        ":", n=2, expand=True)[1].str.split("-", n=2, expand=True)[0]
+    stop = interactions[0].str.split(
+        ":", n=2, expand=True)[1].str.split("-", n=2, expand=True)[1]
+    score = interactions[1]
+
+    return chrom, start, stop, score
+
+
 def link_by_distance(
         regions_file,
         target_regions_file,
         out_file,
         k_nearest=3,
         max_dist=25000,
-        annotate_gene_ids=True):
+        annotate_gene_ids=True,
+        add_mirrored_interactions=True):
     """normally use for regulatory regions to TSS
     if annotate_gene_ids, keep track of which genes are linked
     """
+    assert out_file.endswith(".gz")
+    
     # bedtools closest
     tmp_file = "tss.overlap.tmp.txt"
     closest = "bedtools closest -d -k {} -a {} -b {} > {}".format(
@@ -46,7 +108,14 @@ def link_by_distance(
 
     # save out
     data.to_csv(out_file, compression="gzip", sep="\t", header=False, index=False)
-    
+
+    # adjust if mirroring interactions
+    if add_mirrored_interactions:
+        tmp_mirror_file = "links.tmp.txt.gz"
+        os.system("mv {} {}".format(out_file, tmp_mirror_file))
+        _add_mirrored_interactions(tmp_mirror_file, out_file)
+        os.system("rm {}".format(tmp_mirror_file))
+        
     # cleanup
     os.system("rm {}".format(tmp_file))
     
@@ -64,6 +133,7 @@ def link_by_distance_and_corr(
         corr_coeff_thresh=0,
         pval_thresh=0.50,
         annotate_gene_ids=True,
+        add_mirrored_interactions=True,
         is_ggr=False):
     """link by distance and then filter for correlation
     """
@@ -136,6 +206,13 @@ def link_by_distance_and_corr(
     # and save this out
     filtered_links.to_csv(out_file, sep="\t", compression="gzip", header=False, index=False)
 
+    # adjust if mirroring interactions
+    if add_mirrored_interactions:
+        tmp_mirror_file = "links.tmp.txt.gz"
+        os.system("mv {} {}".format(out_file, tmp_mirror_file))
+        _add_mirrored_interactions(tmp_mirror_file, out_file)
+        os.system("rm {}".format(tmp_mirror_file))
+    
     # clean up
     os.system("rm {}".format(tmp_file))
     
@@ -143,112 +220,47 @@ def link_by_distance_and_corr(
 
 
 
-def setup_proximity_links_OLD(
-        ref_region_file,
-        tss_file,
-        out_links_file,
-        region_signal_file=None,
-        rna_signal_file=None,
-        k_nearest=3,
-        max_dist=25000,
-        corr_coeff_thresh=0,
-        pval_thresh=0.10,
-        is_ggr=True):
-    """actually, just set up links here?
-    then can have a BED file with gene IDs
+def regions_to_genes(
+        region_file, links_file, tss_file, out_file,
+        region_signals=None, rna_signals=None):
+    """goes from a region set to a linked gene set
     """
-    assert out_links_file.endswith(".gz")
+    # overlap regions with links
+    tmp_file = "{}.region_to_region.tmp.txt.gz".format(
+        out_file.split(".txt")[0])
+    intersect_cmd = (
+        "bedtools intersect -u -a {} -b {} | "
+        "gzip -c > {}").format(
+            links_file, region_file, tmp_file)
     
-    # first setup proximal links
-    link_by_distance(
-        ref_region_file, tss_file, out_links_file,
-        k_nearest=k_nearest, max_dist=max_dist)
+    # reformat linked regions to bed file
+    tmp_bed_file = "{}.bed.gz".format(tmp_file.split(".txt")[0])
+    data = pd.read_csv(tmp_file, sep="\t")
+    chrom, start, stop, score = _split_interaction_name_field(data[3])
+    region_id = data[0].mapt(str) + ":" + data[1].map(str) + "-" + data[2].map(str)
+    bed_data = pd.DataFrame(
+        {"chrom": chrom,
+         "start": start,
+         "stop": stop,
+         "region_id": region_id,
+         "score": score})
+    bed_data.to_csv(tmp_bed_file, sep="\t", compression="gzip")
     
-    # then read in proximal links, region signal mat, rna signal mat
-    # if signal files are given
-    if region_signal_file is not None:
-        assert rna_signal_file is not None
+    # overlap linked regions with TSS file
+    tmp_genes_file = "{}.region_to_tss.tmp.txt.gz".format(
+        out_file.split(".txt")[0])
+    intersect_cmd = (
+        "bedtools intersect -a {} -b {} | "
+        "gzip -c > {}").format(
+            tss_file, tmp_bed_file, tmp_genes_file)
 
-        # read in links
-        links = pd.read_csv(out_links_file, sep="\t", header=None)
-        mappings = links[3].str.split(";", n=2, expand=True)
-        links["region_id"] = mappings[0]
-        links["genes"] = mappings[1]
-        print links.shape
-        
-        # read in region signals
-        region_signals = pd.read_csv(region_signal_file, sep="\t", header=0)
-        if is_ggr:
-            region_signals = region_signals.drop("d05", axis=1)
-            
-        # read in rna signals
-        rna_signals = pd.read_csv(rna_signal_file, sep="\t", header=0)
-
-        # then for each row, correlate gene to atac
-        filtered_links = []
-        for region_idx in range(links.shape[0]):
-
-            if region_idx % 5000 == 0:
-                print region_idx
-            
-            region_id = links["region_id"].iloc[region_idx]
-            region_linked_genes = links["genes"].iloc[region_idx].split(",")
-            region_signal = region_signals.loc[region_id,:]
-            region_signal_str = ",".join(
-                ["{:0.3f}".format(val) for val in region_signal.values])
-            
-            filtered_genes = {}
-            for gene_idx in range(len(region_linked_genes)):
-                gene_id = region_linked_genes[gene_idx]
-                try:
-                    gene_signal = rna_signals.loc[gene_id,:]
-                    gene_signal_str = ",".join(
-                        ["{:0.3f}".format(val) for val in gene_signal.values])
-                except KeyError:
-                    continue
-                
-                # correlate
-                corr_coeff, pval = pearsonr(
-                    region_signal.values, gene_signal.values)
-
-                # filters
-                if corr_coeff < corr_coeff_thresh:
-                    continue
-
-                if pval > pval_thresh:
-                    continue
-
-                # append if passed filter
-                filtered_genes[gene_id] = gene_signal_str
-                
-            # first confirm there are any genes left
-            if len(filtered_genes.keys()) == 0:
-                continue
-            
-            # pull links, replace genes, and save out
-            link = links.iloc[region_idx].copy()
-            link["region_signal"] = region_signal_str
-            link["genes"] = ",".join([
-                "{}:[{}]".format(gene_id, filtered_genes[gene_id])
-                for gene_id in filtered_genes.keys()])
-            filtered_links.append(link)
-
-        # concat
-        filtered_links = pd.concat(filtered_links, axis=1).transpose()
-        filtered_links[3] = "region_id=" + filtered_links["region_id"].map(str) + ";region_signal=[" + filtered_links["region_signal"].map(str) + "];genes=" + filtered_links["genes"].map(str)
-        filtered_links = filtered_links.drop(["region_id", "region_signal", "genes"], axis=1)
-        
-        # and save this out
-        filtered_links.to_csv(out_links_file, sep="\t", compression="gzip", header=False, index=False)
-
-    return
+    # read in and clean up
 
 
-def setup_interaction_links(interaction_file, tss_file):
-    """takes links from interaction format and associates them with genes
-    """
-    # TODO once we have ABC distance links
+    # if signals available, read them in and get aggregate info
+    # across regions and genes
     
+
     return
 
 
@@ -577,7 +589,8 @@ def reformat_interaction_file(interaction_file, out_file, remove_dups=True):
     return None
 
 
-def reconcile_interactions(links_files, out_dir, method="pooled"):
+def reconcile_interactions(
+        links_files, out_dir, method="pooled"):
     """reconcile interactions so that they'll have the same IDs
     """
     # fix ids (start/stop)
@@ -606,82 +619,100 @@ def reconcile_interactions(links_files, out_dir, method="pooled"):
         os.system(adjust_cmd)
         adj_links_files.append(adj_links_file)
     
-    # reconcile
+    # build master regions for reconciling files
     reconciled_files = []
     if method == "pooled":
         # if matching to pooled links, intersect each rep
         # with pooled file to get mapping,
         # then adjust IDs
-        pooled_file = adj_links_files[0]
-        reconciled_files.append(links_files[0])
-        for link_file_idx in range(1, len(adj_links_files)):
-            # intersect w pooled file to get mapping
-            links_file = adj_links_files[link_file_idx]
-            tmp_file = "{}/{}.mapping.txt.gz".format(
-                out_dir,
-                os.path.basename(links_file).split(".bed")[0].split(".txt")[0])
-            intersect_cmd = (
-                "bedtools intersect -wao -a {} -b {} | "
-                "awk -F '\t' '{{ print $1\":\"$2\"-\"$3\"\t\"$4\":\"$5\"-\"$6\"\t\"$7 }}' | "
-                "gzip -c > {}").format(
-                    links_file, pooled_file, tmp_file)
-            print intersect_cmd
-            os.system(intersect_cmd)
-            
-            # read in the mapping
-            mapping = {}
-            best_overlap_lens = {}
-            with gzip.open(tmp_file, "r") as fp:
-                for line in fp:
-                    fields = line.strip().split("\t")
-                    # check if actually null mapping here?
-                    try:
-                        best_overlap_len = best_overlap_lens[fields[0]]
-                        if int(fields[2]) > best_overlap_len:
-                            mapping[fields[0]] = fields[1]
-                            best_overlap_lens[fields[0]] = int(fields[2])
-                    except:
+        master_regions_file = adj_links_files[0]
+        adj_links_files = adj_links_files[1:]
+        reconciled_files.append(master_regions_file)
+    elif method == "union":
+        master_regions_file = "{}/master.union.bed.gz".format(out_dir)
+        union_cmd = (
+            "zcat {} | "
+            "sort -k1,1 -k2,2n | "
+            "bedtools merge -d -100 -i stdin | "
+            "gzip -c > {}").format(
+                " ".join(adj_links_files),
+                master_regions_file)
+        print union_cmd
+        os.system(union_cmd)
+
+    # map to master regions
+    for link_file_idx in range(len(adj_links_files)):
+        # intersect w pooled file to get mapping
+        links_file = adj_links_files[link_file_idx]
+        tmp_file = "{}/{}.mapping.txt.gz".format(
+            out_dir,
+            os.path.basename(links_file).split(".bed")[0].split(".txt")[0])
+        intersect_cmd = (
+            "bedtools intersect -wao -a {} -b {} | "
+            "awk -F '\t' '{{ print $1\":\"$2\"-\"$3\"\t\"$4\":\"$5\"-\"$6\"\t\"$7 }}' | "
+            "gzip -c > {}").format(
+                links_file, master_regions_file, tmp_file)
+        print intersect_cmd
+        os.system(intersect_cmd)
+
+        # read in the mapping
+        mapping = {}
+        best_overlap_lens = {}
+        with gzip.open(tmp_file, "r") as fp:
+            for line in fp:
+                fields = line.strip().split("\t")
+                # check if actually null mapping here?
+                try:
+                    best_overlap_len = best_overlap_lens[fields[0]]
+                    if int(fields[2]) > best_overlap_len:
                         mapping[fields[0]] = fields[1]
                         best_overlap_lens[fields[0]] = int(fields[2])
+                except:
+                    mapping[fields[0]] = fields[1]
+                    best_overlap_lens[fields[0]] = int(fields[2])
 
-            reconcile_file = "{}/{}.matched.txt.gz".format(
-                out_dir,
-                os.path.basename(links_file).split(".bed")[0].split(".txt")[0])
-            with gzip.open(links_files[link_file_idx], "r") as fp:
-                with gzip.open(reconcile_file, "w") as out:
-                    for line in fp:
-                        fields = line.strip().split("\t")
-                        start_id = "{}:{}-{}".format(
-                            fields[0], fields[1], fields[2])
-                        end_id = fields[3].split(",")[0]
-                        signal_val = fields[3].split(",")[1]
-                        
-                        # adjust start end of interaction
-                        # but only adjust if there is a mapping val
-                        if mapping[start_id] != ".:-1--1":
-                            start_id = mapping[start_id]
-                        
-                        # adjust stop end of interaction
-                        if mapping[end_id] != ".:-1--1":
-                            end_id = mapping[end_id]
-                            
-                        # new line
-                        adj_line = "{}\t{}\t{}\t{},{}\t{}\n".format(
-                            start_id.split(":")[0],
-                            start_id.split(":")[1].split("-")[0],
-                            start_id.split(":")[1].split("-")[1],
-                            end_id,
-                            signal_val,
-                            fields[4],
-                            fields[5])
-                        
-                        # write out
-                        out.write(adj_line)
+        reconcile_file = "{}/{}.matched.txt.gz".format(
+            out_dir,
+            os.path.basename(links_file).split(".bed")[0].split(".txt")[0])
+        with gzip.open(links_files[link_file_idx], "r") as fp:
+            with gzip.open(reconcile_file, "w") as out:
+                for line in fp:
+                    fields = line.strip().split("\t")
+                    start_id = "{}:{}-{}".format(
+                        fields[0], fields[1], fields[2])
+                    end_id = fields[3].split(",")[0]
+                    signal_val = fields[3].split(",")[1]
 
-            # save to list
-            reconciled_files.append(reconcile_file)
+                    # adjust start end of interaction
+                    # but only adjust if there is a mapping val
+                    if mapping[start_id] != ".:-1--1":
+                        start_id = mapping[start_id]
+
+                    # adjust stop end of interaction
+                    if mapping[end_id] != ".:-1--1":
+                        end_id = mapping[end_id]
+
+                    # new line
+                    adj_line = "{}\t{}\t{}\t{},{}\t{}\n".format(
+                        start_id.split(":")[0],
+                        start_id.split(":")[1].split("-")[0],
+                        start_id.split(":")[1].split("-")[1],
+                        end_id,
+                        signal_val,
+                        fields[4],
+                        fields[5])
+
+                    # write out
+                    out.write(adj_line)
+
+        # save to list
+        reconciled_files.append(reconcile_file)
             
     return reconciled_files
+
+
+
+
 
 
 def run_interaction_idr_test(mat_file, out_file, idr_thresh=0.10):
@@ -759,11 +790,20 @@ def run_interaction_idr_test(mat_file, out_file, idr_thresh=0.10):
     return None
 
 
-def _convert_to_interaction_format(mat_file, out_file):
+def _convert_to_interaction_format(mat_file, out_file, score_val="pooled"):
     """convert to interaction format
     """
     # read in data
     data = pd.read_csv(mat_file, sep="\t", index_col=0)
+
+    # which method to score with
+    if score_val == "max":
+        data = data.fillna(0)
+        data["pooled"] = data.values.max(axis=1)
+    else:
+        raise ValueError, "not implemented!"
+
+    # adjust
     data["region_id"] = data.index
     interactions = data["region_id"].str.split("_x_", n=2, expand=True)
     data["chrom"] = interactions[0].str.split(
@@ -773,12 +813,12 @@ def _convert_to_interaction_format(mat_file, out_file):
     data["stop"] = interactions[0].str.split(
         ":", n=2, expand=True)[1].str.split("-", n=2, expand=True)[1]
     data["interaction"] = interactions[1].map(str) + "," + data["pooled"].map(str)
-
+        
     # clean up
     keep_cols = ["chrom", "start", "stop", "interaction", "pooled"]
     data = data[keep_cols]
     data["strand"] = "."
-
+    
     # save out
     data.to_csv(out_file, sep="\t", compression="gzip", header=False, index=False)
     
@@ -787,6 +827,7 @@ def _convert_to_interaction_format(mat_file, out_file):
 
 def get_replicate_consistent_links(
         pooled_file, links_files, out_prefix,
+        add_mirrored_interactions=True,
         colnames=["pooled", "rep1", "rep2"]):
     """get replicate consistent links
     """
@@ -850,5 +891,71 @@ def get_replicate_consistent_links(
     # and save out as interaction format
     interaction_file = "{}.interactions.txt.gz".format(mat_filt_file.split(".mat")[0])
     _convert_to_interaction_format(mat_filt_file, interaction_file)
+
+    # adjust if mirroring interactions
+    if add_mirrored_interactions:
+        tmp_mirror_file = "links.tmp.txt.gz"
+        os.system("mv {} {}".format(interaction_file, tmp_mirror_file))
+        _add_mirrored_interactions(tmp_mirror_file, interaction_file)
+        os.system("rm {}".format(tmp_mirror_file))
     
     return
+
+
+def get_timepoint_consistent_links(
+        links_files, out_file, method="union",
+        add_mirrored_interactions=True,
+        colnames=["d0", "d3", "d6"]):
+    """aggregate links across timepoints
+    """
+    # out dir, tmp_dir
+    out_dir = os.path.dirname(out_file)
+    tmp_dir = "{}/tmp".format(out_dir)
+    os.system("mkdir -p {}".format(tmp_dir))
+
+    # map to pooled space
+    matched_links_files = reconcile_interactions(
+        links_files, tmp_dir, method=method)
+
+    # format link files
+    interaction_files = []
+    for links_file in matched_links_files:
+        print links_file
+        tmp_file = "{}/{}.interaction_ids.tmp.txt.gz".format(
+            tmp_dir,
+            os.path.basename(links_file).split(".bed")[0].split(".txt")[0])
+        reformat_interaction_file(links_file, tmp_file)
+        interaction_files.append(tmp_file)
+
+    # merge to make a table
+    summary = None
+    for interaction_file_idx in range(len(interaction_files)):
+        interaction_file = interaction_files[interaction_file_idx]
+        data = pd.read_csv(interaction_file, sep="\t", header=None, index_col=None)
+        data.index = data[0].map(str) + "_x_" + data[1].map(str)
+        data[colnames[interaction_file_idx]] = data[2]
+        data = data.drop([0,1,2], axis=1)
+
+        # merge. use UNION 
+        if summary is None:
+            summary = data.copy()
+        else:
+            summary = summary.merge(
+                data, how="outer", left_index=True, right_index=True)
+
+    # save out
+    mat_file = "{}.mat.txt.gz".format(out_file.split(".txt")[0])
+    summary.to_csv(mat_file, sep="\t", compression="gzip", header=True)
+    
+    # and save out as interaction format
+    _convert_to_interaction_format(mat_file, out_file, score_val="max")
+
+    # adjust if mirroring interactions
+    if add_mirrored_interactions:
+        tmp_mirror_file = "links.tmp.txt.gz"
+        os.system("mv {} {}".format(out_file, tmp_mirror_file))
+        _add_mirrored_interactions(tmp_mirror_file, out_file)
+        os.system("rm {}".format(tmp_mirror_file))
+    
+    return
+
