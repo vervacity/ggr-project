@@ -261,7 +261,8 @@ def runall(args, prefix):
     # distance based ABC
     logger.info("ANALYSIS: build replicate consistent ABC links - distance-based")
     abc_dist_dir = "abc.distance"
-    if not os.path.isdir("{}/{}".format(results_dir, abc_dist_dir)):
+    #if not os.path.isdir("{}/{}".format(results_dir, abc_dist_dir)):
+    if True:
         run_replicate_consistent_links_workflow(
             args,
             prefix,

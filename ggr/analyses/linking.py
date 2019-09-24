@@ -10,6 +10,8 @@ import pandas as pd
 from collections import Counter
 from scipy.stats import pearsonr
 
+from ggr.util.utils import run_shell_cmd
+
 
 def _add_mirrored_interactions(interaction_file, out_file):
     """if have an interaction file with just one side of the interaction,
@@ -218,6 +220,468 @@ def link_by_distance_and_corr(
     
     return
 
+
+def _fix_invalid_records(interaction_file, out_file):
+    """adjust records for start/stop problems
+    """
+    with gzip.open(interaction_file, "r") as fp:
+        with gzip.open(out_file, "w") as out:
+            for line in fp:
+                # check for broken lines
+                assert line.startswith("chr")
+                
+                # get fields
+                fields = line.strip().split("\t")
+
+                # check for broken lines
+                assert len(fields) == 6
+                
+                # check interaction start
+                try:
+                    start = int(fields[1])
+                    stop = int(fields[2])
+                except:
+                    continue
+                if start > stop:
+                    fields[1] = str(stop)
+                    fields[2] = str(start)
+
+                # check interaction end
+                name_fields = fields[3].split(",")
+                start = int(name_fields[0].split(":")[1].split("-")[0])
+                stop = int(name_fields[0].split("-")[1])
+                if start > stop:
+                    name_fields[0] = "{}:{}-{}".format(
+                        name_fields[0].split(":")[0], stop, start)
+                fields[3] = ",".join(name_fields)
+                    
+                # save out
+                out.write("{}\n".format("\t".join(fields)))
+                
+    return
+
+
+def reconcile_interactions(
+        links_files, out_dir,
+        method="pooled"):
+    """reconcile interactions so that they'll have the same IDs
+    """
+    # fix ids (start/stop) to make sure BED format compatible
+    # note: interaction format
+    fixed_links_files = []
+    for links_file in links_files:
+        fixed_links_file = "{}/{}.clean.txt.gz".format(
+            out_dir,
+            os.path.basename(links_file).split(".bed")[0].split(".txt")[0])
+        _fix_invalid_records(links_file, fixed_links_file)
+        fixed_links_files.append(fixed_links_file)
+    
+    # adjust for just regions, to intersect in next step
+    # note: bed format
+    adj_links_bed_files = []
+    for links_file in fixed_links_files:
+        adj_links_bed_file = "{}/{}.unique.bed.gz".format(
+            out_dir,
+            os.path.basename(links_file).split(".bed")[0].split(".txt")[0])
+        adjust_cmd = (
+            "zcat {} | "
+            "awk -F '\t' '{{ print $1\"\t\"$2\"\t\"$3 }}' | "
+            "sort -k1,1 -k2,2n | "
+            "uniq | "
+            "gzip -c > {}").format(
+                links_file, adj_links_bed_file)
+        run_shell_cmd(adjust_cmd)
+        adj_links_bed_files.append(adj_links_bed_file)
+
+    # list of files with reconciled coordinates
+    # note: mapping format
+    reconciled_files = []
+    
+    # build master regions for reconciling files
+    if method == "pooled":
+        # pooled regions is master file
+        master_regions_file = adj_links_bed_files[0]
+        reconciled_files.append(fixed_links_files[0])
+        adj_links_bed_files = adj_links_bed_files[1:]
+        fixed_links_files = fixed_links_files[1:]
+    elif method == "union":
+        # make a union file of all seen regions with an overlap of 100 bp minimum
+        # TODO adjust this?
+        master_regions_file = "{}/master.union.bed.gz".format(out_dir)
+        union_cmd = (
+            "zcat {} | "
+            "sort -k1,1 -k2,2n | "
+            "bedtools merge -d -100 -i stdin | "
+            "gzip -c > {}").format(
+                " ".join(adj_links_files),
+                master_regions_file)
+        run_shell_cmd(union_cmd)
+
+    # for each file, map regions
+    for link_file_idx in range(len(adj_links_bed_files)):
+
+        # in file, out file
+        links_file = adj_links_bed_files[link_file_idx]
+        reconcile_file = "{}/{}.reconciled.txt.gz".format(
+            out_dir,
+            os.path.basename(links_file).split(".clean")[0])
+
+        # intersect to master regions        
+        tmp_file = "{}/{}.mapping.txt.gz".format(
+            out_dir,
+            os.path.basename(links_file).split(".bed")[0].split(".txt")[0])
+        intersect_cmd = (
+            "bedtools intersect -wao -a {} -b {} | "
+            "awk -F '\t' '{{ print $1\":\"$2\"-\"$3\"\t\"$4\":\"$5\"-\"$6\"\t\"$7 }}' | "
+            "gzip -c > {}").format(
+                links_file, master_regions_file, tmp_file)
+        run_shell_cmd(intersect_cmd)
+
+        # read in the mapping, keep the MOST overlapping hit
+        mapping = {}
+        best_overlap_lens = {}
+        with gzip.open(tmp_file, "r") as fp:
+            for line in fp:
+                fields = line.strip().split("\t")
+                try:
+                    best_overlap_len = best_overlap_lens[fields[0]]
+                    if int(fields[2]) > best_overlap_len:
+                        mapping[fields[0]] = fields[1]
+                        best_overlap_lens[fields[0]] = int(fields[2])
+                except:
+                    mapping[fields[0]] = fields[1]
+                    best_overlap_lens[fields[0]] = int(fields[2])
+
+        # map from original coords to reconciled coords
+        with gzip.open(fixed_links_files[link_file_idx], "r") as fp:
+            with gzip.open(reconcile_file, "w") as out:
+                for line in fp:
+                    # split to fields
+                    fields = line.strip().split("\t")
+                    start_id = "{}:{}-{}".format(
+                        fields[0], fields[1], fields[2])
+                    end_id = fields[3].split(",")[0]
+                    signal_val = fields[3].split(",")[1]
+
+                    # map to reconciled coords
+                    # but only adjust if there is a mapping val
+                    if mapping[start_id] != ".:-1--1":
+                        start_id = mapping[start_id]
+                    if mapping[end_id] != ".:-1--1":
+                        end_id = mapping[end_id]
+
+                    # new line
+                    adj_line = "{}\t{}\t{}\t{},{}\t{}\n".format(
+                        start_id.split(":")[0],
+                        start_id.split(":")[1].split("-")[0],
+                        start_id.split(":")[1].split("-")[1],
+                        end_id,
+                        signal_val,
+                        fields[4],
+                        fields[5])
+
+                    # write out
+                    out.write(adj_line)
+
+        # save to list
+        reconciled_files.append(reconcile_file)
+        
+    return reconciled_files
+
+
+
+def run_interaction_idr_test(mat_file, out_file, idr_thresh=0.10):
+    """convert to narrowpeak format files, run IDR,
+    filter for consistent peaks
+    """
+    # make tmp files
+    rep1_tmp_file = "{}.rep1.bed.gz".format(mat_file.split(".txt")[0])
+    rep2_tmp_file = "{}.rep2.bed.gz".format(mat_file.split(".txt")[0])
+    
+    # read in data and adjust
+    data = pd.read_csv(mat_file, sep="\t", index_col=0)
+    data["region_id"] = data.index
+    interactions = data["region_id"].str.split("_x_", n=2, expand=True)
+    # CHROM HACK: to ensure uniqueness, use to map back also
+    data["chrom"] = ["chr{}".format(str(val)) for val in range(data.shape[0])] 
+    data["start"] = interactions[0].str.split(
+        ":", n=2, expand=True)[1].str.split("-", n=2, expand=True)[0]
+    data["stop"] = interactions[0].str.split(
+        ":", n=2, expand=True)[1].str.split("-", n=2, expand=True)[1]
+    data["interaction"] = interactions[1].map(str) + "," + data["pooled"].map(str)
+
+    # filter for unique set to put into IDR
+    region_ids = data.index.values.tolist()
+    seen_ids = set()
+    for region_id in region_ids:
+        # flip and check if in seen_ids
+        fields = region_id.split("_x_")
+        flipped_id = "{}_x_{}".format(fields[1], fields[0])
+        if flipped_id in seen_ids:
+            continue
+        seen_ids.add(region_id)
+    data_idr = data[data.index.isin(seen_ids)]
+    
+    # rep1
+    rep1_cols = ["chrom", "start", "stop", "interaction", "rep1"]
+    rep1 = data_idr[rep1_cols].copy()
+    rep1["strand"] = "."
+    rep1["plotStart"] = rep1["start"]
+    rep1["plotEnd"] = rep1["stop"]
+    rep1["rgb"] = 100
+    rep1.to_csv(rep1_tmp_file, sep="\t", header=None, index=None, compression="gzip")
+
+    # rep2
+    rep2_cols = ["chrom", "start", "stop", "interaction", "rep2"]
+    rep2 = data_idr[rep2_cols].copy()
+    rep2["strand"] = "."
+    rep2["plotStart"] = rep2["start"]
+    rep2["plotEnd"] = rep2["stop"]
+    rep2["rgb"] = 100
+    rep2.to_csv(rep2_tmp_file, sep="\t", header=None, index=None, compression="gzip")
+
+    # IDR
+    idr_tmp_file = "{}.idr_results.tmp".format(out_file.split(".gz")[0])
+    idr_cmd = (
+        "idr --samples {} {} "
+        "--input-file-type bed "
+        "--rank 5 "
+        "-o {} "
+        "--idr-threshold {} "
+        "--plot").format(
+            rep1_tmp_file, rep2_tmp_file,
+            idr_tmp_file,
+            idr_thresh)
+    run_shell_cmd(idr_cmd)
+
+    # read in IDR file and use IDs to filter mat file
+    idr_results = pd.read_csv(idr_tmp_file, sep="\t", header=None)
+    keep_ids = data[data["chrom"].isin(idr_results.iloc[:,0])].index.to_series()
+    flip_ids = keep_ids.str.split("_x_", n=2, expand=True)
+    flip_ids["flipped"] = flip_ids[1].map(str) + "_x_" + flip_ids[0].map(str)
+    keep_ids = pd.concat([keep_ids, flip_ids["flipped"]], axis=0)
+    data_filt = data[data.index.isin(keep_ids)]
+    
+    # clean up and save out
+    drop_cols = ["chrom", "start", "stop", "region_id", "interaction"]
+    data_filt = data_filt.drop(drop_cols, axis=1)
+    data_filt.to_csv(out_file, sep="\t", compression="gzip", header=True, index=True)
+
+    # plot
+    plot_file = "{}.after_idr.scatter.png".format(out_file.split(".txt")[0])
+    plot_cmd = "Rscript /users/dskim89/git/ggr-project/R/plot.links.rep_consistency.R {} {}".format(
+        out_file, plot_file)
+    print plot_cmd
+    os.system(plot_cmd)
+
+    # clean up (delete tmp)
+    os.system("rm {} {}".format(rep1_tmp_file, rep2_tmp_file))
+    
+    return None
+
+
+def _convert_to_coord_format(interaction_file, out_file):
+    """make it easier to work with interaction file,
+    produces start_id, end_id, score
+    """
+    assert interaction_file.endswith(".gz")
+    assert out_file.endswith(".gz")
+    
+    # reformat
+    reformat = (
+        "zcat {} | "
+        "awk -F ',' '{{ print $1\"\t\"$2 }}' | "
+        "awk -F '\t' '{{ print $1\":\"$2\"-\"$3\"\t\"$4\"\t\"$5 }}' | "
+        "gzip -c > {}").format(interaction_file, out_file)
+    run_shell_cmd(reformat)
+        
+    return None
+
+
+def _convert_to_interaction_format(mat_file, out_file, score_val="pooled"):
+    """convert to interaction format
+    """
+    # read in data
+    data = pd.read_csv(mat_file, sep="\t", index_col=0)
+
+    # which method to score with
+    if score_val == "pooled":
+        pass
+    elif score_val == "max":
+        data = data.fillna(0)
+        data["pooled"] = data.values.max(axis=1)
+    else:
+        raise ValueError, "not implemented!"
+
+    # adjust
+    data["region_id"] = data.index
+    interactions = data["region_id"].str.split("_x_", n=2, expand=True)
+    data["chrom"] = interactions[0].str.split(
+        ":", n=2, expand=True)[0]
+    data["start"] = interactions[0].str.split(
+        ":", n=2, expand=True)[1].str.split("-", n=2, expand=True)[0]
+    data["stop"] = interactions[0].str.split(
+        ":", n=2, expand=True)[1].str.split("-", n=2, expand=True)[1]
+    data["interaction"] = interactions[1].map(str) + "," + data["pooled"].map(str)
+        
+    # clean up
+    keep_cols = ["chrom", "start", "stop", "interaction", "pooled"]
+    data = data[keep_cols]
+    data["strand"] = "."
+    data = data.drop_duplicates()
+    
+    # save out
+    data.to_csv(out_file, sep="\t", compression="gzip", header=False, index=False)
+    
+    return
+
+
+def get_replicate_consistent_links(
+        pooled_file, links_files, out_prefix,
+        add_mirrored_interactions=True,
+        colnames=["pooled", "rep1", "rep2"]):
+    """get replicate consistent links, using pooled results as a guide
+    """
+    # out dir, tmp_dir, results file
+    out_dir = os.path.dirname(out_prefix)
+    tmp_dir = "{}/tmp".format(out_dir)
+    os.system("mkdir -p {}".format(tmp_dir))
+    out_mat_file = "{}.reps.mat.txt.gz".format(out_prefix)
+    interaction_file = "{}.interactions.txt.gz".format(out_mat_file.split(".mat")[0])
+
+    if True:
+        # first reconcile interaction coords, mapping to pooled links
+        matched_links_files = reconcile_interactions(
+            [pooled_file] + links_files, tmp_dir, method="pooled")
+
+        # format link files to "coordinate format" (start_id, end_id, score)
+        interaction_files = []
+        for links_file in matched_links_files:
+            tmp_file = "{}/{}.coord_formatted.tmp.txt.gz".format(
+                tmp_dir,
+                os.path.basename(links_file).split(".bed")[0].split(".txt")[0])
+            _convert_to_coord_format(links_file, tmp_file)
+            interaction_files.append(tmp_file)
+
+        # merge to make a table
+        summary = None
+        for interaction_file_idx in range(len(interaction_files)):
+            # adjust data
+            interaction_file = interaction_files[interaction_file_idx]
+            data = pd.read_csv(interaction_file, sep="\t", header=None, index_col=None)
+            data.index = data[0].map(str) + "_x_" + data[1].map(str)
+            data[colnames[interaction_file_idx]] = data[2]
+            data = data.drop([0,1,2], axis=1)
+
+            # merge. use INTERSECTION since the peak needs to be present
+            # in pooled AND rep1 AND rep2
+            if summary is None:
+                summary = data.copy()
+            else:
+                summary = summary.merge(
+                    data, how="inner", left_index=True, right_index=True)
+
+        # clean up duplicates (multiple matching hits per link)
+        # first flip all to make sure both sides are represented
+        summary_flipped = summary.copy()
+        flip_regions = summary_flipped.index.to_series().str.split("_x_", n=2, expand=True)
+        flip_regions["flip"] = flip_regions[1].map(str) + "_x_" + flip_regions[0].map(str)
+        summary_flipped.index = flip_regions["flip"]
+        summary = pd.concat([summary, summary_flipped], axis=0)
+        
+        # then choose max pooled value to keep
+        # note max can produce multiple hits, so need to drop dups in index as final step
+        summary = summary.reset_index()
+        keep_rows = summary.groupby(["index"])["pooled"].transform(max) == summary["pooled"]
+        summary = summary[keep_rows]
+        summary = summary.set_index("index")
+        summary = summary.loc[~summary.index.duplicated(keep="first")]
+
+        # save out    
+        summary.to_csv(out_mat_file, sep="\t", compression="gzip", header=True)
+
+        # plot in R
+        plot_file = "{}.reps.scatter.png".format(out_prefix)
+        plot_cmd = "Rscript /users/dskim89/git/ggr-project/R/plot.links.rep_consistency.R {} {}".format(
+            out_mat_file, plot_file)
+        run_shell_cmd(plot_cmd)
+
+    # and set threshold for consistency - use IDR framework
+    mat_filt_file = "{}.filt.mat.txt.gz".format(out_mat_file.split(".mat")[0])
+    run_interaction_idr_test(out_mat_file, mat_filt_file)
+    
+    # and save out as interaction format
+    _convert_to_interaction_format(mat_filt_file, interaction_file)
+
+    quit()
+    
+    # adjust if mirroring interactions
+    if add_mirrored_interactions:
+        tmp_mirror_file = "links.tmp.txt.gz"
+        os.system("mv {} {}".format(interaction_file, tmp_mirror_file))
+        _add_mirrored_interactions(tmp_mirror_file, interaction_file)
+        os.system("rm {}".format(tmp_mirror_file))
+    
+    return
+
+
+def get_timepoint_consistent_links(
+        links_files, out_file, method="union",
+        add_mirrored_interactions=True,
+        colnames=["d0", "d3", "d6"]):
+    """aggregate links across timepoints
+    """
+    # out dir, tmp_dir
+    out_dir = os.path.dirname(out_file)
+    tmp_dir = "{}/tmp".format(out_dir)
+    os.system("mkdir -p {}".format(tmp_dir))
+
+    # map to pooled space
+    matched_links_files = reconcile_interactions(
+        links_files, tmp_dir, method=method)
+
+    # format link files
+    interaction_files = []
+    for links_file in matched_links_files:
+        print links_file
+        tmp_file = "{}/{}.interaction_ids.tmp.txt.gz".format(
+            tmp_dir,
+            os.path.basename(links_file).split(".bed")[0].split(".txt")[0])
+        reformat_interaction_file(links_file, tmp_file)
+        interaction_files.append(tmp_file)
+
+    # merge to make a table
+    summary = None
+    for interaction_file_idx in range(len(interaction_files)):
+        interaction_file = interaction_files[interaction_file_idx]
+        data = pd.read_csv(interaction_file, sep="\t", header=None, index_col=None)
+        data.index = data[0].map(str) + "_x_" + data[1].map(str)
+        data[colnames[interaction_file_idx]] = data[2]
+        data = data.drop([0,1,2], axis=1)
+
+        # merge. use UNION 
+        if summary is None:
+            summary = data.copy()
+        else:
+            summary = summary.merge(
+                data, how="outer", left_index=True, right_index=True)
+
+    # save out
+    summary = summary.drop_duplicates()
+    mat_file = "{}.mat.txt.gz".format(out_file.split(".txt")[0])
+    summary.to_csv(mat_file, sep="\t", compression="gzip", header=True)
+    
+    # and save out as interaction format
+    _convert_to_interaction_format(mat_file, out_file, score_val="max")
+
+    # adjust if mirroring interactions
+    if add_mirrored_interactions:
+        tmp_mirror_file = "links.tmp.txt.gz"
+        os.system("mv {} {}".format(out_file, tmp_mirror_file))
+        _add_mirrored_interactions(tmp_mirror_file, out_file)
+        os.system("rm {}".format(tmp_mirror_file))
+    
+    return
 
 
 def regions_to_genes(
@@ -506,466 +970,4 @@ def build_confusion_matrix(traj_bed_files, gene_sets, gene_clusters_file, out_fi
     
     return
 
-
-def fix_invalid_records(interaction_file, out_file):
-    """adjust records for start/stop problems
-    """
-    with gzip.open(interaction_file, "r") as fp:
-        with gzip.open(out_file, "w") as out:
-            for line in fp:
-                # check for broken lines
-                assert line.startswith("chr")
-                
-                # get fields
-                fields = line.strip().split("\t")
-
-                # check for broken lines
-                assert len(fields) == 6
-                
-                # check interaction start
-                try:
-                    start = int(fields[1])
-                    stop = int(fields[2])
-                except:
-                    continue
-                if start > stop:
-                    fields[1] = str(stop)
-                    fields[2] = str(start)
-
-                # check interaction end
-                name_fields = fields[3].split(",")
-                start = int(name_fields[0].split(":")[1].split("-")[0])
-                stop = int(name_fields[0].split("-")[1])
-                if start > stop:
-                    name_fields[0] = "{}:{}-{}".format(
-                        name_fields[0].split(":")[0], stop, start)
-                fields[3] = ",".join(name_fields)
-                    
-                # save out
-                out.write("{}\n".format("\t".join(fields)))
-                
-    return
-
-
-def reformat_interaction_file(interaction_file, out_file, remove_dups=True):
-    """make it easier to work with interaction file
-    """
-    assert interaction_file.endswith(".gz")
-    assert out_file.endswith(".gz")
-    
-    # reformat
-    reformat = (
-        "zcat {} | "
-        "awk -F ',' '{{ print $1\"\t\"$2 }}' | "
-        "awk -F '\t' '{{ print $1\":\"$2\"-\"$3\"\t\"$4\"\t\"$5 }}' | "
-        "gzip -c > {}").format(interaction_file, out_file)
-    print reformat
-    os.system(reformat)
-
-    # and reduce
-    if remove_dups:
-        tmp_file = "{}.tmp.txt.gz".format(out_file.split(".txt.gz")[0])
-        os.system("mv {} {}".format(out_file, tmp_file))
-        seen_ids = set()
-        with gzip.open(tmp_file, "r") as fp:
-            with gzip.open(out_file, "w") as out:
-                for line in fp:
-                    fields = line.strip().split("\t")
-                    reciprocal = "{}\t{}\t{}\n".format(
-                        fields[1], fields[0], fields[2])
-                    if reciprocal not in seen_ids:
-                        # check that first is always smaller than second
-                        try:
-                            first_start = int(fields[0].split(":")[1].split("-")[0])
-                            second_start = int(fields[1].split(":")[1].split("-")[0])
-                        except:
-                            print line
-                        #assert first_start <= second_start, line
-                        # and write out
-                        out.write(line)
-                        seen_ids.add(line)
-        # remove tmp
-        os.system("rm {}".format(tmp_file))
-        
-    return None
-
-
-def reconcile_interactions(
-        links_files, out_dir, method="pooled"):
-    """reconcile interactions so that they'll have the same IDs
-    """
-    # fix ids (start/stop)
-    fixed_links_files = []
-    for links_file in links_files:
-        fixed_links_file = "{}/{}.fixed.txt.gz".format(
-            out_dir,
-            os.path.basename(links_file).split(".bed")[0].split(".txt")[0])
-        fix_invalid_records(links_file, fixed_links_file)
-        fixed_links_files.append(fixed_links_file)
-    
-    # adjust for just regions, to intersect in next step
-    adj_links_files = []
-    for links_file in fixed_links_files:
-        adj_links_file = "{}/{}.unique.bed.gz".format(
-            out_dir,
-            os.path.basename(links_file).split(".bed")[0].split(".txt")[0])
-        adjust_cmd = (
-            "zcat {} | "
-            "awk -F '\t' '{{ print $1\"\t\"$2\"\t\"$3 }}' | "
-            "sort -k1,1 -k2,2n | "
-            "uniq | "
-            "gzip -c > {}").format(
-                links_file, adj_links_file)
-        print adjust_cmd
-        os.system(adjust_cmd)
-        adj_links_files.append(adj_links_file)
-    
-    # build master regions for reconciling files
-    reconciled_files = []
-    if method == "pooled":
-        # if matching to pooled links, intersect each rep
-        # with pooled file to get mapping,
-        # then adjust IDs
-        master_regions_file = adj_links_files[0]
-        reconciled_files.append(fixed_links_files[0])
-        # remove pooled files
-        fixed_links_files = fixed_links_files[1:]
-        adj_links_files = adj_links_files[1:]
-    elif method == "union":
-        master_regions_file = "{}/master.union.bed.gz".format(out_dir)
-        union_cmd = (
-            "zcat {} | "
-            "sort -k1,1 -k2,2n | "
-            "bedtools merge -d -100 -i stdin | "
-            "gzip -c > {}").format(
-                " ".join(adj_links_files),
-                master_regions_file)
-        print union_cmd
-        os.system(union_cmd)
-
-    # map to master regions
-    for link_file_idx in range(len(adj_links_files)):
-        # intersect w pooled file to get mapping
-        links_file = adj_links_files[link_file_idx]
-        tmp_file = "{}/{}.mapping.txt.gz".format(
-            out_dir,
-            os.path.basename(links_file).split(".bed")[0].split(".txt")[0])
-        intersect_cmd = (
-            "bedtools intersect -wao -a {} -b {} | "
-            "awk -F '\t' '{{ print $1\":\"$2\"-\"$3\"\t\"$4\":\"$5\"-\"$6\"\t\"$7 }}' | "
-            "gzip -c > {}").format(
-                links_file, master_regions_file, tmp_file)
-        print intersect_cmd
-        os.system(intersect_cmd)
-
-        # read in the mapping
-        mapping = {}
-        best_overlap_lens = {}
-        with gzip.open(tmp_file, "r") as fp:
-            for line in fp:
-                fields = line.strip().split("\t")
-                # check if actually null mapping here?
-                try:
-                    best_overlap_len = best_overlap_lens[fields[0]]
-                    if int(fields[2]) > best_overlap_len:
-                        mapping[fields[0]] = fields[1]
-                        best_overlap_lens[fields[0]] = int(fields[2])
-                except:
-                    mapping[fields[0]] = fields[1]
-                    best_overlap_lens[fields[0]] = int(fields[2])
-
-        reconcile_file = "{}/{}.matched.txt.gz".format(
-            out_dir,
-            os.path.basename(links_file).split(".bed")[0].split(".txt")[0])
-        #with gzip.open(links_files[link_file_idx], "r") as fp:
-        with gzip.open(fixed_links_files[link_file_idx], "r") as fp:
-            with gzip.open(reconcile_file, "w") as out:
-                for line in fp:
-                    fields = line.strip().split("\t")
-                    start_id = "{}:{}-{}".format(
-                        fields[0], fields[1], fields[2])
-                    end_id = fields[3].split(",")[0]
-                    signal_val = fields[3].split(",")[1]
-
-                    # adjust start end of interaction
-                    # but only adjust if there is a mapping val
-                    if mapping[start_id] != ".:-1--1":
-                        start_id = mapping[start_id]
-
-                    # adjust stop end of interaction
-                    if mapping[end_id] != ".:-1--1":
-                        end_id = mapping[end_id]
-
-                    # new line
-                    adj_line = "{}\t{}\t{}\t{},{}\t{}\n".format(
-                        start_id.split(":")[0],
-                        start_id.split(":")[1].split("-")[0],
-                        start_id.split(":")[1].split("-")[1],
-                        end_id,
-                        signal_val,
-                        fields[4],
-                        fields[5])
-
-                    # write out
-                    out.write(adj_line)
-
-        # save to list
-        reconciled_files.append(reconcile_file)
-            
-    return reconciled_files
-
-
-
-
-
-
-def run_interaction_idr_test(mat_file, out_file, idr_thresh=0.10):
-    """convert to narrowpeak format files, run IDR,
-    filter for consistent peaks
-    """
-    # make tmp files
-    rep1_tmp_file = "{}.rep1.bed.gz".format(mat_file.split(".txt")[0])
-    rep2_tmp_file = "{}.rep2.bed.gz".format(mat_file.split(".txt")[0])
-
-    # read in data and adjust
-    data = pd.read_csv(mat_file, sep="\t", index_col=0)
-    data["region_id"] = data.index
-    interactions = data["region_id"].str.split("_x_", n=2, expand=True)
-    # CHROM HACK: to ensure uniqueness, use to map back also
-    data["chrom"] = ["chr{}".format(str(val)) for val in range(data.shape[0])] 
-    data["start"] = interactions[0].str.split(
-        ":", n=2, expand=True)[1].str.split("-", n=2, expand=True)[0]
-    data["stop"] = interactions[0].str.split(
-        ":", n=2, expand=True)[1].str.split("-", n=2, expand=True)[1]
-    data["interaction"] = interactions[1].map(str) + "," + data["pooled"].map(str)
-
-    # rep1
-    rep1_cols = ["chrom", "start", "stop", "interaction", "rep1"]
-    rep1 = data[rep1_cols].copy()
-    rep1["strand"] = "."
-    rep1["plotStart"] = rep1["start"]
-    rep1["plotEnd"] = rep1["stop"]
-    rep1["rgb"] = 100
-    rep1.to_csv(rep1_tmp_file, sep="\t", header=None, index=None, compression="gzip")
-
-    # rep2
-    rep2_cols = ["chrom", "start", "stop", "interaction", "rep2"]
-    rep2 = data[rep2_cols].copy()
-    rep2["strand"] = "."
-    rep2["plotStart"] = rep2["start"]
-    rep2["plotEnd"] = rep2["stop"]
-    rep2["rgb"] = 100
-    rep2.to_csv(rep2_tmp_file, sep="\t", header=None, index=None, compression="gzip")
-
-    # IDR
-    idr_tmp_file = "{}.idr_results.tmp".format(out_file.split(".gz")[0])
-    idr_cmd = (
-        "idr --samples {} {} "
-        "--input-file-type bed "
-        "--rank 5 "
-        "-o {} "
-        "--idr-threshold {} "
-        "--plot").format(
-            rep1_tmp_file, rep2_tmp_file,
-            idr_tmp_file,
-            idr_thresh)
-    print idr_cmd
-    os.system(idr_cmd)
-
-    # read in IDR file and use IDs to filter mat file
-    idr_results = pd.read_csv(idr_tmp_file, sep="\t", header=None)
-    data_filt = data[data["chrom"].isin(idr_results.iloc[:,0])]
-    
-    # clean up and save out
-    drop_cols = ["chrom", "start", "stop", "region_id", "interaction"]
-    data_filt = data_filt.drop(drop_cols, axis=1)
-    data_filt.to_csv(out_file, sep="\t", compression="gzip", header=True, index=True)
-
-    # plot
-    plot_file = "{}.after_idr.scatter.pdf".format(out_file.split(".txt")[0])
-    plot_cmd = "Rscript /users/dskim89/git/ggr-project/R/plot.links.rep_consistency.R {} {}".format(
-        out_file, plot_file)
-    print plot_cmd
-    os.system(plot_cmd)
-
-    # clean up (delete tmp)
-    os.system("rm {} {}".format(rep1_tmp_file, rep2_tmp_file))
-    
-    return None
-
-
-def _convert_to_interaction_format(mat_file, out_file, score_val="pooled"):
-    """convert to interaction format
-    """
-    # read in data
-    data = pd.read_csv(mat_file, sep="\t", index_col=0)
-
-    # which method to score with
-    if score_val == "pooled":
-        pass
-    elif score_val == "max":
-        data = data.fillna(0)
-        data["pooled"] = data.values.max(axis=1)
-    else:
-        raise ValueError, "not implemented!"
-
-    # adjust
-    data["region_id"] = data.index
-    interactions = data["region_id"].str.split("_x_", n=2, expand=True)
-    data["chrom"] = interactions[0].str.split(
-        ":", n=2, expand=True)[0]
-    data["start"] = interactions[0].str.split(
-        ":", n=2, expand=True)[1].str.split("-", n=2, expand=True)[0]
-    data["stop"] = interactions[0].str.split(
-        ":", n=2, expand=True)[1].str.split("-", n=2, expand=True)[1]
-    data["interaction"] = interactions[1].map(str) + "," + data["pooled"].map(str)
-        
-    # clean up
-    keep_cols = ["chrom", "start", "stop", "interaction", "pooled"]
-    data = data[keep_cols]
-    data["strand"] = "."
-    data = data.drop_duplicates()
-    
-    # save out
-    data.to_csv(out_file, sep="\t", compression="gzip", header=False, index=False)
-    
-    return
-
-
-def get_replicate_consistent_links(
-        pooled_file, links_files, out_prefix,
-        add_mirrored_interactions=True,
-        colnames=["pooled", "rep1", "rep2"]):
-    """get replicate consistent links
-    """
-    # out dir, tmp_dir
-    out_dir = os.path.dirname(out_prefix)
-    tmp_dir = "{}/tmp".format(out_dir)
-    os.system("mkdir -p {}".format(tmp_dir))
-
-    # merge reps/pooled
-    out_mat_file = "{}.reps.mat.txt.gz".format(out_prefix)
-    
-    # map to pooled space
-    matched_links_files = reconcile_interactions(
-        [pooled_file] + links_files, tmp_dir, method="pooled")
-    print matched_links_files
-    print "here"
-    
-    # format link files
-    interaction_files = []
-    for links_file in matched_links_files:
-        print links_file
-        tmp_file = "{}/{}.interaction_ids.tmp.txt.gz".format(
-            tmp_dir,
-            os.path.basename(links_file).split(".bed")[0].split(".txt")[0])
-        reformat_interaction_file(links_file, tmp_file)
-        interaction_files.append(tmp_file)
-    print interaction_files
-
-    # merge to make a table
-    summary = None
-    for interaction_file_idx in range(len(interaction_files)):
-        interaction_file = interaction_files[interaction_file_idx]
-        data = pd.read_csv(interaction_file, sep="\t", header=None, index_col=None)
-        data.index = data[0].map(str) + "_x_" + data[1].map(str)
-        data[colnames[interaction_file_idx]] = data[2]
-        data = data.drop([0,1,2], axis=1)
-
-        # merge. use intersection since the peak needs to be present
-        # in pooled AND rep1 AND rep2
-        if summary is None:
-            summary = data.copy()
-        else:
-            summary = summary.merge(
-                data, how="inner", left_index=True, right_index=True)
-
-    # save out
-    summary = summary.drop_duplicates()
-    summary.to_csv(out_mat_file, sep="\t", compression="gzip", header=True)
-    
-    # plot in R
-    plot_file = "{}.reps.scatter.pdf".format(out_prefix)
-    plot_cmd = "Rscript /users/dskim89/git/ggr-project/R/plot.links.rep_consistency.R {} {}".format(
-        out_mat_file, plot_file)
-    print plot_cmd
-    os.system(plot_cmd)
-
-    # and set threshold for consistency
-    # how to do this?
-    # convert to peak files and compute IDR?
-    mat_filt_file = "{}.filt.mat.txt.gz".format(out_mat_file.split(".mat")[0])
-    run_interaction_idr_test(out_mat_file, mat_filt_file)
-    
-    # and save out as interaction format
-    interaction_file = "{}.interactions.txt.gz".format(mat_filt_file.split(".mat")[0])
-    _convert_to_interaction_format(mat_filt_file, interaction_file)
-
-    # adjust if mirroring interactions
-    if add_mirrored_interactions:
-        tmp_mirror_file = "links.tmp.txt.gz"
-        os.system("mv {} {}".format(interaction_file, tmp_mirror_file))
-        _add_mirrored_interactions(tmp_mirror_file, interaction_file)
-        os.system("rm {}".format(tmp_mirror_file))
-    
-    return
-
-
-def get_timepoint_consistent_links(
-        links_files, out_file, method="union",
-        add_mirrored_interactions=True,
-        colnames=["d0", "d3", "d6"]):
-    """aggregate links across timepoints
-    """
-    # out dir, tmp_dir
-    out_dir = os.path.dirname(out_file)
-    tmp_dir = "{}/tmp".format(out_dir)
-    os.system("mkdir -p {}".format(tmp_dir))
-
-    # map to pooled space
-    matched_links_files = reconcile_interactions(
-        links_files, tmp_dir, method=method)
-
-    # format link files
-    interaction_files = []
-    for links_file in matched_links_files:
-        print links_file
-        tmp_file = "{}/{}.interaction_ids.tmp.txt.gz".format(
-            tmp_dir,
-            os.path.basename(links_file).split(".bed")[0].split(".txt")[0])
-        reformat_interaction_file(links_file, tmp_file)
-        interaction_files.append(tmp_file)
-
-    # merge to make a table
-    summary = None
-    for interaction_file_idx in range(len(interaction_files)):
-        interaction_file = interaction_files[interaction_file_idx]
-        data = pd.read_csv(interaction_file, sep="\t", header=None, index_col=None)
-        data.index = data[0].map(str) + "_x_" + data[1].map(str)
-        data[colnames[interaction_file_idx]] = data[2]
-        data = data.drop([0,1,2], axis=1)
-
-        # merge. use UNION 
-        if summary is None:
-            summary = data.copy()
-        else:
-            summary = summary.merge(
-                data, how="outer", left_index=True, right_index=True)
-
-    # save out
-    summary = summary.drop_duplicates()
-    mat_file = "{}.mat.txt.gz".format(out_file.split(".txt")[0])
-    summary.to_csv(mat_file, sep="\t", compression="gzip", header=True)
-    
-    # and save out as interaction format
-    _convert_to_interaction_format(mat_file, out_file, score_val="max")
-
-    # adjust if mirroring interactions
-    if add_mirrored_interactions:
-        tmp_mirror_file = "links.tmp.txt.gz"
-        os.system("mv {} {}".format(out_file, tmp_mirror_file))
-        _add_mirrored_interactions(tmp_mirror_file, out_file)
-        os.system("rm {}".format(tmp_mirror_file))
-    
-    return
 
