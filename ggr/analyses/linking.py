@@ -546,8 +546,7 @@ def get_replicate_consistent_links(
     out_dir = os.path.dirname(out_prefix)
     tmp_dir = "{}/tmp".format(out_dir)
     os.system("mkdir -p {}".format(tmp_dir))
-    out_mat_file = "{}.reps.mat.txt.gz".format(out_prefix)
-    interaction_file = "{}.interactions.txt.gz".format(out_mat_file.split(".reps")[0])
+    out_mat_file = "{}.overlap.mat.txt.gz".format(out_prefix)
 
     # first reconcile interaction coords, mapping to pooled links
     matched_links_files = reconcile_interactions(
@@ -606,10 +605,11 @@ def get_replicate_consistent_links(
     run_shell_cmd(plot_cmd)
 
     # and set threshold for consistency - use IDR framework
-    mat_filt_file = "{}.filt.mat.txt.gz".format(out_mat_file.split(".mat")[0])
+    mat_filt_file = "{}.idr_filt.mat.txt.gz".format(out_mat_file.split(".mat")[0])
     run_interaction_idr_test(out_mat_file, mat_filt_file)
     
     # and save out as interaction format
+    interaction_file = "{}.interactions.txt.gz".format(mat_filt_file.split(".mat")[0])
     _convert_to_interaction_format(mat_filt_file, interaction_file)
     
     return
