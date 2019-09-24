@@ -99,8 +99,6 @@ def run_traj_linking_workflow(args, prefix, links_dir):
     # tss file
     tss_file = args.outputs["annotations"]["tss.pc.bed"]
     print tss_file
-
-    # background gene set?
     
     # first, per cluster, get gene set enrichments
     region_clusters_to_genes(
@@ -317,8 +315,8 @@ def runall(args, prefix):
     # between ATAC and RNA
     # input: atac clusters, rna clusters/data
     links_dirs = [
-        "abc.distance",
-        #"abc.hic.celltype_avg",
+        #"abc.distance",
+        "abc.hic.celltype_avg",
         #"proximity",
         "proximity.corr",
         "proximity.corr.dynamic"]

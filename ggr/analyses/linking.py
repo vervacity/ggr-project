@@ -761,6 +761,18 @@ def regions_to_genes(
     genes["region_ids"] = genes["region_ids"].apply(";".join)
     genes["score"] = genes["region_ids"].apply(_get_aggregate_score)
     genes = genes.sort_values("score", ascending=False)
+
+    # trim?
+    if False:
+        noise_calc_fract = 0.80
+        noise_calc_index = int(genes.shape[0] * noise_calc_fract)
+        thresh_val = np.mean(genes["score"].values[noise_calc_index:])
+        genes = genes[genes["score"] > thresh_val]
+
+    if True:
+        if genes.shape[0] > 1000:
+            genes = genes.iloc[0:1000]
+        
     genes.to_csv(out_file, sep="\t", compression="gzip", header=True, index=False)
 
     return None
@@ -817,8 +829,6 @@ def region_clusters_to_genes(
             run_gprofiler(
                 gene_set_file, background_gene_file,
                 gprofiler_dir, ordered=True, header=True)
-
-    quit()
 
     return
 
