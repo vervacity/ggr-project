@@ -263,7 +263,8 @@ def _fix_invalid_records(interaction_file, out_file):
 
 def reconcile_interactions(
         links_files, out_dir,
-        method="pooled"):
+        method="pooled",
+        union_min_overlap=200):
     """reconcile interactions so that they'll have the same IDs
     """
     # fix ids (start/stop) to make sure BED format compatible
@@ -311,9 +312,10 @@ def reconcile_interactions(
         union_cmd = (
             "zcat {} | "
             "sort -k1,1 -k2,2n | "
-            "bedtools merge -d -100 -i stdin | "
+            "bedtools merge -d -{} -i stdin | "
             "gzip -c > {}").format(
-                " ".join(adj_links_files),
+                " ".join(adj_links_bed_files),
+                union_min_overlap,
                 master_regions_file)
         run_shell_cmd(union_cmd)
 
@@ -525,8 +527,9 @@ def _convert_to_interaction_format(mat_file, out_file, score_val="pooled"):
     data["interaction"] = interactions[1].map(str) + "," + data["pooled"].map(str)
         
     # clean up
-    keep_cols = ["chrom", "start", "stop", "interaction", "pooled"]
+    keep_cols = ["chrom", "start", "stop", "interaction"]
     data = data[keep_cols]
+    data["unique_id"] = range(data.shape[0])
     data["strand"] = "."
     data = data.drop_duplicates()
     
@@ -616,60 +619,71 @@ def get_replicate_consistent_links(
 
 
 def get_timepoint_consistent_links(
-        links_files, out_file, method="union",
-        add_mirrored_interactions=True,
+        links_files, out_prefix, method="union",
         colnames=["d0", "d3", "d6"]):
     """aggregate links across timepoints
     """
     # out dir, tmp_dir
-    out_dir = os.path.dirname(out_file)
+    out_dir = os.path.dirname(out_prefix)
     tmp_dir = "{}/tmp".format(out_dir)
     os.system("mkdir -p {}".format(tmp_dir))
-
-    # map to pooled space
+    out_mat_file = "{}.overlap.mat.txt.gz".format(out_prefix)
+    
+    # map to union
     matched_links_files = reconcile_interactions(
         links_files, tmp_dir, method=method)
 
     # format link files
     interaction_files = []
     for links_file in matched_links_files:
-        print links_file
-        tmp_file = "{}/{}.interaction_ids.tmp.txt.gz".format(
+        tmp_file = "{}/{}.coord_formatted.tmp.txt.gz".format(
             tmp_dir,
             os.path.basename(links_file).split(".bed")[0].split(".txt")[0])
-        reformat_interaction_file(links_file, tmp_file)
+        _convert_to_coord_format(links_file, tmp_file)
         interaction_files.append(tmp_file)
 
     # merge to make a table
     summary = None
     for interaction_file_idx in range(len(interaction_files)):
+        # adjust data
         interaction_file = interaction_files[interaction_file_idx]
         data = pd.read_csv(interaction_file, sep="\t", header=None, index_col=None)
         data.index = data[0].map(str) + "_x_" + data[1].map(str)
         data[colnames[interaction_file_idx]] = data[2]
         data = data.drop([0,1,2], axis=1)
 
-        # merge. use UNION 
+        # merge. use UNION across timepoints
         if summary is None:
             summary = data.copy()
         else:
             summary = summary.merge(
                 data, how="outer", left_index=True, right_index=True)
 
+    # clean up duplicates (multiple matching hits per link)
+    # first flip all to make sure both sides are represented
+    summary = summary.fillna(0)
+    summary["max"] = summary.values.max(axis=1)
+    summary_flipped = summary.copy()
+    flip_regions = summary_flipped.index.to_series().str.split("_x_", n=2, expand=True)
+    flip_regions["flip"] = flip_regions[1].map(str) + "_x_" + flip_regions[0].map(str)
+    summary_flipped.index = flip_regions["flip"]
+    summary = pd.concat([summary, summary_flipped], axis=0)
+
+    # then choose max pooled value to keep
+    # note max can produce multiple hits, so need to drop dups in index as final step
+    summary = summary.reset_index()
+    keep_rows = summary.groupby(["index"])["max"].transform(max) == summary["max"]
+    summary = summary[keep_rows]
+    summary = summary.set_index("index")
+    summary = summary.loc[~summary.index.duplicated(keep="first")]
+    summary = summary.drop("max", axis=1)
+    
     # save out
-    summary = summary.drop_duplicates()
-    mat_file = "{}.mat.txt.gz".format(out_file.split(".txt")[0])
-    summary.to_csv(mat_file, sep="\t", compression="gzip", header=True)
+    summary.to_csv(out_mat_file, sep="\t", compression="gzip", header=True)
     
     # and save out as interaction format
-    _convert_to_interaction_format(mat_file, out_file, score_val="max")
-
-    # adjust if mirroring interactions
-    if add_mirrored_interactions:
-        tmp_mirror_file = "links.tmp.txt.gz"
-        os.system("mv {} {}".format(out_file, tmp_mirror_file))
-        _add_mirrored_interactions(tmp_mirror_file, out_file)
-        os.system("rm {}".format(tmp_mirror_file))
+    interaction_file = "{}.interactions.txt.gz".format(out_mat_file.split(".mat")[0])
+    _convert_to_interaction_format(out_mat_file, interaction_file, score_val="max")
     
     return
 

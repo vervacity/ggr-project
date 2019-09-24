@@ -55,6 +55,18 @@ def run_replicate_consistent_links_workflow(
             rep_link_files,
             link_prefix)
 
+    # and reconcile across timepoints
+    all_prefix = "{}/{}.ALL".format(replicated_link_dir, prefix)
+    all_interactions_file = "{}.interactions.txt.gz".format(all_prefix)
+    if not os.path.isfile(all_interactions_file):
+        links_files = sorted(
+            glob.glob("{}/*interactions.txt.gz".format(
+                replicated_link_dir)))
+        get_timepoint_consistent_links(
+            links_files, all_prefix)
+
+    quit()
+
     return args
 
 
@@ -269,16 +281,6 @@ def runall(args, prefix):
             results_dir,
             link_key="distance",
             out_dir=abc_dist_dir)
-
-    # and reconcile across timepoints
-    all_links_file = "{}/{}/{}.links.abc.distance.ALL.txt.gz".format(
-        results_dir, abc_dist_dir, prefix)
-    if not os.path.isfile(all_links_file):
-        links_files = sorted(
-            glob.glob("{}/{}/*interactions.txt.gz".format(
-                results_dir, abc_dist_dir)))
-        get_timepoint_consistent_links(
-            links_files, all_links_file, method="union")
 
     # average hiC based ABC
     logger.info("ANALYSIS: build replicate consistent ABC links - cell type avg HiC")
