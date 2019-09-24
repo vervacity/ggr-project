@@ -62,12 +62,12 @@
 
     "linking": {
 	"proximity": {
-	    "k_nearest": 3,
-	    "max_dist": 25000
+	    "k_nearest": 2,
+	    "max_dist": 100000
 	},
 	"proximity.corr": {
-	    "k_nearest": 3,
-	    "max_dist": 25000,
+	    "k_nearest": 2,
+	    "max_dist": 100000,
 	    "corr_coeff_thresh": 0,
 	    "pval_thresh": 0.50
 	},

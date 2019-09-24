@@ -10,7 +10,10 @@ import pandas as pd
 from collections import Counter
 from scipy.stats import pearsonr
 
+from ggr.analyses.bioinformatics import run_gprofiler
+
 from ggr.util.utils import run_shell_cmd
+from ggr.util.bed_utils import id_to_bed
 
 
 def _add_mirrored_interactions(interaction_file, out_file):
@@ -392,7 +395,6 @@ def reconcile_interactions(
     return reconciled_files
 
 
-
 def run_interaction_idr_test(mat_file, out_file, idr_thresh=0.10):
     """convert to narrowpeak format files, run IDR,
     filter for consistent peaks
@@ -542,6 +544,7 @@ def _convert_to_interaction_format(mat_file, out_file, score_val="pooled"):
 
 def get_replicate_consistent_links(
         pooled_file, links_files, out_prefix,
+        idr=False,
         colnames=["pooled", "rep1", "rep2"]):
     """get replicate consistent links, using pooled results as a guide
     note: includes flipped interactions (start_x_end and end_x_start)
@@ -609,9 +612,12 @@ def get_replicate_consistent_links(
     run_shell_cmd(plot_cmd)
 
     # and set threshold for consistency - use IDR framework
-    mat_filt_file = "{}.idr_filt.mat.txt.gz".format(out_mat_file.split(".mat")[0])
-    run_interaction_idr_test(out_mat_file, mat_filt_file)
-    
+    if idr:
+        mat_filt_file = "{}.idr_filt.mat.txt.gz".format(out_mat_file.split(".mat")[0])
+        run_interaction_idr_test(out_mat_file, mat_filt_file)
+    else:
+        mat_filt_file = out_mat_file
+        
     # and save out as interaction format
     interaction_file = "{}.interactions.txt.gz".format(mat_filt_file.split(".mat")[0])
     _convert_to_interaction_format(mat_filt_file, interaction_file)
@@ -689,46 +695,134 @@ def get_timepoint_consistent_links(
     return
 
 
-def regions_to_genes(
-        region_file, links_file, tss_file, out_file,
-        region_signals=None, rna_signals=None):
-    """goes from a region set to a linked gene set
+def _get_aggregate_score(region_ids_string):
+    """get back aggregate score
     """
+    region_ids_w_score = region_ids_string.split(";")
+    scores = [float(val.split(",")[1]) for val in region_ids_w_score]
+
+    return np.sum(scores)
+
+
+def regions_to_genes(
+        region_file, links_file, tss_file, out_file, tmp_dir=None):
+    """goes from a region set to a linked gene set
+    note that region id file must match ids in region signals if using
+    """
+    if tmp_dir is None:
+        tmp_dir = os.path.dirname(out_file)
+    
     # overlap regions with links
-    tmp_file = "{}.region_to_region.tmp.txt.gz".format(
-        out_file.split(".txt")[0])
+    # keep original region info to pass through
+    tmp_file = "{}/{}.region_to_region.tmp.txt.gz".format(
+        tmp_dir,
+        os.path.basename(out_file).split(".txt")[0])
     intersect_cmd = (
-        "bedtools intersect -u -a {} -b {} | "
+        "bedtools intersect -wo -a {} -b {} | "
         "gzip -c > {}").format(
             links_file, region_file, tmp_file)
+    run_shell_cmd(intersect_cmd)
     
     # reformat linked regions to bed file
+    # keep original region info to pass through
     tmp_bed_file = "{}.bed.gz".format(tmp_file.split(".txt")[0])
-    data = pd.read_csv(tmp_file, sep="\t")
+    data = pd.read_csv(tmp_file, sep="\t", header=None)
     chrom, start, stop, score = _split_interaction_name_field(data[3])
-    region_id = data[0].mapt(str) + ":" + data[1].map(str) + "-" + data[2].map(str)
+    region_id = data[6].map(str) + ":" + data[7].map(str) + "-" + data[8].map(str) + "," + score.map(str)
     bed_data = pd.DataFrame(
         {"chrom": chrom,
          "start": start,
          "stop": stop,
-         "region_id": region_id,
-         "score": score})
-    bed_data.to_csv(tmp_bed_file, sep="\t", compression="gzip")
+         "region_id": region_id})
+
+    # groupby region ids linking to that position
+    groupby_cols = ["chrom", "start", "stop"]
+    bed_data = bed_data.groupby(groupby_cols)["region_id"].apply(list)
+    bed_data = bed_data.reset_index()
+    bed_data["region_id"] = bed_data["region_id"].apply(";".join)
+    bed_data["unique_id"] = range(bed_data.shape[0])
+    bed_data["strand"] = "."    
+    bed_data = bed_data[["chrom", "start", "stop", "region_id", "unique_id", "strand"]]
+    bed_data.to_csv(
+        tmp_bed_file, sep="\t", compression="gzip",
+        header=False, index=False)
     
     # overlap linked regions with TSS file
-    tmp_genes_file = "{}.region_to_tss.tmp.txt.gz".format(
-        out_file.split(".txt")[0])
+    tmp_genes_file = "{}/{}.region_to_tss.tmp.txt.gz".format(
+        tmp_dir,
+        os.path.basename(out_file).split(".txt")[0])
     intersect_cmd = (
-        "bedtools intersect -a {} -b {} | "
+        "bedtools intersect -wo -a {} -b {} | "
         "gzip -c > {}").format(
             tss_file, tmp_bed_file, tmp_genes_file)
-
-    # read in and clean up
-
-
-    # if signals available, read them in and get aggregate info
-    # across regions and genes
+    run_shell_cmd(intersect_cmd)
     
+    # read in and clean up
+    genes = pd.read_csv(tmp_genes_file, sep="\t", header=None)
+    genes = genes[[3,9]]
+    genes.columns = ["gene_id", "region_ids"]
+    genes = genes.groupby("gene_id")["region_ids"].apply(list).reset_index()
+    genes["region_ids"] = genes["region_ids"].apply(";".join)
+    genes["score"] = genes["region_ids"].apply(_get_aggregate_score)
+    genes = genes.sort_values("score")
+    genes.to_csv(out_file, sep="\t", compression="gzip", header=True, index=False)
+
+    return None
+
+
+
+def region_clusters_to_genes(
+        cluster_file,
+        links_file,
+        tss_file,
+        out_dir,
+        region_signal_file=None,
+        rna_signal_file=None,
+        background_gene_file=None,
+        run_enrichments=True):
+    """take a cluster file, split to present clusters and get gene sets
+    """
+    # set up tmp dir
+    tmp_dir = "{}/tmp".format(out_dir)
+    run_shell_cmd("mkdir -p {}".format(tmp_dir))
+    
+    # read in data
+    data = pd.read_csv(cluster_file, sep="\t")
+    unique_cluster_ids = sorted(list(set(data["cluster"].values.tolist())))
+
+    # go through each cluster
+    for cluster_id in unique_cluster_ids:
+        # set up bed file
+        tmp_id_file = "{}/cluster-{}.txt.gz".format(tmp_dir, cluster_id)
+        tmp_bed_file = "{}/cluster-{}.bed.gz".format(tmp_dir, cluster_id)
+        ids_in_cluster = data[data["cluster"] == cluster_id]["id"]
+        ids_in_cluster.to_csv(
+            tmp_id_file,
+            sep="\t", compression="gzip",
+            header=False, index=False)
+        id_to_bed(tmp_id_file, tmp_bed_file, sort=True)
+
+        # bed file to gene set
+        gene_set_file = "{}/cluster-{}.regions_to_genes.txt.gz".format(
+            out_dir, cluster_id)
+        regions_to_genes(
+            tmp_bed_file,
+            links_file,
+            tss_file,
+            gene_set_file,
+            tmp_dir=tmp_dir)
+
+        # add in signal info?
+        
+        # run gprofiler
+        gprofiler_dir = "{}/cluster-{}.enrichments".format(out_dir, cluster_id)
+        run_shell_cmd("mkdir -p {}".format(gprofiler_dir))
+        if run_enrichments:
+            run_gprofiler(
+                gene_set_file, background_gene_file,
+                gprofiler_dir, header=True)
+
+    quit()
 
     return
 
