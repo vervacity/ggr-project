@@ -58,6 +58,54 @@ def run_replicate_consistent_links_workflow(
     return args
 
 
+
+def run_traj_linking_workflow(args, linking_dir):
+    """link ATAC trajectories to RNA trajectories with linking file
+    """
+    logger.info("ANALYSIS: correlation between ATAC/RNA clusters")
+
+    # setup
+    traj_dir = "{}/traj.linking".format(linking_dir)
+    os.system("mkdir -p {}".format(traj_dir))
+
+    # get needed files
+    atac_clusters_file = args.outputs["results"]["atac"]["timeseries"]["dp_gp"][
+        "clusters.reproducible.hard.reordered.list"]
+    atac_mat_file = args.outputs["data"]["atac.counts.pooled.rlog.dynamic.mat"]
+
+    rna_clusters_file = args.outputs["results"]["rna"]["timeseries"]["dp_gp"][
+        "clusters.reproducible.hard.reordered.list"]
+    rna_mat_file = args.outputs["data"][
+        "rna.counts.pc.expressed.timeseries_adj.pooled.rlog.dynamic.mat"]
+    
+    # get linking file
+    linking_file = glob.glob("{}/*links*ALL.txt.gz".format(linking_dir))
+    assert len(linking_file) == 1
+    linking_file = linking_file[0]
+
+    # need to collect:
+    # 1) gene set enrichments
+    # 2) count overlap (gene number)
+    # 3) correlation match (also individual plots?)
+    
+    
+
+    # get correlation matrix
+    correlation_matrix_file = "{}/{}.correlation_mat.txt.gz".format(
+        traj_dir, prefix)
+    if not os.path.isfile(correlation_matrix_file):
+        build_correlation_matrix(
+            atac_clusters_file,
+            atac_mat_file,
+            rna_clusters_file,
+            rna_mat_file,
+            correlation_matrix_file)
+
+    
+    return
+
+
+
 def runall(args, prefix):
     """all workflows for atac-seq data
     """
@@ -258,6 +306,18 @@ def runall(args, prefix):
     # TODO - for each of these link sets, get correlation matrix
     # between ATAC and RNA
     # input: atac clusters, rna clusters/data
+    links_dirs = [
+        "abc.distance",
+        "abc.hic.celltype_avg",
+        "proximity",
+        "proximity.corr",
+        "proxmity.corr.dynamic"]
+    for links_dir in links_dirs:
+        # run workflow for using links to get from ATAC traj to RNA traj
+
+        
+        pass
+    
     
     
     # -------------------------------------------
@@ -342,96 +402,5 @@ def runall(args, prefix):
             confusion_matrix_file)
 
     # TODO split this by TFs vs non TFs <- make annotation TSS files
-
-    # -------------------------------------------
-    # ANALYSIS - get replicate consistent distance based links (ABC method)
-    # input: ABC distance-based links
-    # output: replicate consistent links
-    # -------------------------------------------
-    logger.info("ANALYSIS: build replicate consistent ABC links - distance-based")
-    if False:
-        run_replicate_consistent_links_workflow(
-            args,
-            prefix,
-            results_dir,
-            link_key="distance",
-            out_dir="abc.distance")
-
-    logger.info("ANALYSIS: build replicate consistent ABC links - cell type avg HiC")
-    run_replicate_consistent_links_workflow(
-        args,
-        prefix,
-        results_dir,
-        link_key="hic.celltype_avg",
-        out_dir="abc.hic.celltype_avg")
-
-    
-    quit()
-    
-    # set up
-    link_dir = args.inputs["conformation"][args.cluster]["distance"]["data_dir"]
-    link_days = ["d0", "d3", "d6"]
-    replicated_link_dir = "{}/abc.distance".format(results_dir)
-    os.system("mkdir -p {}".format(replicated_link_dir))
-    
-    for link_day in link_days:
-        pooled_file = glob.glob(
-            "{}/*{}*pooled*.txt.gz".format(link_dir, link_day))
-        print pooled_file
-        assert len(pooled_file) == 1
-        pooled_file = pooled_file[0]
-        rep_link_files = sorted(
-            glob.glob("{}/*{}*b*.gz".format(link_dir, link_day)))
-        link_prefix = "{}/{}.{}".format(
-            replicated_link_dir,
-            prefix,
-            link_day)
-        get_replicate_consistent_links(
-            pooled_file,
-            rep_link_files,
-            link_prefix)
-
-
-        
-    # TODO copy over to data dir?
-    quit()
-    
-    # -------------------------------------------
-    # ANALYSIS - get replicate consistent HiC based links (ABC method)
-    # input: ABC HiC links
-    # output: replicate consistent links
-    # -------------------------------------------
-    logger.info("ANALYSIS: build replicate consistent HiChIP link set")
-
-    # set up
-    link_dir = args.inputs["conformation"][args.cluster]["hic.keratinocyte"]["data_dir"]
-    #link_days = ["d0", "d3", "d6"]
-    link_days = ["d3", "d6"]
-    replicated_link_dir = "{}/abc.hic.keratinocyte".format(results_dir)
-    os.system("mkdir -p {}".format(replicated_link_dir))
-    
-    # get replicate consistent links
-    for link_day in link_days:
-        pooled_file = glob.glob(
-            "{}/*{}*pooled*.txt.gz".format(link_dir, link_day))
-        assert len(pooled_file) == 1
-        pooled_file = pooled_file[0]
-        rep_link_files = sorted(
-            glob.glob("{}/*{}*b*.gz".format(link_dir, link_day)))
-        link_prefix = "{}/{}.{}".format(
-            replicated_link_dir,
-            prefix,
-            link_day)
-        get_replicate_consistent_links(
-            pooled_file,
-            rep_link_files,
-            link_prefix)
-        
-    quit()
-    
-
-    
-    # and then rerun select enrichments?
-    
 
     return args

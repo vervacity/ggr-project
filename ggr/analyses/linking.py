@@ -337,6 +337,7 @@ def regions_to_genes_through_links(region_file, links_file, out_file):
     return
 
 
+# tODO deprecate this
 def traj_bed_to_gene_set_by_proximity(
         bed_file,
         tss_file,
