@@ -264,7 +264,7 @@ def regions_to_genes(
     return
 
 
-def regions_to_genes_through_links(region_file, links_file, out_file):
+def regions_to_genes_through_links_OLD(region_file, links_file, out_file):
     """intersect regions with link file to get to gene set
     """
     assert out_file.endswith(".gz")
@@ -824,6 +824,7 @@ def _convert_to_interaction_format(mat_file, out_file, score_val="pooled"):
     keep_cols = ["chrom", "start", "stop", "interaction", "pooled"]
     data = data[keep_cols]
     data["strand"] = "."
+    data = data.drop_duplicates()
     
     # save out
     data.to_csv(out_file, sep="\t", compression="gzip", header=False, index=False)
@@ -880,6 +881,7 @@ def get_replicate_consistent_links(
                 data, how="inner", left_index=True, right_index=True)
 
     # save out
+    summary = summary.drop_duplicates()
     summary.to_csv(out_mat_file, sep="\t", compression="gzip", header=True)
     
     # plot in R
@@ -951,6 +953,7 @@ def get_timepoint_consistent_links(
                 data, how="outer", left_index=True, right_index=True)
 
     # save out
+    summary = summary.drop_duplicates()
     mat_file = "{}.mat.txt.gz".format(out_file.split(".txt")[0])
     summary.to_csv(mat_file, sep="\t", compression="gzip", header=True)
     
