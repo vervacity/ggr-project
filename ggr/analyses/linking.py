@@ -544,7 +544,6 @@ def _convert_to_interaction_format(mat_file, out_file, score_val="pooled"):
 
 def get_replicate_consistent_links(
         pooled_file, links_files, out_prefix,
-        idr=False,
         colnames=["pooled", "rep1", "rep2"]):
     """get replicate consistent links, using pooled results as a guide
     note: includes flipped interactions (start_x_end and end_x_start)
@@ -612,11 +611,8 @@ def get_replicate_consistent_links(
     run_shell_cmd(plot_cmd)
 
     # and set threshold for consistency - use IDR framework
-    if idr:
-        mat_filt_file = "{}.idr_filt.mat.txt.gz".format(out_mat_file.split(".mat")[0])
-        run_interaction_idr_test(out_mat_file, mat_filt_file)
-    else:
-        mat_filt_file = out_mat_file
+    mat_filt_file = "{}.idr_filt.mat.txt.gz".format(out_mat_file.split(".mat")[0])
+    run_interaction_idr_test(out_mat_file, mat_filt_file)
         
     # and save out as interaction format
     interaction_file = "{}.interactions.txt.gz".format(mat_filt_file.split(".mat")[0])
@@ -764,7 +760,7 @@ def regions_to_genes(
     genes = genes.groupby("gene_id")["region_ids"].apply(list).reset_index()
     genes["region_ids"] = genes["region_ids"].apply(";".join)
     genes["score"] = genes["region_ids"].apply(_get_aggregate_score)
-    genes = genes.sort_values("score")
+    genes = genes.sort_values("score", ascending=False)
     genes.to_csv(out_file, sep="\t", compression="gzip", header=True, index=False)
 
     return None
@@ -820,7 +816,7 @@ def region_clusters_to_genes(
         if run_enrichments:
             run_gprofiler(
                 gene_set_file, background_gene_file,
-                gprofiler_dir, header=True)
+                gprofiler_dir, ordered=True, header=True)
 
     quit()
 

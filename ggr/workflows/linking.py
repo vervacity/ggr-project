@@ -317,7 +317,7 @@ def runall(args, prefix):
     # between ATAC and RNA
     # input: atac clusters, rna clusters/data
     links_dirs = [
-        #"abc.distance",
+        "abc.distance",
         #"abc.hic.celltype_avg",
         #"proximity",
         "proximity.corr",

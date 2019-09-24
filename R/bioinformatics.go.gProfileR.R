@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 
-# run DAVID GO term analysis
+# run gProfiler
 # requires gene set and background gene set
 
 library(gProfileR)
@@ -10,10 +10,11 @@ args <- commandArgs(trailingOnly=TRUE)
 gene_list_file <- args[1]
 background_list_file <- args[2]
 out_dir <- args[3]
-header <- as.numeric(args[4])
+header <- as.numeric(args[4]) == 1
+ordered <- as.numeric(args[5]) == 1
 
 # read in gene list and background gene list
-if (header != 0) {
+if (header) {
     gene_list <- read.table(
         gzfile(gene_list_file), header=TRUE, stringsAsFactors=FALSE)[,1]
 } else {
@@ -29,7 +30,7 @@ padj_cutoff <- 0.1
 # run gProfileR
 results <- gprofiler(
     gene_list,
-    #ordered_query=TRUE,
+    ordered_query=ordered,
     organism="hsapiens",
     #max_p_value=padj_cutoff,
     #correction_method="fdr",

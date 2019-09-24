@@ -55,19 +55,27 @@ def run_gprofiler(
         gene_set_file,
         background_gene_set_file,
         out_dir,
+        ordered=False,
         header=True):
     """
     """
+    if ordered:
+        ordered_val = 1
+    else:
+        ordered_val = 0
+    
     if header:
         header_val = 1
     else:
         header_val = 0
-    
-    gprofiler_cmd = "bioinformatics.go.gProfileR.R {} {} {} {}".format(
+        
+    #gprofiler_cmd = "bioinformatics.go.gProfileR.R {} {} {} {}".format(
+    gprofiler_cmd = "Rscript /users/dskim89/git/ggr-project/R/bioinformatics.go.gProfileR.R {} {} {} {} {}".format(
         gene_set_file,
         background_gene_set_file,
         out_dir,
-        header_val)
+        header_val,
+        ordered_val)
     run_shell_cmd(gprofiler_cmd)
 
     return
