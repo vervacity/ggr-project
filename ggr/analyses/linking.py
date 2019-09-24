@@ -538,73 +538,72 @@ def _convert_to_interaction_format(mat_file, out_file, score_val="pooled"):
 
 def get_replicate_consistent_links(
         pooled_file, links_files, out_prefix,
-        add_mirrored_interactions=True,
         colnames=["pooled", "rep1", "rep2"]):
     """get replicate consistent links, using pooled results as a guide
+    note: includes flipped interactions (start_x_end and end_x_start)
     """
     # out dir, tmp_dir, results file
     out_dir = os.path.dirname(out_prefix)
     tmp_dir = "{}/tmp".format(out_dir)
     os.system("mkdir -p {}".format(tmp_dir))
     out_mat_file = "{}.reps.mat.txt.gz".format(out_prefix)
-    interaction_file = "{}.interactions.txt.gz".format(out_mat_file.split(".mat")[0])
+    interaction_file = "{}.interactions.txt.gz".format(out_mat_file.split(".reps")[0])
 
-    if True:
-        # first reconcile interaction coords, mapping to pooled links
-        matched_links_files = reconcile_interactions(
-            [pooled_file] + links_files, tmp_dir, method="pooled")
+    # first reconcile interaction coords, mapping to pooled links
+    matched_links_files = reconcile_interactions(
+        [pooled_file] + links_files, tmp_dir, method="pooled")
 
-        # format link files to "coordinate format" (start_id, end_id, score)
-        interaction_files = []
-        for links_file in matched_links_files:
-            tmp_file = "{}/{}.coord_formatted.tmp.txt.gz".format(
-                tmp_dir,
-                os.path.basename(links_file).split(".bed")[0].split(".txt")[0])
-            _convert_to_coord_format(links_file, tmp_file)
-            interaction_files.append(tmp_file)
+    # format link files to "coordinate format" (start_id, end_id, score)
+    interaction_files = []
+    for links_file in matched_links_files:
+        tmp_file = "{}/{}.coord_formatted.tmp.txt.gz".format(
+            tmp_dir,
+            os.path.basename(links_file).split(".bed")[0].split(".txt")[0])
+        _convert_to_coord_format(links_file, tmp_file)
+        interaction_files.append(tmp_file)
 
-        # merge to make a table
-        summary = None
-        for interaction_file_idx in range(len(interaction_files)):
-            # adjust data
-            interaction_file = interaction_files[interaction_file_idx]
-            data = pd.read_csv(interaction_file, sep="\t", header=None, index_col=None)
-            data.index = data[0].map(str) + "_x_" + data[1].map(str)
-            data[colnames[interaction_file_idx]] = data[2]
-            data = data.drop([0,1,2], axis=1)
+    # merge to make a table
+    summary = None
+    for interaction_file_idx in range(len(interaction_files)):
+        # adjust data
+        interaction_file = interaction_files[interaction_file_idx]
+        data = pd.read_csv(interaction_file, sep="\t", header=None, index_col=None)
+        data.index = data[0].map(str) + "_x_" + data[1].map(str)
+        data[colnames[interaction_file_idx]] = data[2]
+        data = data.drop([0,1,2], axis=1)
 
-            # merge. use INTERSECTION since the peak needs to be present
-            # in pooled AND rep1 AND rep2
-            if summary is None:
-                summary = data.copy()
-            else:
-                summary = summary.merge(
-                    data, how="inner", left_index=True, right_index=True)
+        # merge. use INTERSECTION since the peak needs to be present
+        # in pooled AND rep1 AND rep2
+        if summary is None:
+            summary = data.copy()
+        else:
+            summary = summary.merge(
+                data, how="inner", left_index=True, right_index=True)
 
-        # clean up duplicates (multiple matching hits per link)
-        # first flip all to make sure both sides are represented
-        summary_flipped = summary.copy()
-        flip_regions = summary_flipped.index.to_series().str.split("_x_", n=2, expand=True)
-        flip_regions["flip"] = flip_regions[1].map(str) + "_x_" + flip_regions[0].map(str)
-        summary_flipped.index = flip_regions["flip"]
-        summary = pd.concat([summary, summary_flipped], axis=0)
-        
-        # then choose max pooled value to keep
-        # note max can produce multiple hits, so need to drop dups in index as final step
-        summary = summary.reset_index()
-        keep_rows = summary.groupby(["index"])["pooled"].transform(max) == summary["pooled"]
-        summary = summary[keep_rows]
-        summary = summary.set_index("index")
-        summary = summary.loc[~summary.index.duplicated(keep="first")]
+    # clean up duplicates (multiple matching hits per link)
+    # first flip all to make sure both sides are represented
+    summary_flipped = summary.copy()
+    flip_regions = summary_flipped.index.to_series().str.split("_x_", n=2, expand=True)
+    flip_regions["flip"] = flip_regions[1].map(str) + "_x_" + flip_regions[0].map(str)
+    summary_flipped.index = flip_regions["flip"]
+    summary = pd.concat([summary, summary_flipped], axis=0)
 
-        # save out    
-        summary.to_csv(out_mat_file, sep="\t", compression="gzip", header=True)
+    # then choose max pooled value to keep
+    # note max can produce multiple hits, so need to drop dups in index as final step
+    summary = summary.reset_index()
+    keep_rows = summary.groupby(["index"])["pooled"].transform(max) == summary["pooled"]
+    summary = summary[keep_rows]
+    summary = summary.set_index("index")
+    summary = summary.loc[~summary.index.duplicated(keep="first")]
 
-        # plot in R
-        plot_file = "{}.reps.scatter.png".format(out_prefix)
-        plot_cmd = "Rscript /users/dskim89/git/ggr-project/R/plot.links.rep_consistency.R {} {}".format(
-            out_mat_file, plot_file)
-        run_shell_cmd(plot_cmd)
+    # save out    
+    summary.to_csv(out_mat_file, sep="\t", compression="gzip", header=True)
+
+    # plot in R
+    plot_file = "{}.reps.scatter.png".format(out_prefix)
+    plot_cmd = "Rscript /users/dskim89/git/ggr-project/R/plot.links.rep_consistency.R {} {}".format(
+        out_mat_file, plot_file)
+    run_shell_cmd(plot_cmd)
 
     # and set threshold for consistency - use IDR framework
     mat_filt_file = "{}.filt.mat.txt.gz".format(out_mat_file.split(".mat")[0])
@@ -612,15 +611,6 @@ def get_replicate_consistent_links(
     
     # and save out as interaction format
     _convert_to_interaction_format(mat_filt_file, interaction_file)
-
-    quit()
-    
-    # adjust if mirroring interactions
-    if add_mirrored_interactions:
-        tmp_mirror_file = "links.tmp.txt.gz"
-        os.system("mv {} {}".format(interaction_file, tmp_mirror_file))
-        _add_mirrored_interactions(tmp_mirror_file, interaction_file)
-        os.system("rm {}".format(tmp_mirror_file))
     
     return
 
