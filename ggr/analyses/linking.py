@@ -105,7 +105,8 @@ def link_by_distance(
     data["name"] = data[3].map(str) + ":" + data[4].map(str) + "-" + data[5].map(str) + "," + data["score"].map(str)
     if annotate_gene_ids:
         data["name"] = data["name"].map(str) + "," + data[6]
-    keep_cols = [0, 1, 2, "name", 7, 8]
+    data["unique_id"] = range(data.shape[0])
+    keep_cols = [0, 1, 2, "name", "unique_id", 8]
     data = data[keep_cols]
 
     # save out

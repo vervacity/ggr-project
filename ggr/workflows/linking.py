@@ -65,8 +65,6 @@ def run_replicate_consistent_links_workflow(
         get_timepoint_consistent_links(
             links_files, all_prefix)
 
-    quit()
-
     return args
 
 
@@ -96,9 +94,9 @@ def run_traj_linking_workflow(args, linking_dir):
     linking_file = linking_file[0]
 
     # need to collect:
-    # 1) gene set enrichments
-    # 2) count overlap (gene number)
-    # 3) correlation match (also individual plots?)
+    # 1) gene set enrichments (just ATAC traj to anything)
+    # 2) count overlap (gene number) for ATAC traj to RNA traj
+    # 3) correlation match (also individual plots?) <- this is separate
     
     
 
@@ -189,10 +187,10 @@ def runall(args, prefix):
         links_files.append(day_links_file)
 
     # and reconcile across timepoints
-    all_links_file = "{}/links.proximity.ALL.k-{}.max_d-{}.txt.gz".format(
-        proximity_links_dir, k_nearest, max_dist)
-    if not os.path.isfile(all_links_file):
-        get_timepoint_consistent_links(links_files, all_links_file, method="union")
+    all_prefix = "{}/{}.ALL".format(proximity_links_dir, prefix)
+    all_interactions_file = "{}.interactions.txt.gz".format(all_prefix)
+    if not os.path.isfile(all_interactions_file):
+        get_timepoint_consistent_links(links_files, all_prefix)
 
     # proximity with corr
     method_type = "proximity.corr"
@@ -222,12 +220,12 @@ def runall(args, prefix):
                 pval_thresh=pval_thresh,
                 is_ggr=True)
         links_files.append(day_links_file)
-
+        
     # and reconcile across timepoints
-    all_links_file = "{}/links.proximity.ALL.k-{}.max_d-{}.corr-{}.txt.gz".format(
-        proximity_corr_links_dir, k_nearest, max_dist, corr_coeff_thresh)
-    if not os.path.isfile(all_links_file):
-        get_timepoint_consistent_links(links_files, all_links_file, method="union")
+    all_prefix = "{}/{}.ALL".format(proximity_corr_links_dir, prefix)
+    all_interactions_file = "{}.interactions.txt.gz".format(all_prefix)
+    if not os.path.isfile(all_interactions_file):
+        get_timepoint_consistent_links(links_files, all_prefix)
 
     # proximity with corr: ONLY dynamic
     method_type = "proximity.corr.dynamic"
@@ -257,13 +255,14 @@ def runall(args, prefix):
                 pval_thresh=pval_thresh,
                 is_ggr=True)
         links_files.append(day_links_file)
-
+        
     # and reconcile across timepoints
-    all_links_file = "{}/links.proximity.ALL.k-{}.max_d-{}.corr-{}.txt.gz".format(
-        proximity_corr_dynamic_links_dir, k_nearest, max_dist, corr_coeff_thresh)
-    if not os.path.isfile(all_links_file):
-        get_timepoint_consistent_links(links_files, all_links_file, method="union")
-            
+    all_prefix = "{}/{}.ALL".format(proximity_corr_dynamic_links_dir, prefix)
+    all_interactions_file = "{}.interactions.txt.gz".format(all_prefix)
+    if not os.path.isfile(all_interactions_file):
+        get_timepoint_consistent_links(links_files, all_prefix)
+
+    quit()
     # -------------------------------------------
     # ANALYSIS - different styles of ABC linking
     # input: ABC links
@@ -273,8 +272,7 @@ def runall(args, prefix):
     # distance based ABC
     logger.info("ANALYSIS: build replicate consistent ABC links - distance-based")
     abc_dist_dir = "abc.distance"
-    #if not os.path.isdir("{}/{}".format(results_dir, abc_dist_dir)):
-    if True:
+    if not os.path.isdir("{}/{}".format(results_dir, abc_dist_dir)):
         run_replicate_consistent_links_workflow(
             args,
             prefix,
@@ -292,17 +290,7 @@ def runall(args, prefix):
             results_dir,
             link_key="hic.celltype_avg",
             out_dir=abc_avg_hic_dir)
-
-    # and reconcile across timepoints
-    all_links_file = "{}/{}/{}.links.abc.distance.ALL.txt.gz".format(
-        results_dir, abc_avg_hic_dir, prefix)
-    if not os.path.isfile(all_links_file):
-        links_files = sorted(
-            glob.glob("{}/{}/*interactions.txt.gz".format(
-                results_dir, abc_avg_hic_dir)))
-        get_timepoint_consistent_links(
-            links_files, all_links_file, method="union")
-
+        
     quit()
 
 
