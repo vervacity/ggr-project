@@ -769,10 +769,25 @@ def regions_to_genes(
         thresh_val = np.mean(genes["score"].values[noise_calc_index:])
         genes = genes[genes["score"] > thresh_val]
 
-    if True:
+    if False:
         if genes.shape[0] > 1000:
             genes = genes.iloc[0:1000]
-        
+
+    # inflection point analysis?
+    if False:
+        # normalize so max value is rank value
+        slope_thresh = 1.0
+        normalization_factor = float(genes.shape[0]) / np.max(genes["score"].values)
+        for stop_i in reversed(range(1, genes.shape[0])):
+            slope = (genes["score"].iloc[stop_i-1] - genes["score"].iloc[stop_i]) * normalization_factor
+            #print stop_i, genes["score"].iloc[stop_i - 1], genes["score"].iloc[stop_i], slope
+            if slope > slope_thresh:
+                print slope, stop_i
+                break
+        #print stop_i
+        genes = genes.iloc[:stop_i]
+
+    # save out
     genes.to_csv(out_file, sep="\t", compression="gzip", header=True, index=False)
 
     return None
