@@ -1,0 +1,15 @@
+
+param selection
+
+
+
+linking
+
+>> k nearest
+Gasperini et all Cell 2019 suggests that mostly 1st-3rd nearest gene, but mostly first or second nearest.
+
+>> distance
+100kb max dist since GTEx suggests eQTL distr falls off around 100kb (Gamazon et al Nature Genetics 2018)
+Also note Gasperini et all Cell 2019 suggests median position of enhancers (crispr validated) is 25kb, ie 50% of all effective enhancers for a gene could be within 25kb.
+
+So, 100kb is a good max and 25kb is a good min.
