@@ -69,13 +69,19 @@
 	    "k_nearest": 2,
 	    "max_dist": 100000,
 	    "corr_coeff_thresh": 0,
-	    "pval_thresh": 0.50
+	    "pval_thresh": 1
 	},
 	"proximity.corr.dynamic": {
 	    "k_nearest": 3,
 	    "max_dist": 100000,
 	    "corr_coeff_thresh": 0,
-	    "pval_thresh": 0.50
+	    "pval_thresh": 1
+	},
+	"abc.distance": {
+	    "idr_thresh": 0.10
+	},
+	"abc.hic.celltype_avg": {
+	    "idr_thresh": 0.01
 	}
     }
     

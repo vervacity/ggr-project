@@ -35,5 +35,11 @@ results <- gprofiler(
     #max_p_value=padj_cutoff,
     #correction_method="fdr",
     custom_bg=background_list)
+
+# clean up
+results <- results[results$domain != "tf",]
+results <- results[results$domain != "mir",]
+
+# save out
 out_file <- paste(out_dir, "/", prefix, ".go_gprofiler.txt", sep="")
 write.table(results, out_file, quote=FALSE, sep="\t")
