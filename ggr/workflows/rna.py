@@ -267,7 +267,26 @@ def runall(args, prefix):
         prefix,
         datatype_key="rna",
         mat_key="rna.counts.pc.expressed.mat")
-        
+
+    # filter for reproducible dynamic IDs and save to data dir
+    dynamic_mat_key = "rna.counts.pc.expressed.timeseries_adj.pooled.rlog.dynamic.mat"
+    dynamic_traj_mat_key = "{}.traj.mat".format(dynamic_mat_key.split(".mat")[0])
+    reproducible_dynamic_file = "{}/{}.traj.mat.txt.gz".format(
+        data_dir,
+        os.path.basename(args.outputs["data"][dynamic_mat_key]).split(".mat")[0])
+    args.outputs["data"][dynamic_traj_mat_key] = reproducible_dynamic_file
+    if not os.path.isfile(args.outputs["data"][dynamic_traj_mat_key]):
+        tmp_id_file = "ids.tmp.txt"
+        pd.read_csv(
+            args.outputs["results"]["rna"]["timeseries"]["dp_gp"][
+                "clusters.reproducible.hard.reordered.list"], sep="\t")["id"].to_csv(
+                    tmp_id_file, index=False, sep="\t")
+        filter_for_ids(
+            args.outputs["data"][dynamic_mat_key],
+            tmp_id_file,
+            args.outputs["data"][dynamic_traj_mat_key])
+        os.system("rm {}".format(tmp_id_file))
+    
     # here can do a PCA/correlation plot to show samples
     plot_dir = "{}/plots".format(
         out_results["dir"])
