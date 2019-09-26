@@ -821,6 +821,81 @@ def regions_to_genes(
     return None
 
 
+def regions_to_genes_with_null_distr(
+        region_file, links_file, tss_file, out_file,
+        tmp_dir=None,
+        region_set=[],
+        filter_genes=[],
+        num_null_runs=20):
+    """run regions to genes with a matched size null
+    set (bootstrapped) to get expected score of genes,
+    then run it on actualy region set and only keep genes
+    that fall above the expected value
+    """
+    assert len(region_set) > 0
+    
+    # get params
+    num_regions = pd.read_csv(region_file).shape[0]
+
+    # null runs
+    null_runs = []
+    for null_i in range(num_null_runs):
+        # get a random set of regions, save out to bed file
+        tmp_id_file = "{}/null-{}.txt.gz".format(tmp_dir, null_i)
+        tmp_bed_file = "{}/null-{}.bed.gz".format(tmp_dir, null_i)
+        rand_state = np.random.RandomState(null_i)
+        random_regions = pd.DataFrame({
+            "rand": rand_state.choice(region_set, size=num_regions, replace=False)})
+        random_regions.to_csv(
+            tmp_id_file,
+            sep="\t", compression="gzip",
+            header=False, index=False)
+        id_to_bed(tmp_id_file, tmp_bed_file, sort=True)
+        
+        #  run regions to genes
+        null_results_file = "{}/null-{}.genes.txt.gz".format(tmp_dir, null_i)
+        if False:
+            regions_to_genes(
+                tmp_bed_file, links_file, tss_file,
+                null_results_file, tmp_dir=tmp_dir,
+                filter_genes=filter_genes)
+
+        # read in and save to null runs
+        null_results = pd.read_csv(null_results_file, sep="\t", index_col=0)
+        null_results = null_results[["score"]]
+        null_runs.append(null_results)
+
+    # get average
+    null_results = reduce(
+        lambda x, y: pd.merge(x, y, how="outer", left_index=True, right_index=True),
+        null_runs)
+    null_results = pd.DataFrame({"expected": null_results.mean(axis=1)})
+    null_results = null_results.fillna(0)
+
+    # now run actual regions
+    tmp_regions_file = "{}/notnull.genes.txt.gz".format(tmp_dir)
+    if False:
+        regions_to_genes(
+            tmp_bed_file, links_file, tss_file,
+            tmp_regions_file, tmp_dir=tmp_dir,
+            filter_genes=filter_genes)
+
+    # read in and compare
+    scores = pd.read_csv(tmp_regions_file, sep="\t", index_col=0)
+    scores_w_expected_vals = scores.merge(
+        null_results, how="left", left_index=True, right_index=True)
+    scores_w_expected_vals = scores_w_expected_vals.fillna(0)
+    scores_w_expected_vals["diff"] = scores_w_expected_vals["score"] - scores_w_expected_vals["expected"]
+    results = scores_w_expected_vals[scores_w_expected_vals["diff"] > 0]
+    results = results.sort_values("diff", ascending=False)
+
+    # save out
+    print "genes linked: ", results.shape[0]
+    results.to_csv(out_file, sep="\t", compression="gzip", header=True, index=True)
+    
+    return None
+
+
 
 def region_clusters_to_genes(
         cluster_file,
@@ -854,10 +929,12 @@ def region_clusters_to_genes(
     # read in rna signals
     if rna_signal_file is not None:
         rna_signals = pd.read_csv(rna_signal_file, sep="\t", index_col=0)
-        filter_genes = rna_signals.index.values.tolist()
+        #filter_genes = rna_signals.index.values.tolist()
     else:
         rna_signals = None
-        filter_genes = []
+
+    # don't filter genes
+    filter_genes = []
         
     # go through each cluster
     for cluster_id in unique_cluster_ids:
@@ -879,16 +956,18 @@ def region_clusters_to_genes(
             cluster_mean_signal = region_signals[
                 region_signals.index.isin(ids_in_cluster)].mean(axis=0)
             rna_corrs = rna_signals.corrwith(cluster_mean_signal, axis=1)
-            filter_genes = rna_corrs[rna_corrs > -0.1].index.values.tolist()
+            filter_genes = rna_corrs[rna_corrs > 0].index.values.tolist()
         
         # bed file to gene set
         gene_set_file = "{}/cluster-{}.regions_to_genes.txt.gz".format(
             out_dir, cluster_id)
-        regions_to_genes(
+        #regions_to_genes(
+        regions_to_genes_with_null_distr(
             tmp_bed_file,
             links_file,
             tss_file,
             gene_set_file,
+            region_set=region_signals.index.values.tolist(),
             tmp_dir=tmp_dir,
             filter_genes=filter_genes)
         
@@ -900,6 +979,8 @@ def region_clusters_to_genes(
             run_gprofiler(
                 gene_set_file, background_gene_file,
                 gprofiler_dir, ordered=True, header=True)
+
+        quit()
 
     return
 

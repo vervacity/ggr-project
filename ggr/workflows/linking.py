@@ -86,6 +86,7 @@ def run_traj_linking_workflow(args, prefix, links_dir):
 
     rna_clusters_file = args.outputs["results"]["rna"]["timeseries"]["dp_gp"][
         "clusters.reproducible.hard.reordered.list"]
+    # TODO consider using ALL expressed genes?
     rna_mat_file = args.outputs["data"][
         "rna.counts.pc.expressed.timeseries_adj.pooled.rlog.dynamic.traj.mat"]
     rna_expressed_file = args.outputs["data"]["rna.counts.pc.expressed.mat"]
