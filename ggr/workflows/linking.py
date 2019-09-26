@@ -120,7 +120,7 @@ def run_traj_linking_workflow(args, prefix, links_dir):
             rna_signal_file=rna_mat_file,
             filter_gene_file=filter_gene_file,
             filter_by_score=score_filter,
-            run_enrichments=False, # tODO adjust back
+            run_enrichments=False,
             background_gene_file=rna_expressed_file)
 
     # then, use the gene set files and overlap with rna clusters
@@ -342,7 +342,7 @@ def runall(args, prefix):
         #"abc.distance"
         "abc.hic.celltype_avg"
         #"proximity",
-        #"proximity.corr",
+        #"proximity.corr", # <- this biases the links, right now just denovo connecting to genes
         #"proximity.corr.dynamic"
     ]
     for links_dir in links_dirs:

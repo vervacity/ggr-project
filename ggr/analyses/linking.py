@@ -884,7 +884,6 @@ def region_clusters_to_genes(
     return
 
 
-
 def build_confusion_matrix(
         atac_clusters_file,
         rna_clusters_file,
@@ -917,6 +916,7 @@ def build_confusion_matrix(
             linked_genes = genes[genes.index.isin(rna.loc[rna_id])]
             num_possible_genes = len(rna.loc[rna_id])
             # normalized
+            normalize = False
             if normalize:
                 enrichment = linked_genes.shape[0] / (
                     float(num_atac_regions) * float(num_possible_genes))
@@ -928,7 +928,10 @@ def build_confusion_matrix(
             
     # save out results
     results = pd.DataFrame(data=results)
+    if True:
+        results = results.div(results.sum(axis=0), axis=1) # normalize columns (gene count and linking expectations)
     results = results.div(results.sum(axis=1), axis=0) # normalize rows (prob across rows)
+
     out_file = "{}.mat.txt.gz".format(prefix)
     results.to_csv(out_file, sep="\t", compression="gzip")
 
@@ -939,8 +942,6 @@ def build_confusion_matrix(
     run_shell_cmd(plot_cmd)
     
     return
-
-
 
 
 def build_correlation_matrix(
@@ -1022,57 +1023,3 @@ def build_correlation_matrix(
     run_shell_cmd(plot_cmd)
     
     return
-
-
-def build_confusion_matrix_OLD(traj_bed_files, gene_sets, gene_clusters_file, out_file):
-    """collect gene set results into a confusion matrix
-    """
-    # first figure out how many clusters (ATAC)
-    num_gene_sets = len(gene_sets)
-
-    # build row normalization vector
-    traj_region_counts = np.zeros((num_gene_sets))
-    
-    # also figure out how many clusters (RNA)
-    gene_clusters_data = pd.read_csv(gene_clusters_file, sep="\t")
-    cluster_counts = Counter(gene_clusters_data["cluster"])
-    num_gene_clusters = len(set(list(gene_clusters_data["cluster"].values)))
-    
-    # set up results mat
-    mat = np.zeros((num_gene_sets, num_gene_clusters))
-
-    # go through gene sets and fill out mat
-    for gene_set_idx in range(len(gene_sets)):
-        gene_set_file = gene_sets[gene_set_idx]
-        traj_bed_file = traj_bed_files[gene_set_idx]
-        num_regions = pd.read_csv(traj_bed_file, sep="\t", header=None).shape[0]
-        gene_set_idx = int(
-            os.path.basename(gene_set_file).split(".cluster_")[1].split(".")[0]) - 1
-        gene_set = pd.read_csv(gene_set_file, sep="\t")
-        gene_set_counts = Counter(gene_set["traj"])
-        #print gene_set_idx, num_regions
-        
-        for cluster_idx, total in gene_set_counts.most_common():
-            if cluster_idx == -1:
-                continue
-            
-            col_idx = cluster_idx - 1
-            #print "  ", cluster_idx, col_idx, cluster_counts[cluster_idx], total
-            mat[gene_set_idx, col_idx] = total / (float(cluster_counts[cluster_idx]) * float(num_regions))
-
-    # maybe just row normalize?
-            
-    # save out
-    results = pd.DataFrame(data=mat)
-    results = results.div(results.sum(axis=1), axis=0)
-    results.to_csv(out_file, sep="\t", compression="gzip")
-
-    # and plot
-    plot_file = "{}.pdf".format(out_file.split(".txt")[0])
-    plot_cmd = "plot.confusion_matrix.R {} {}".format(
-        out_file, plot_file)
-    print plot_cmd
-    
-    return
-
-
