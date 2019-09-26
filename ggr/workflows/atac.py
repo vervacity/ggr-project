@@ -6,6 +6,8 @@ import glob
 import signal
 import logging
 
+import pandas as pd
+
 from ggr.util.utils import run_shell_cmd
 from ggr.util.utils import parallel_copy
 
@@ -139,6 +141,25 @@ def runall(args, prefix):
         datatype_key="atac",
         mat_key=counts_key)
 
+    # filter for reproducible dynamic IDs and save to data dir
+    dynamic_mat_key = "atac.counts.pooled.rlog.dynamic.mat"
+    dynamic_traj_mat_key = "{}.traj.mat".format(dynamic_mat_key.split(".mat")[0])
+    reproducible_dynamic_file = "{}/{}.traj.mat.txt.gz".format(
+        data_dir,
+        os.path.basename(args.outputs["data"][dynamic_mat_key]).split(".mat")[0])
+    args.outputs["data"][dynamic_traj_mat_key] = reproducible_dynamic_file
+    if not os.path.isfile(args.outputs["data"][dynamic_traj_mat_key]):
+        tmp_id_file = "ids.tmp.txt"
+        pd.read_csv(
+            args.outputs["results"]["atac"]["timeseries"]["dp_gp"][
+                "clusters.reproducible.hard.reordered.list"], sep="\t")["id"].to_csv(
+                    tmp_id_file, index=False, sep="\t")
+        filter_for_ids(
+            args.outputs["data"][dynamic_mat_key],
+            tmp_id_file,
+            args.outputs["data"][dynamic_traj_mat_key])
+        os.system("rm {}".format(tmp_id_file))
+    
     # get PCA
     plot_dir = "{}/plots".format(
         out_results["timeseries"]["dir"])
