@@ -79,7 +79,7 @@ def run_traj_linking_workflow(args, prefix, links_dir):
     # ATAC traj files
     atac_clusters_file = args.outputs["results"]["atac"]["timeseries"]["dp_gp"][
         "clusters.reproducible.hard.reordered.list"]
-    atac_mat_file = args.outputs["data"]["atac.counts.pooled.rlog.dynamic.mat"]
+    atac_mat_file = args.outputs["data"]["atac.counts.pooled.rlog.dynamic.traj.mat"]
 
     # RNA traj files
     rna_clusters_file = args.outputs["results"]["rna"]["timeseries"]["dp_gp"][
