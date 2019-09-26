@@ -8,22 +8,20 @@ import logging
 
 from ggr.util.utils import run_shell_cmd
 from ggr.util.utils import parallel_copy
-
 from ggr.util.bed_utils import merge_regions
 from ggr.util.bed_utils import id_to_bed
 
 from ggr.analyses.bioinformatics import run_gprofiler
-
+from ggr.analyses.linking import build_correlation_matrix
 from ggr.analyses.linking import link_by_distance
 from ggr.analyses.linking import link_by_distance_and_corr
+from ggr.analyses.linking import get_replicate_consistent_links
 from ggr.analyses.linking import get_timepoint_consistent_links
 from ggr.analyses.linking import region_clusters_to_genes
 
-
-from ggr.analyses.linking import build_correlation_matrix
+# TODO deprecate these
 from ggr.analyses.linking import traj_bed_to_gene_set_by_proximity
 from ggr.analyses.linking import build_confusion_matrix
-from ggr.analyses.linking import get_replicate_consistent_links
 
 
 def run_replicate_consistent_links_workflow(
@@ -56,7 +54,8 @@ def run_replicate_consistent_links_workflow(
         get_replicate_consistent_links(
             pooled_file,
             rep_link_files,
-            link_prefix)
+            link_prefix,
+            idr_thresh=args.inputs["params"]["linking"][out_dir]["idr_thresh"])
 
     # and reconcile across timepoints
     all_prefix = "{}/{}.ALL".format(replicated_link_dir, prefix)
@@ -69,7 +68,6 @@ def run_replicate_consistent_links_workflow(
             links_files, all_prefix)
 
     return args
-
 
 
 def run_traj_linking_workflow(args, prefix, links_dir):
@@ -89,16 +87,14 @@ def run_traj_linking_workflow(args, prefix, links_dir):
     rna_clusters_file = args.outputs["results"]["rna"]["timeseries"]["dp_gp"][
         "clusters.reproducible.hard.reordered.list"]
     rna_mat_file = args.outputs["data"][
-        "rna.counts.pc.expressed.timeseries_adj.pooled.rlog.dynamic.mat"]
+        "rna.counts.pc.expressed.timeseries_adj.pooled.rlog.dynamic.traj.mat"]
     rna_expressed_file = args.outputs["data"]["rna.counts.pc.expressed.mat"]
     
     # get linking file
     interactions_file = "{}/{}.ALL.overlap.interactions.txt.gz".format(links_dir, prefix)
-    print interactions_file
 
     # tss file
     tss_file = args.outputs["annotations"]["tss.pc.bed"]
-    print tss_file
     
     # first, per cluster, get gene set enrichments
     region_clusters_to_genes(
@@ -106,35 +102,17 @@ def run_traj_linking_workflow(args, prefix, links_dir):
         interactions_file,
         tss_file,
         traj_dir,
-        region_signal_file=atac_mat_file,
-        rna_signal_file=rna_mat_file,
+        run_enrichments=True,
         background_gene_file=rna_expressed_file,
-        run_enrichments=True)
-    quit()
-    
-    
-    # need to collect:
-    # 1) gene set enrichments (just ATAC traj to anything)
-    # 2) count overlap (gene number) for ATAC traj to RNA traj
-    # 3) correlation match (also individual plots?) <- this is separate
-    
-    
+        filter_by_signal_corr=False,
+        region_signal_file=atac_mat_file,
+        rna_signal_file=rna_mat_file)
 
-    # get correlation matrix
-    if False:
-        correlation_matrix_file = "{}/{}.correlation_mat.txt.gz".format(
-            traj_dir, prefix)
-        if not os.path.isfile(correlation_matrix_file):
-            build_correlation_matrix(
-                atac_clusters_file,
-                atac_mat_file,
-                rna_clusters_file,
-                rna_mat_file,
-                correlation_matrix_file)
-
+    # TODO
+    # then, use the gene set files and overlap with rna clusters
+    # to get counts per cluster
     
     return
-
 
 
 def runall(args, prefix):
@@ -154,6 +132,37 @@ def runall(args, prefix):
     args.outputs["results"][results_dirname] = {"dir": results_dir}
     run_shell_cmd("mkdir -p {}".format(results_dir))
     out_results = args.outputs["results"][results_dirname]
+
+    # -------------------------------------------
+    # ANALYSIS - get correlation matrix between ATAC and RNA
+    # input: atac clusters/data, rna clusters/data
+    # output: correlation matrix
+    # -------------------------------------------
+    logger.info("ANALYSIS: correlation between ATAC/RNA clusters")
+
+    # set up dir
+    corr_dir = "{}/traj.corr".format(results_dir)
+    run_shell_cmd("mkdir -p {}".format(corr_dir))
+
+    # get needed files
+    atac_clusters_file = args.outputs["results"]["atac"]["timeseries"]["dp_gp"][
+        "clusters.reproducible.hard.reordered.list"]
+    atac_mat_file = args.outputs["data"]["atac.counts.pooled.rlog.dynamic.mat"]
+    rna_clusters_file = args.outputs["results"]["rna"]["timeseries"]["dp_gp"][
+        "clusters.reproducible.hard.reordered.list"]
+    rna_mat_file = args.outputs["data"][
+        "rna.counts.pc.expressed.timeseries_adj.pooled.rlog.dynamic.mat"]
+
+    # run analysis
+    correlation_matrix_file = "{}/{}.correlation_mat.txt.gz".format(
+        corr_dir, prefix)
+    if not os.path.isfile(correlation_matrix_file):
+        build_correlation_matrix(
+            atac_clusters_file,
+            atac_mat_file,
+            rna_clusters_file,
+            rna_mat_file,
+            correlation_matrix_file)
     
     # -------------------------------------------
     # ANALYSIS - naive proximity linking
@@ -315,49 +324,21 @@ def runall(args, prefix):
     # between ATAC and RNA
     # input: atac clusters, rna clusters/data
     links_dirs = [
-        "abc.distance",
-        #"abc.hic.celltype_avg",
+        #"abc.distance"
+        "abc.hic.celltype_avg"
         #"proximity",
-        "proximity.corr",
-        "proximity.corr.dynamic"]
+        #"proximity.corr",
+        #"proximity.corr.dynamic"
+    ]
     for links_dir in links_dirs:
         # run workflow for using links to get from ATAC traj to RNA traj        
         run_traj_linking_workflow(args, prefix, "{}/{}".format(results_dir, links_dir))
 
     quit()
-    
-    # -------------------------------------------
-    # ANALYSIS - get correlation matrix between ATAC and RNA
-    # input: atac clusters/data, rna clusters/data
-    # output: correlation matrix
-    # -------------------------------------------
-    logger.info("ANALYSIS: correlation between ATAC/RNA clusters")
 
-    # set up dir
-    atac_linking_dir = "{}/atac".format(results_dir)
-    run_shell_cmd("mkdir -p {}".format(atac_linking_dir))
-
-    # get needed files
-    atac_clusters_file = args.outputs["results"]["atac"]["timeseries"]["dp_gp"][
-        "clusters.reproducible.hard.reordered.list"]
-    atac_mat_file = args.outputs["data"]["atac.counts.pooled.rlog.dynamic.mat"]
-
-    rna_clusters_file = args.outputs["results"]["rna"]["timeseries"]["dp_gp"][
-        "clusters.reproducible.hard.reordered.list"]
-    rna_mat_file = args.outputs["data"][
-        "rna.counts.pc.expressed.timeseries_adj.pooled.rlog.dynamic.mat"]
-
-    # run analysis
-    correlation_matrix_file = "{}/{}.correlation_mat.txt.gz".format(
-        atac_linking_dir, prefix)
-    if not os.path.isfile(correlation_matrix_file):
-        build_correlation_matrix(
-            atac_clusters_file,
-            atac_mat_file,
-            rna_clusters_file,
-            rna_mat_file,
-            correlation_matrix_file)
-    
+        
+    # TODO get rid of everything down here once clean
+        
     # -------------------------------------------
     # ANALYSIS - overlap ATAC trajectories with RNA
     # input: atac trajectories, tss file

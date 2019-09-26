@@ -544,6 +544,7 @@ def _convert_to_interaction_format(mat_file, out_file, score_val="pooled"):
 
 def get_replicate_consistent_links(
         pooled_file, links_files, out_prefix,
+        idr_thresh=0.10,
         colnames=["pooled", "rep1", "rep2"]):
     """get replicate consistent links, using pooled results as a guide
     note: includes flipped interactions (start_x_end and end_x_start)
@@ -612,7 +613,7 @@ def get_replicate_consistent_links(
 
     # and set threshold for consistency - use IDR framework
     mat_filt_file = "{}.idr_filt.mat.txt.gz".format(out_mat_file.split(".mat")[0])
-    run_interaction_idr_test(out_mat_file, mat_filt_file)
+    run_interaction_idr_test(out_mat_file, mat_filt_file, idr_thresh=idr_thresh)
         
     # and save out as interaction format
     interaction_file = "{}.interactions.txt.gz".format(mat_filt_file.split(".mat")[0])
@@ -698,10 +699,13 @@ def _get_aggregate_score(region_ids_string):
     scores = [float(val.split(",")[1]) for val in region_ids_w_score]
 
     return np.sum(scores)
+    #return np.max(scores)
 
 
 def regions_to_genes(
-        region_file, links_file, tss_file, out_file, tmp_dir=None):
+        region_file, links_file, tss_file, out_file,
+        tmp_dir=None,
+        filter_genes=[]):
     """goes from a region set to a linked gene set
     note that region id file must match ids in region signals if using
     """
@@ -743,7 +747,7 @@ def regions_to_genes(
         tmp_bed_file, sep="\t", compression="gzip",
         header=False, index=False)
     
-    # overlap linked regions with TSS file
+    # overlap linked regions with TSS file (generally, all expressed)
     tmp_genes_file = "{}/{}.region_to_tss.tmp.txt.gz".format(
         tmp_dir,
         os.path.basename(out_file).split(".txt")[0])
@@ -762,6 +766,22 @@ def regions_to_genes(
     genes["score"] = genes["region_ids"].apply(_get_aggregate_score)
     genes = genes.sort_values("score", ascending=False)
 
+    # filtering (as needed) here
+    # could filter for dynamic genes only
+    if len(filter_genes) != 0:
+        print "before filter:", genes.shape[0]
+        genes = genes[genes["gene_id"].isin(filter_genes)]
+        print "after filter:", genes.shape[0]
+        
+    # proximity - ask for sum of at least 0.5?
+    # try chop off anyhting less than 0.5
+    if False:
+        genes = genes[genes["score"] > 0.5]
+
+    if False:
+        genes = genes[genes["score"] > 1]
+
+        
     # trim?
     if False:
         noise_calc_fract = 0.80
@@ -773,23 +793,31 @@ def regions_to_genes(
         if genes.shape[0] > 1000:
             genes = genes.iloc[0:1000]
 
+    # ABC links...?
     # inflection point analysis?
     if False:
         # normalize so max value is rank value
-        slope_thresh = 1.0
+        slope_thresh = 2.0
         normalization_factor = float(genes.shape[0]) / np.max(genes["score"].values)
-        for stop_i in reversed(range(1, genes.shape[0])):
-            slope = (genes["score"].iloc[stop_i-1] - genes["score"].iloc[stop_i]) * normalization_factor
+        for stop_i in reversed(range(1, genes.shape[0]-1)):
+            y_a = genes["score"].iloc[stop_i-1] + genes["score"].iloc[stop_i]
+            y_b = genes["score"].iloc[stop_i] + genes["score"].iloc[stop_i+1]
+            
+            slope = (y_a - y_b) * normalization_factor
             #print stop_i, genes["score"].iloc[stop_i - 1], genes["score"].iloc[stop_i], slope
             if slope > slope_thresh:
-                print slope, stop_i
+                #print slope, stop_i
                 break
         #print stop_i
         genes = genes.iloc[:stop_i]
 
+    #if genes.shape[0] > 500:
+    #    genes = genes.iloc[:500]
+        
     # save out
+    print "genes linked: ", genes.shape[0]
     genes.to_csv(out_file, sep="\t", compression="gzip", header=True, index=False)
-
+    
     return None
 
 
@@ -799,20 +827,38 @@ def region_clusters_to_genes(
         links_file,
         tss_file,
         out_dir,
+        run_enrichments=True,
+        background_gene_file=None,
+        filter_by_signal_corr=False,
         region_signal_file=None,
         rna_signal_file=None,
-        background_gene_file=None,
-        run_enrichments=True):
+        is_ggr=True):
     """take a cluster file, split to present clusters and get gene sets
     """
     # set up tmp dir
     tmp_dir = "{}/tmp".format(out_dir)
     run_shell_cmd("mkdir -p {}".format(tmp_dir))
     
-    # read in data
+    # read in cluster file
     data = pd.read_csv(cluster_file, sep="\t")
     unique_cluster_ids = sorted(list(set(data["cluster"].values.tolist())))
 
+    # read in region signals
+    if region_signal_file is not None:
+        region_signals = pd.read_csv(region_signal_file, sep="\t", index_col=0)
+        if is_ggr:
+            region_signals = region_signals.drop("d05", axis=1)
+    else:
+        region_signals = None
+
+    # read in rna signals
+    if rna_signal_file is not None:
+        rna_signals = pd.read_csv(rna_signal_file, sep="\t", index_col=0)
+        filter_genes = rna_signals.index.values.tolist()
+    else:
+        rna_signals = None
+        filter_genes = []
+        
     # go through each cluster
     for cluster_id in unique_cluster_ids:
         # set up bed file
@@ -825,6 +871,16 @@ def region_clusters_to_genes(
             header=False, index=False)
         id_to_bed(tmp_id_file, tmp_bed_file, sort=True)
 
+        # if filter by signal corr, figure out which genes match
+        # trajectory (loosely) and use to filter gene set
+        if filter_by_signal_corr:
+            assert region_signals is not None
+            assert rna_signals is not None
+            cluster_mean_signal = region_signals[
+                region_signals.index.isin(ids_in_cluster)].mean(axis=0)
+            rna_corrs = rna_signals.corrwith(cluster_mean_signal, axis=1)
+            filter_genes = rna_corrs[rna_corrs > -0.1].index.values.tolist()
+        
         # bed file to gene set
         gene_set_file = "{}/cluster-{}.regions_to_genes.txt.gz".format(
             out_dir, cluster_id)
@@ -833,13 +889,13 @@ def region_clusters_to_genes(
             links_file,
             tss_file,
             gene_set_file,
-            tmp_dir=tmp_dir)
-
-        # add in signal info?
+            tmp_dir=tmp_dir,
+            filter_genes=filter_genes)
         
         # run gprofiler
         gprofiler_dir = "{}/cluster-{}.enrichments".format(out_dir, cluster_id)
         run_shell_cmd("mkdir -p {}".format(gprofiler_dir))
+        #run_enrichments = False
         if run_enrichments:
             run_gprofiler(
                 gene_set_file, background_gene_file,
@@ -965,16 +1021,18 @@ def build_correlation_matrix(
         atac_mat_file,
         rna_cluster_ids,
         rna_mat_file,
-        out_file):
+        out_file,
+        is_ggr=True):
     """using the mean trajectory for ATAC and RNA, make a correlation
     matrix on those patterns
     """
-    # to consider - do anything with proximity?
-    
-    # for each cluster id set, pull mean traj out
+    # read in signal data
     atac_data = pd.read_csv(atac_mat_file, sep="\t", index_col=0)
-    # for GGR, need to remove d05
-    atac_data = atac_data.drop("d05", axis=1)
+    if is_ggr:
+        # for GGR, need to remove d05
+        atac_data = atac_data.drop("d05", axis=1)
+
+    # read in clusters and process
     atac_clusters = pd.read_csv(atac_cluster_ids, sep="\t")
     atac_unique_clusters = np.sort(
         np.unique(atac_clusters["cluster"].values))
@@ -1034,7 +1092,7 @@ def build_correlation_matrix(
     plot_file = "{}.pdf".format(out_file.split(".txt")[0])
     plot_cmd = "plot.corr.R {} {}".format(
         out_file, plot_file)
-    print plot_cmd
+    run_shell_cmd(plot_cmd)
     
     return
 
