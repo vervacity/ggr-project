@@ -699,12 +699,12 @@ def _get_aggregate_score(region_ids_string):
     scores = [float(val.split(",")[1]) for val in region_ids_w_score]
 
     return np.sum(scores)
-    #return np.max(scores)
 
 
 def regions_to_genes(
         region_file, links_file, tss_file, out_file,
         tmp_dir=None,
+        filter_by_score=None,
         filter_genes=[]):
     """goes from a region set to a linked gene set
     note that region id file must match ids in region signals if using
@@ -769,50 +769,15 @@ def regions_to_genes(
     # filtering (as needed) here
     # could filter for dynamic genes only
     if len(filter_genes) != 0:
-        print "before filter:", genes.shape[0]
+        print "before filter genes:", genes.shape[0]
         genes = genes[genes["gene_id"].isin(filter_genes)]
-        print "after filter:", genes.shape[0]
-        
-    # proximity - ask for sum of at least 0.5?
-    # try chop off anyhting less than 0.5
-    if False:
-        genes = genes[genes["score"] > 0.5]
+        print "after filter genes:", genes.shape[0]
 
-    if False:
-        genes = genes[genes["score"] > 1]
-
-        
-    # trim?
-    if False:
-        noise_calc_fract = 0.80
-        noise_calc_index = int(genes.shape[0] * noise_calc_fract)
-        thresh_val = np.mean(genes["score"].values[noise_calc_index:])
-        genes = genes[genes["score"] > thresh_val]
-
-    if False:
-        if genes.shape[0] > 1000:
-            genes = genes.iloc[0:1000]
-
-    # ABC links...?
-    # inflection point analysis?
-    if False:
-        # normalize so max value is rank value
-        slope_thresh = 2.0
-        normalization_factor = float(genes.shape[0]) / np.max(genes["score"].values)
-        for stop_i in reversed(range(1, genes.shape[0]-1)):
-            y_a = genes["score"].iloc[stop_i-1] + genes["score"].iloc[stop_i]
-            y_b = genes["score"].iloc[stop_i] + genes["score"].iloc[stop_i+1]
-            
-            slope = (y_a - y_b) * normalization_factor
-            #print stop_i, genes["score"].iloc[stop_i - 1], genes["score"].iloc[stop_i], slope
-            if slope > slope_thresh:
-                #print slope, stop_i
-                break
-        #print stop_i
-        genes = genes.iloc[:stop_i]
-
-    #if genes.shape[0] > 500:
-    #    genes = genes.iloc[:500]
+    # filter for score as needed
+    if filter_by_score is not None:
+        print "before filter score:", genes.shape[0]
+        genes = genes[genes["score"] > filter_by_score]
+        print "after filter score:", genes.shape[0]
         
     # save out
     print "genes linked: ", genes.shape[0]
@@ -821,94 +786,25 @@ def regions_to_genes(
     return None
 
 
-def regions_to_genes_with_null_distr(
-        region_file, links_file, tss_file, out_file,
-        tmp_dir=None,
-        region_set=[],
-        filter_genes=[],
-        num_null_runs=20):
-    """run regions to genes with a matched size null
-    set (bootstrapped) to get expected score of genes,
-    then run it on actualy region set and only keep genes
-    that fall above the expected value
-    """
-    assert len(region_set) > 0
-    
-    # get params
-    num_regions = pd.read_csv(region_file).shape[0]
-
-    # null runs
-    null_runs = []
-    for null_i in range(num_null_runs):
-        # get a random set of regions, save out to bed file
-        tmp_id_file = "{}/null-{}.txt.gz".format(tmp_dir, null_i)
-        tmp_bed_file = "{}/null-{}.bed.gz".format(tmp_dir, null_i)
-        rand_state = np.random.RandomState(null_i)
-        random_regions = pd.DataFrame({
-            "rand": rand_state.choice(region_set, size=num_regions, replace=False)})
-        random_regions.to_csv(
-            tmp_id_file,
-            sep="\t", compression="gzip",
-            header=False, index=False)
-        id_to_bed(tmp_id_file, tmp_bed_file, sort=True)
-        
-        #  run regions to genes
-        null_results_file = "{}/null-{}.genes.txt.gz".format(tmp_dir, null_i)
-        if False:
-            regions_to_genes(
-                tmp_bed_file, links_file, tss_file,
-                null_results_file, tmp_dir=tmp_dir,
-                filter_genes=filter_genes)
-
-        # read in and save to null runs
-        null_results = pd.read_csv(null_results_file, sep="\t", index_col=0)
-        null_results = null_results[["score"]]
-        null_runs.append(null_results)
-
-    # get average
-    null_results = reduce(
-        lambda x, y: pd.merge(x, y, how="outer", left_index=True, right_index=True),
-        null_runs)
-    null_results = pd.DataFrame({"expected": null_results.mean(axis=1)})
-    null_results = null_results.fillna(0)
-
-    # now run actual regions
-    tmp_regions_file = "{}/notnull.genes.txt.gz".format(tmp_dir)
-    if False:
-        regions_to_genes(
-            tmp_bed_file, links_file, tss_file,
-            tmp_regions_file, tmp_dir=tmp_dir,
-            filter_genes=filter_genes)
-
-    # read in and compare
-    scores = pd.read_csv(tmp_regions_file, sep="\t", index_col=0)
-    scores_w_expected_vals = scores.merge(
-        null_results, how="left", left_index=True, right_index=True)
-    scores_w_expected_vals = scores_w_expected_vals.fillna(0)
-    scores_w_expected_vals["diff"] = scores_w_expected_vals["score"] - scores_w_expected_vals["expected"]
-    results = scores_w_expected_vals[scores_w_expected_vals["diff"] > 0]
-    results = results.sort_values("diff", ascending=False)
-
-    # save out
-    print "genes linked: ", results.shape[0]
-    results.to_csv(out_file, sep="\t", compression="gzip", header=True, index=True)
-    
-    return None
-
-
-
 def region_clusters_to_genes(
         cluster_file,
         links_file,
         tss_file,
         out_dir,
-        run_enrichments=True,
-        background_gene_file=None,
-        filter_by_signal_corr=False,
         region_signal_file=None,
         rna_signal_file=None,
+        filter_gene_file=None,
+        filter_by_signal_corr=False,
+        filter_by_score=None,
+        run_enrichments=True,
+        background_gene_file=None,
         is_ggr=True):
     """take a cluster file, split to present clusters and get gene sets
+    including signal files will output mean signals for regions and signals
+
+    possible filters:
+    - filter by genes in gene file (must be first col)
+    - filter also for correlation
     """
     # set up tmp dir
     tmp_dir = "{}/tmp".format(out_dir)
@@ -929,12 +825,15 @@ def region_clusters_to_genes(
     # read in rna signals
     if rna_signal_file is not None:
         rna_signals = pd.read_csv(rna_signal_file, sep="\t", index_col=0)
-        #filter_genes = rna_signals.index.values.tolist()
     else:
         rna_signals = None
 
-    # don't filter genes
-    filter_genes = []
+    # filter gene set if filter file present
+    if filter_gene_file is not None:
+        filter_genes = pd.read_csv(
+            filter_gene_file, sep="\t", index_col=0).index.values.tolist()
+    else:
+        filter_genes = []
         
     # go through each cluster
     for cluster_id in unique_cluster_ids:
@@ -942,6 +841,7 @@ def region_clusters_to_genes(
         tmp_id_file = "{}/cluster-{}.txt.gz".format(tmp_dir, cluster_id)
         tmp_bed_file = "{}/cluster-{}.bed.gz".format(tmp_dir, cluster_id)
         ids_in_cluster = data[data["cluster"] == cluster_id]["id"]
+        print "num regions in cluster:", ids_in_cluster.shape[0]
         ids_in_cluster.to_csv(
             tmp_id_file,
             sep="\t", compression="gzip",
@@ -961,140 +861,86 @@ def region_clusters_to_genes(
         # bed file to gene set
         gene_set_file = "{}/cluster-{}.regions_to_genes.txt.gz".format(
             out_dir, cluster_id)
-        #regions_to_genes(
-        regions_to_genes_with_null_distr(
+        regions_to_genes(
             tmp_bed_file,
             links_file,
             tss_file,
             gene_set_file,
-            region_set=region_signals.index.values.tolist(),
             tmp_dir=tmp_dir,
-            filter_genes=filter_genes)
+            filter_genes=filter_genes,
+            filter_by_score=filter_by_score)
         
         # run gprofiler
         gprofiler_dir = "{}/cluster-{}.enrichments".format(out_dir, cluster_id)
         run_shell_cmd("mkdir -p {}".format(gprofiler_dir))
-        #run_enrichments = False
         if run_enrichments:
             run_gprofiler(
                 gene_set_file, background_gene_file,
                 gprofiler_dir, ordered=True, header=True)
 
-        quit()
+        # TODO: add in mean ATAC and mean RNA traj vals
+        
 
     return
 
 
-def regions_to_genes_through_links_OLD(region_file, links_file, out_file):
-    """intersect regions with link file to get to gene set
+
+def build_confusion_matrix(
+        atac_clusters_file,
+        rna_clusters_file,
+        traj_dir,
+        prefix,
+        normalize=True):
+    """pull together confusion matrix
     """
-    assert out_file.endswith(".gz")
+    # read in atac data and get clusters
+    atac = pd.read_csv(atac_clusters_file, sep="\t", header=0)
+    atac_cluster_ids = sorted(
+        list(set(atac["cluster"].values.tolist())))
+
+    # read in rna data and get clusters
+    rna = pd.read_csv(rna_clusters_file, sep="\t", header=0)
+    rna = rna.groupby("cluster")["id"].apply(list)
+    rna_cluster_ids = rna.index.values.tolist()
     
-    # intersect
-    tmp_out_file = "links.overlap.tmp.txt.gz"
-    intersect_cmd = (
-        "bedtools intersect -u -a {} -b {} | "
-        "gzip -c > {}").format(
-            links_file, region_file, tmp_out_file)
-    print intersect_cmd
-    os.system(intersect_cmd)
-
-    # summaries
-    region_signals = []
-    rna_signals = []
-    gene_ids = []
-    
-    # read in results
-    results = pd.read_csv(tmp_out_file, sep="\t", header=None)
-
-    # extract data from metadata field
-    for result_idx in range(results.shape[0]):
-        # make a metadata dict
-        metadata = results[3][result_idx].split(";")
-        metadata = dict([key_val.split("=") for key_val in metadata])
+    # go through clusters
+    results = np.zeros(
+        (len(atac_cluster_ids), len(rna_cluster_ids)))
+    for atac_id in atac_cluster_ids:
+        # pull regions to genes file
+        gene_file = "{}/cluster-{}.regions_to_genes.txt.gz".format(traj_dir, atac_id)
+        genes = pd.read_csv(gene_file, sep="\t", index_col=0)
+        num_atac_regions = np.sum(atac["cluster"] == atac_id)
+        print "ATAC:", atac_id, num_atac_regions
         
-        # adjust region signals
-        metadata["region_signal"] = [
-            float(val)
-            for val in metadata["region_signal"].strip("[").strip("]").split(",")]
-        
-        # adjust gene signals
-        metadata["genes"] = metadata["genes"].split("],")
-        genes = {}
-        for gene_str_idx in range(len(metadata["genes"])):
-            gene_id, signal = metadata["genes"][gene_str_idx].split(":")
-            signal = [
-                float(val)
-                for val in signal.strip("[").strip("]").split(",")]
-            genes[gene_id] = signal
-        metadata["genes"] = genes
-
-        # add to summaries
-        region_signals.append(np.array(metadata["region_signal"]))
-        for gene_id in metadata["genes"].keys():
-            rna_signals.append(np.array(metadata["genes"][gene_id]))
-
-        # keep genes
-        gene_ids.append(metadata["genes"].keys())
+        for rna_id in rna_cluster_ids:
+            linked_genes = genes[genes.index.isin(rna.loc[rna_id])]
+            num_possible_genes = len(rna.loc[rna_id])
+            # normalized
+            if normalize:
+                enrichment = linked_genes.shape[0] / (
+                    float(num_atac_regions) * float(num_possible_genes))
+            else:
+                enrichment = linked_genes.shape[0]
+                
+            print "    RNA:", rna_id, linked_genes.shape[0], num_possible_genes, enrichment
+            results[atac_id-1,rna_id-1] = enrichment
             
-    # summarize
-    region_signal_mean = np.median(np.stack(region_signals, axis=0), axis=0)
-    rna_signal_mean = np.median(np.stack(rna_signals, axis=0), axis=0)
-    gene_ids = np.concatenate(gene_ids, axis=0)
-    gene_ids = sorted(list(set(gene_ids.tolist())))
-    results = pd.DataFrame({"gene_id": gene_ids})
+    # save out results
+    results = pd.DataFrame(data=results)
+    results = results.div(results.sum(axis=1), axis=0) # normalize rows (prob across rows)
+    out_file = "{}.mat.txt.gz".format(prefix)
+    results.to_csv(out_file, sep="\t", compression="gzip")
+
+    # and plot
+    plot_file = "{}.pdf".format(prefix)
+    plot_cmd = "plot.confusion_matrix.R {} {}".format(
+        out_file, plot_file)
+    run_shell_cmd(plot_cmd)
     
-    # save out
-    with gzip.open(out_file, "w") as out:
-        comment_line = "#region_signal={};rna_signal={}\n".format(
-            ",".join(["{:0.3f}".format(val) for val in region_signal_mean.tolist()]),
-            ",".join(["{:0.3f}".format(val) for val in rna_signal_mean.tolist()]))
-        out.write(comment_line)
-    results.to_csv(out_file, mode="a", sep="\t", compression="gzip", header=True, index=False)
-
-    # clean up
-    os.system("rm {}".format(tmp_out_file))
-
     return
 
 
-# tODO deprecate this
-def traj_bed_to_gene_set_by_proximity(
-        bed_file,
-        tss_file,
-        out_file,
-        k_nearest=3,
-        max_dist=250000):
-    """assuming proximal linking captures the majority of linking
-    """
-    # bedtools closest
-    tmp_file = "tss.overlap.tmp.txt"
-    closest = "bedtools closest -d -k {} -a {} -b {} > {}".format(
-        k_nearest, bed_file, tss_file, tmp_file)
-    os.system(closest)
-
-    # load results and use distance cutoff
-    data = pd.read_table(tmp_file, header=None)
-    data = data[data[9] < max_dist]
-
-    # clean up
-    data = data.sort_values([6, 9])
-    data = data.drop_duplicates(6, keep="first")
-
-    # split coumn and keep traj, gene name, distance
-    gene_set = data[6].str.split(";", n=2, expand=True)
-    gene_set["gene_id"] = gene_set[0].str.split("=", n=2, expand=True)[1]
-    gene_set["traj"] = gene_set[1].str.split("=", n=2, expand=True)[1].astype(int)
-    gene_set["dist"] = data[9]
-    gene_set = gene_set[["gene_id", "traj", "dist"]]
-    
-    # save out
-    gene_set.to_csv(out_file, compression="gzip", sep="\t", header=True, index=False)
-    
-    # cleanup
-    os.system("rm {}".format(tmp_file))
-    
-    return data
 
 
 def build_correlation_matrix(
@@ -1178,7 +1024,7 @@ def build_correlation_matrix(
     return
 
 
-def build_confusion_matrix(traj_bed_files, gene_sets, gene_clusters_file, out_file):
+def build_confusion_matrix_OLD(traj_bed_files, gene_sets, gene_clusters_file, out_file):
     """collect gene set results into a confusion matrix
     """
     # first figure out how many clusters (ATAC)

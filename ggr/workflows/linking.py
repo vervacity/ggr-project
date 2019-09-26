@@ -20,7 +20,6 @@ from ggr.analyses.linking import get_timepoint_consistent_links
 from ggr.analyses.linking import region_clusters_to_genes
 
 # TODO deprecate these
-from ggr.analyses.linking import traj_bed_to_gene_set_by_proximity
 from ggr.analyses.linking import build_confusion_matrix
 
 
@@ -73,45 +72,62 @@ def run_replicate_consistent_links_workflow(
 def run_traj_linking_workflow(args, prefix, links_dir):
     """link ATAC trajectories to RNA trajectories with linking file
     """
-    logging.info("ANALYSIS: correlation between ATAC/RNA clusters")
+    logging.info("ANALYSIS: link ATAC traj to downstream genes/gene trajs")
 
     # setup
     traj_dir = "{}/traj.linking".format(links_dir)
     os.system("mkdir -p {}".format(traj_dir))
 
-    # get needed files
+    # ATAC traj files
     atac_clusters_file = args.outputs["results"]["atac"]["timeseries"]["dp_gp"][
         "clusters.reproducible.hard.reordered.list"]
     atac_mat_file = args.outputs["data"]["atac.counts.pooled.rlog.dynamic.mat"]
 
+    # RNA traj files
     rna_clusters_file = args.outputs["results"]["rna"]["timeseries"]["dp_gp"][
         "clusters.reproducible.hard.reordered.list"]
-    # TODO consider using ALL expressed genes?
     rna_mat_file = args.outputs["data"][
         "rna.counts.pc.expressed.timeseries_adj.pooled.rlog.dynamic.traj.mat"]
-    rna_expressed_file = args.outputs["data"]["rna.counts.pc.expressed.mat"]
     
     # get linking file
     interactions_file = "{}/{}.ALL.overlap.interactions.txt.gz".format(links_dir, prefix)
 
-    # tss file
+    # tss file and all expressed genes file
     tss_file = args.outputs["annotations"]["tss.pc.bed"]
+    rna_expressed_file = args.outputs["data"]["rna.counts.pc.expressed.mat"]
     
-    # first, per cluster, get gene set enrichments
-    region_clusters_to_genes(
-        atac_clusters_file,
-        interactions_file,
-        tss_file,
-        traj_dir,
-        run_enrichments=True,
-        background_gene_file=rna_expressed_file,
-        filter_by_signal_corr=False,
-        region_signal_file=atac_mat_file,
-        rna_signal_file=rna_mat_file)
+    # first, per cluster, get gene sets and enrichments
+    # only use dynamic genes
+    # DONT run a correlation filter since we're checking region to gene mapping without
+    # assuming anything about genes (outside of dynamic status)
+    if "abc.hic" in links_dir:
+        filter_gene_file = rna_mat_file
+    else:
+        filter_gene_file = None
 
-    # TODO
+    if "proximity" in links_dir:
+        score_filter = 0.5
+    else:
+        score_filter = None
+
+    if True:
+        region_clusters_to_genes(
+            atac_clusters_file,
+            interactions_file,
+            tss_file,
+            traj_dir,
+            region_signal_file=atac_mat_file,
+            rna_signal_file=rna_mat_file,
+            filter_gene_file=filter_gene_file,
+            filter_by_score=score_filter,
+            run_enrichments=False, # tODO adjust back
+            background_gene_file=rna_expressed_file)
+
     # then, use the gene set files and overlap with rna clusters
     # to get counts per cluster
+    confusion_prefix = "{}/{}.traj.atac_to_rna".format(traj_dir, prefix)
+    build_confusion_matrix(
+        atac_clusters_file, rna_clusters_file, traj_dir, confusion_prefix)
     
     return
 
@@ -321,9 +337,7 @@ def runall(args, prefix):
             link_key="hic.celltype_avg",
             out_dir=abc_avg_hic_dir)
 
-    # TODO - for each of these link sets, get correlation matrix
-    # between ATAC and RNA
-    # input: atac clusters, rna clusters/data
+    # analyze trajectories (ATAC to RNA)
     links_dirs = [
         #"abc.distance"
         "abc.hic.celltype_avg"
@@ -334,7 +348,7 @@ def runall(args, prefix):
     for links_dir in links_dirs:
         # run workflow for using links to get from ATAC traj to RNA traj        
         run_traj_linking_workflow(args, prefix, "{}/{}".format(results_dir, links_dir))
-
+        
     quit()
 
         
