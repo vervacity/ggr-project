@@ -18,8 +18,6 @@ from ggr.analyses.linking import link_by_distance_and_corr
 from ggr.analyses.linking import get_replicate_consistent_links
 from ggr.analyses.linking import get_timepoint_consistent_links
 from ggr.analyses.linking import region_clusters_to_genes
-
-# TODO deprecate these
 from ggr.analyses.linking import build_confusion_matrix
 
 

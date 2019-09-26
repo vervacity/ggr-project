@@ -11,6 +11,7 @@ from collections import Counter
 from scipy.stats import pearsonr
 
 from ggr.analyses.bioinformatics import run_gprofiler
+from ggr.analyses.utils import quantile_norm
 
 from ggr.util.utils import run_shell_cmd
 from ggr.util.bed_utils import id_to_bed
@@ -624,6 +625,7 @@ def get_replicate_consistent_links(
 
 def get_timepoint_consistent_links(
         links_files, out_prefix, method="union",
+        run_quantile_norm=True,
         colnames=["d0", "d3", "d6"]):
     """aggregate links across timepoints
     """
@@ -663,9 +665,16 @@ def get_timepoint_consistent_links(
             summary = summary.merge(
                 data, how="outer", left_index=True, right_index=True)
 
+    # fill na
+    summary = summary.fillna(0)
+    
+    # quantile norm
+    if run_quantile_norm:
+        summary[:] = quantile_norm(summary.values)
+    
     # clean up duplicates (multiple matching hits per link)
     # first flip all to make sure both sides are represented
-    summary = summary.fillna(0)
+
     summary["max"] = summary.values.max(axis=1)
     summary_flipped = summary.copy()
     flip_regions = summary_flipped.index.to_series().str.split("_x_", n=2, expand=True)

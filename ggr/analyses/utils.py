@@ -1,9 +1,24 @@
 # description: basic useful analyses
 
-
+import numpy as np
 import pandas as pd
 
 
+def quantile_norm(array):
+    """quantile norm on a numpy array
+    """
+    # set up sorted mean and originals to interpolate
+    array_rank_sorted = np.sort(array, axis=0)
+    rank_means = np.mean(array_rank_sorted, axis=1)
+    
+    # now use ranks to adjust values
+    for i in range(array.shape[1]):
+        array[:,i] = np.interp(
+            array[:,i],
+            array_rank_sorted[:,i],
+            rank_means)
+
+    return array
 
 
 def build_id_matching_mat(
