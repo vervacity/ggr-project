@@ -38,7 +38,7 @@ def run_replicate_consistent_links_workflow(
     # go through each day
     for link_day in link_days:
         pooled_file = glob.glob(
-            "{}/*{}*pooled*.txt.gz".format(link_dir, link_day))
+            "{}/*{}*pooled*.gz".format(link_dir, link_day))
         print pooled_file
         assert len(pooled_file) == 1
         pooled_file = pooled_file[0]
@@ -106,7 +106,7 @@ def run_traj_linking_workflow(args, prefix, links_dir):
     if "proximity" in links_dir:
         score_filter = 0.5
     else:
-        score_filter = None
+        score_filter = 2 # None
 
     if True:
         region_clusters_to_genes(
@@ -324,6 +324,17 @@ def runall(args, prefix):
             link_key="distance",
             out_dir=abc_dist_dir)
 
+    # distance based ABC w TSS focus
+    logger.info("ANALYSIS: build replicate consistent ABC links - distance-based, my provided TSS links")
+    abc_dist_dir = "abc.distance.tss"
+    if not os.path.isdir("{}/{}".format(results_dir, abc_dist_dir)):
+        run_replicate_consistent_links_workflow(
+            args,
+            prefix,
+            results_dir,
+            link_key="distance.tss",
+            out_dir=abc_dist_dir)
+        
     # average hiC based ABC
     logger.info("ANALYSIS: build replicate consistent ABC links - cell type avg HiC")
     abc_avg_hic_dir = "abc.hic.celltype_avg"
@@ -335,11 +346,24 @@ def runall(args, prefix):
             link_key="hic.celltype_avg",
             out_dir=abc_avg_hic_dir)
 
+    # average hiC based ABC w TSS focus
+    logger.info("ANALYSIS: build replicate consistent ABC links - cell type avg HiC, my provided tss links")
+    abc_avg_hic_dir = "abc.hic.celltype_avg.tss"
+    if not os.path.isdir("{}/{}".format(results_dir, abc_avg_hic_dir)):
+        run_replicate_consistent_links_workflow(
+            args,
+            prefix,
+            results_dir,
+            link_key="hic.celltype_avg.tss",
+            out_dir=abc_avg_hic_dir)
+
+    quit()
+        
     # analyze trajectories (ATAC to RNA)
     links_dirs = [
         #"abc.distance"
-        "abc.hic.celltype_avg"
-        #"proximity",
+        #"abc.hic.celltype_avg"
+        "proximity"
         #"proximity.corr", # <- this biases the links, right now just denovo connecting to genes
         #"proximity.corr.dynamic"
     ]
@@ -347,59 +371,6 @@ def runall(args, prefix):
         # run workflow for using links to get from ATAC traj to RNA traj        
         run_traj_linking_workflow(args, prefix, "{}/{}".format(results_dir, links_dir))
         
-    quit()
-
-        
-    # TODO get rid of everything down here once clean
-        
-    # -------------------------------------------
-    # ANALYSIS - overlap ATAC trajectories with RNA
-    # input: atac trajectories, tss file
-    # output: gene sets, enrichments, confusion matrix
-    # -------------------------------------------
-    logger.info("ANALYSIS: try naive proximal linking")
-
-    # use the TSS file that only has expressed genes
-    tss_file = args.outputs["results"]["rna"]["timeseries"]["dp_gp"]["tss.w_clusters"]
-    
-    # generate the gene sets for each ATAC trajectory
-    atac_traj_dir = "{}/reproducible/hard/reordered/bed".format(
-        args.outputs["results"]["atac"]["timeseries"]["dp_gp"]["dir"])
-    traj_bed_files = sorted(glob.glob("{}/*cluster*bed.gz".format(atac_traj_dir)))
-    gene_set_files = []
-    for traj_bed_file in traj_bed_files:
-        gene_set_file = "{}/{}.linked_genes.txt.gz".format(
-            atac_linking_dir,
-            os.path.basename(traj_bed_file).split(".bed")[0])
-        if not os.path.isfile(gene_set_file):
-            bed_to_gene_set_by_proximity(
-                traj_bed_file,
-                tss_file,
-                gene_set_file,
-                k_nearest=2,
-                max_dist=100000)
-        gene_set_files.append(gene_set_file)
-        
-    # run enrichments (gprofiler)
-    background_gene_set_file = args.outputs["data"]["rna.counts.pc.expressed.mat"]
-    atac_linked_genes_enrich_dir = "{}/enrichments".format(atac_linking_dir)
-    if not os.path.isdir(atac_linked_genes_enrich_dir):
-        run_shell_cmd("mkdir -p {}".format(atac_linked_genes_enrich_dir))
-        for gene_set_file in gene_set_files:
-            run_gprofiler(
-                gene_set_file,
-                background_gene_set_file,
-                atac_linked_genes_enrich_dir)
-    
-    # collect into a confusion matrix
-    cluster_file = args.outputs["results"]["rna"]["timeseries"]["dp_gp"]["clusters.reproducible.hard.reordered.list"]
-    confusion_matrix_file = "{}/{}.confusion_mat.txt.gz".format(atac_linking_dir, prefix)
-    if not os.path.isfile(confusion_matrix_file):
-        build_confusion_matrix(
-            traj_bed_files,
-            gene_set_files,
-            cluster_file,
-            confusion_matrix_file)
 
     # TODO split this by TFs vs non TFs <- make annotation TSS files
 

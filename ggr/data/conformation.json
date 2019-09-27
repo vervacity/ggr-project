@@ -3,8 +3,14 @@
 	"distance": {
 	    "data_dir": "/mnt/lab_data/kundaje/projects/skin/data/linking/distance"
 	},
+	"distance.tss": {
+	    "data_dir": "/mnt/lab_data/kundaje/projects/skin/data/linking/distance.tss"
+	},
 	"hic.celltype_avg": {
 	    "data_dir": "/mnt/lab_data/kundaje/projects/skin/data/linking/hic.celltype_avg"
+	},
+	"hic.celltype_avg.tss": {
+	    "data_dir": "/mnt/lab_data/kundaje/projects/skin/data/linking/hic.celltype_avg.tss"
 	},
 	"hic.keratinocyte": {
 	    "data_dir": "/mnt/lab_data/kundaje/projects/skin/data/linking/hic.keratinocyte"
