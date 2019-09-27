@@ -68,17 +68,8 @@
 	"proximity.corr": {
 	    "k_nearest": 3,
 	    "max_dist": 100000,
-	    "corr_coeff_thresh": 0,
-	    "pval_thresh": 1
-	},
-	"proximity.corr.dynamic": {
-	    "k_nearest": 3,
-	    "max_dist": 100000,
-	    "corr_coeff_thresh": 0,
-	    "pval_thresh": 1
-	},
-	"abc.distance": {
-	    "idr_thresh": 0.10
+	    "corr_coeff_thresh": "None",
+	    "abs_corr_coeff_thresh": 0.3
 	},
 	"abc.distance.tss": {
 	    "idr_thresh": 0.10

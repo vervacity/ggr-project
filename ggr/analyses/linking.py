@@ -9,6 +9,7 @@ import pandas as pd
 
 from collections import Counter
 from scipy.stats import pearsonr
+from scipy.stats import fisher_exact
 
 from ggr.analyses.bioinformatics import run_gprofiler
 from ggr.analyses.utils import quantile_norm
@@ -129,48 +130,14 @@ def link_by_distance(
     return
 
 
-def link_by_distance_and_corr(
-        regions_file,
-        target_regions_file,
-        out_file,
-        regions_signal_file,
-        target_regions_signal_file,
-        k_nearest=3,
-        max_dist=25000,
+def _filter_links_for_corr(
+        links,
+        region_signals,
+        target_region_signals,
         corr_coeff_thresh=0,
-        pval_thresh=0.50,
-        annotate_gene_ids=True,
-        add_mirrored_interactions=True,
-        is_ggr=False):
-    """link by distance and then filter for correlation
+        abs_corr_coeff_thresh=None):
+    """given links and signals, correlate
     """
-    # link by distance
-    tmp_file = "{}.tmp.txt.gz".format(out_file.split(".txt")[0])
-    link_by_distance(
-        regions_file,
-        target_regions_file,
-        tmp_file,
-        k_nearest=3,
-        max_dist=max_dist,
-        annotate_gene_ids=True)
-
-    # read in signals
-    region_signals = pd.read_csv(
-        regions_signal_file, sep="\t", header=0, index_col=0)
-    if is_ggr:
-        region_signals = region_signals.drop("d05", axis=1)
-    target_region_signals = pd.read_csv(
-        target_regions_signal_file, sep="\t", header=0, index_col=0)
-    
-    # read in links
-    links = pd.read_csv(tmp_file, sep="\t", header=None)
-    end_link_info = links[3].str.split(",", expand=True)
-    if annotate_gene_ids:
-        links["target_id"] = end_link_info[2]
-    else:
-        links["target_id"] = end_link_info[0]
-    
-    # go through links
     filtered_links = []
     for region_idx in range(links.shape[0]):
         
@@ -192,15 +159,17 @@ def link_by_distance_and_corr(
         except KeyError:
             continue
 
-        # correlate
-        corr_coeff, pval = pearsonr(
+        # correlate (note pval not reliable at low N)
+        corr_coeff, _ = pearsonr(
             region_signal.values, target_region_signal.values)
 
-        # filter
-        if corr_coeff < corr_coeff_thresh:
-            continue
-        if pval > pval_thresh:
-            continue
+        # filters
+        if corr_coeff_thresh is not None:
+            if corr_coeff < corr_coeff_thresh:
+                continue
+        if abs_corr_coeff_thresh is not None:
+            if abs(corr_coeff) < abs_corr_coeff_thresh:
+                continue
         
         # append if passed filter
         filtered_links.append(interaction)
@@ -209,7 +178,59 @@ def link_by_distance_and_corr(
     filtered_links = pd.concat(filtered_links, axis=1).transpose()
     filtered_links[3] = filtered_links[3].str.split(",ENSG", expand=True).iloc[:,0]
     filtered_links = filtered_links.drop("target_id", axis=1)
+
+    return filtered_links
+
+
+def link_by_distance_and_corr(
+        regions_file,
+        target_regions_file,
+        out_file,
+        regions_signal_file,
+        target_regions_signal_file,
+        k_nearest=3,
+        max_dist=100000,
+        corr_coeff_thresh=0,
+        abs_corr_coeff_thresh=None,
+        annotate_gene_ids=True,
+        add_mirrored_interactions=True,
+        is_ggr=False):
+    """link by distance and then filter for correlation
+    """
+    # link by distance
+    tmp_file = "{}.tmp.txt.gz".format(out_file.split(".txt")[0])
+    link_by_distance(
+        regions_file,
+        target_regions_file,
+        tmp_file,
+        k_nearest=k_nearest,
+        max_dist=max_dist,
+        annotate_gene_ids=True)
+
+    # read in signals
+    region_signals = pd.read_csv(
+        regions_signal_file, sep="\t", header=0, index_col=0)
+    if is_ggr:
+        region_signals = region_signals.drop("d05", axis=1)
+    target_region_signals = pd.read_csv(
+        target_regions_signal_file, sep="\t", header=0, index_col=0)
     
+    # read in links
+    links = pd.read_csv(tmp_file, sep="\t", header=None)
+    end_link_info = links[3].str.split(",", expand=True)
+    if annotate_gene_ids:
+        links["target_id"] = end_link_info[2]
+    else:
+        links["target_id"] = end_link_info[0]
+
+    # filter
+    filtered_links = _filter_links_for_corr(
+        links,
+        region_signals,
+        target_region_signals,
+        corr_coeff_thresh=corr_coeff_thresh,
+        abs_corr_coeff_thresh=abs_corr_coeff_thresh)
+
     # and save this out
     filtered_links.to_csv(out_file, sep="\t", compression="gzip", header=False, index=False)
 
@@ -908,6 +929,8 @@ def build_confusion_matrix(
 
     # read in rna data and get clusters
     rna = pd.read_csv(rna_clusters_file, sep="\t", header=0)
+    all_rna_ids = rna["id"].values.tolist()
+    num_total_genes = rna.shape[0]
     rna = rna.groupby("cluster")["id"].apply(list)
     rna_cluster_ids = rna.index.values.tolist()
     
@@ -915,32 +938,54 @@ def build_confusion_matrix(
     results = np.zeros(
         (len(atac_cluster_ids), len(rna_cluster_ids)))
     for atac_id in atac_cluster_ids:
-        # pull regions to genes file
+        # pull regions to genes file and make sure only using genes that are in rna cluster file
         gene_file = "{}/cluster-{}.regions_to_genes.txt.gz".format(traj_dir, atac_id)
         genes = pd.read_csv(gene_file, sep="\t", index_col=0)
+        genes = genes[genes.index.isin(all_rna_ids)]
         num_atac_regions = np.sum(atac["cluster"] == atac_id)
         print "ATAC:", atac_id, num_atac_regions
         
         for rna_id in rna_cluster_ids:
             linked_genes = genes[genes.index.isin(rna.loc[rna_id])]
             num_possible_genes = len(rna.loc[rna_id])
+            
+            # calculate fisher exact test (counts may be low, so dont use chi square)
+            atac_pos_rna_pos = linked_genes.shape[0]
+            atac_pos_rna_neg = genes.shape[0] - atac_pos_rna_pos
+            atac_neg_rna_pos = num_possible_genes - atac_pos_rna_pos
+            atac_neg_rna_neg = num_total_genes - (
+                atac_pos_rna_pos + atac_pos_rna_neg + atac_neg_rna_pos)
+            table = [
+                [atac_pos_rna_pos, atac_pos_rna_neg],
+                [atac_neg_rna_pos, atac_neg_rna_neg]] # note doesn't matter row v column
+            stat, pval = fisher_exact(table, alternative="greater") # stat is an odds ratio
+            
             # normalized
             normalize = False
             if normalize:
                 enrichment = linked_genes.shape[0] / (
                     float(num_atac_regions) * float(num_possible_genes))
             else:
-                enrichment = linked_genes.shape[0]
+                enrichment = linked_genes.shape[0] / float(num_possible_genes)
                 
-            print "    RNA:", rna_id, linked_genes.shape[0], num_possible_genes, enrichment
-            results[atac_id-1,rna_id-1] = enrichment
+            print "    RNA:", rna_id, linked_genes.shape[0], num_possible_genes, enrichment, -np.log10(pval), stat
+            #print table
+            results[atac_id-1,rna_id-1] = stat #-np.log10(pval) # stat
             
     # save out results
     results = pd.DataFrame(data=results)
-    if True:
+    print results
+    if False:
         results = results.div(results.sum(axis=0), axis=1) # normalize columns (gene count and linking expectations)
-    results = results.div(results.sum(axis=1), axis=0) # normalize rows (prob across rows)
+        results = results.div(results.sum(axis=1), axis=0) # normalize rows (prob across rows)
+    else:
+        results = results.div(results.sum(axis=1), axis=0) # normalize rows (prob across rows)
+        print results
+        results = results.div(results.sum(axis=0), axis=1) # normalize columns (gene count and linking expectations)
 
+        
+    print results
+    
     out_file = "{}.mat.txt.gz".format(prefix)
     results.to_csv(out_file, sep="\t", compression="gzip")
 

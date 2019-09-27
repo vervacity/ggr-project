@@ -106,20 +106,19 @@ def run_traj_linking_workflow(args, prefix, links_dir):
     if "proximity" in links_dir:
         score_filter = 0.5
     else:
-        score_filter = 2 # None
-
-    if True:
-        region_clusters_to_genes(
-            atac_clusters_file,
-            interactions_file,
-            tss_file,
-            traj_dir,
-            region_signal_file=atac_mat_file,
-            rna_signal_file=rna_mat_file,
-            filter_gene_file=filter_gene_file,
-            filter_by_score=score_filter,
-            run_enrichments=False,
-            background_gene_file=rna_expressed_file)
+        score_filter = 2
+        
+    region_clusters_to_genes(
+        atac_clusters_file,
+        interactions_file,
+        tss_file,
+        traj_dir,
+        region_signal_file=atac_mat_file,
+        rna_signal_file=rna_mat_file,
+        filter_gene_file=filter_gene_file,
+        filter_by_score=score_filter,
+        run_enrichments=True,
+        background_gene_file=rna_expressed_file)
 
     # then, use the gene set files and overlap with rna clusters
     # to get counts per cluster
@@ -239,7 +238,11 @@ def runall(args, prefix):
         k_nearest = args.inputs["params"]["linking"][method_type]["k_nearest"]
         max_dist = args.inputs["params"]["linking"][method_type]["max_dist"]
         corr_coeff_thresh = args.inputs["params"]["linking"][method_type]["corr_coeff_thresh"]
-        pval_thresh = args.inputs["params"]["linking"][method_type]["pval_thresh"]
+        if isinstance(corr_coeff_thresh, basestring):
+            corr_coeff_thresh = None
+        abs_corr_coeff_thresh = args.inputs["params"]["linking"][method_type]["abs_corr_coeff_thresh"]
+        if isinstance(abs_corr_coeff_thresh, basestring):
+            abs_corr_coeff_thresh = None
         links_files = []
         for day in days:
             day_links_file = "{}/links.proximity.{}.k-{}.max_d-{}.corr-{}.txt.gz".format(
@@ -259,7 +262,7 @@ def runall(args, prefix):
                     k_nearest=k_nearest,
                     max_dist=max_dist,
                     corr_coeff_thresh=corr_coeff_thresh,
-                    pval_thresh=pval_thresh,
+                    abs_corr_coeff_thresh=abs_corr_coeff_thresh,
                     is_ggr=True)
             links_files.append(day_links_file)
 
@@ -269,60 +272,11 @@ def runall(args, prefix):
         if not os.path.isfile(all_interactions_file):
             get_timepoint_consistent_links(links_files, all_prefix)
 
-    # proximity with corr: ONLY dynamic
-    proximity_corr_dynamic_links_dir = "{}/proximity.corr.dynamic".format(results_dir)
-    if not os.path.isdir(proximity_corr_dynamic_links_dir):
-        run_shell_cmd("mkdir -p {}".format(proximity_corr_dynamic_links_dir))
-        method_type = "proximity.corr.dynamic"
-        k_nearest = args.inputs["params"]["linking"][method_type]["k_nearest"]
-        max_dist = args.inputs["params"]["linking"][method_type]["max_dist"]
-        corr_coeff_thresh = args.inputs["params"]["linking"][method_type]["corr_coeff_thresh"]
-        pval_thresh = args.inputs["params"]["linking"][method_type]["pval_thresh"]
-        links_files = []
-        for day in days:
-            day_links_file = "{}/links.proximity.{}.k-{}.max_d-{}.corr-{}.txt.gz".format(
-                proximity_corr_dynamic_links_dir, day, k_nearest, max_dist, corr_coeff_thresh)
-            if not os.path.isfile(day_links_file):
-                # get inputs
-                day_tss_file = args.outputs["data"]["tss.expressed_{}".format(day)]
-                day_regions_file = "{}/regions.{}.bed.gz".format(proximity_links_dir, day)
-
-                # set up proximity links w correlation filter
-                link_by_distance_and_corr(
-                    day_regions_file,
-                    day_tss_file,
-                    day_links_file,
-                    args.outputs["data"]["atac.counts.pooled.rlog.dynamic.mat"],
-                    args.outputs["data"]["rna.counts.pc.expressed.timeseries_adj.pooled.rlog.dynamic.mat"],
-                    k_nearest=k_nearest,
-                    max_dist=max_dist,
-                    corr_coeff_thresh=corr_coeff_thresh,
-                    pval_thresh=pval_thresh,
-                    is_ggr=True)
-            links_files.append(day_links_file)
-
-        # and reconcile across timepoints
-        all_prefix = "{}/{}.ALL".format(proximity_corr_dynamic_links_dir, prefix)
-        all_interactions_file = "{}.interactions.txt.gz".format(all_prefix)
-        if not os.path.isfile(all_interactions_file):
-            get_timepoint_consistent_links(links_files, all_prefix)
-
     # -------------------------------------------
     # ANALYSIS - different styles of ABC linking
     # input: ABC links
     # output: replicate consistent link sets
     # -------------------------------------------
-
-    # distance based ABC
-    logger.info("ANALYSIS: build replicate consistent ABC links - distance-based")
-    abc_dist_dir = "abc.distance"
-    if not os.path.isdir("{}/{}".format(results_dir, abc_dist_dir)):
-        run_replicate_consistent_links_workflow(
-            args,
-            prefix,
-            results_dir,
-            link_key="distance",
-            out_dir=abc_dist_dir)
 
     # distance based ABC w TSS focus
     logger.info("ANALYSIS: build replicate consistent ABC links - distance-based, my provided TSS links")
@@ -357,21 +311,19 @@ def runall(args, prefix):
             link_key="hic.celltype_avg.tss",
             out_dir=abc_avg_hic_dir)
 
-    quit()
-        
     # analyze trajectories (ATAC to RNA)
+    # TODO consider a light filter for correlation (since we assume dynamic regions
+    # should have dynamic effects)
     links_dirs = [
-        #"abc.distance"
+        "proximity",
+        #"proximity.corr",
+        #"abc.distance.tss"
         #"abc.hic.celltype_avg"
-        "proximity"
-        #"proximity.corr", # <- this biases the links, right now just denovo connecting to genes
-        #"proximity.corr.dynamic"
+        #"abc.hic.celltype_avg.tss"
     ]
+    
     for links_dir in links_dirs:
         # run workflow for using links to get from ATAC traj to RNA traj        
         run_traj_linking_workflow(args, prefix, "{}/{}".format(results_dir, links_dir))
-        
-
-    # TODO split this by TFs vs non TFs <- make annotation TSS files
 
     return args
