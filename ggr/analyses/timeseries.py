@@ -753,7 +753,7 @@ def plot_clusters(
         "{0} {1} {2} {3} {4}").format(
             cluster_subsample_file, cluster_mat, out_dir, prefix, title)
     print r_plot_heatmap
-    run_shell_cmd(r_plot_heatmap)
+    #run_shell_cmd(r_plot_heatmap)
 
     # individual clusters
     if plot_individual:

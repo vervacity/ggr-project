@@ -32,11 +32,11 @@ def main():
             "{}/{}".format(GGR_DIR, outputs["data"][
                 "atac.counts.pooled.rlog.dynamic.traj.mat"].lstrip("./")),
             out_dir, "{}.epigenome.ATAC".format(prefix),
-            plot_individual=False)
+            plot_individual=True)
     # row seps file produced by plotting
     rowsep_file = "{}/{}.epigenome.ATAC.row_seps.txt".format(out_dir, prefix)
-
-    if True:
+    
+    if False:
         # histones
         for histone_idx in range(len(histones)):
             histone = histones[histone_idx]
@@ -65,7 +65,7 @@ def main():
             "{}/{}".format(GGR_DIR, outputs["data"][
                 "rna.counts.pc.expressed.timeseries_adj.pooled.rlog.dynamic.traj.mat"].lstrip("./")),
             out_dir, "{}.RNA".format(prefix),
-            plot_individual=False)
+            plot_individual=True)
     
     return
 
