@@ -98,10 +98,10 @@ def run_traj_linking_workflow(args, prefix, links_dir):
     # only use dynamic genes
     # DONT run a correlation filter since we're checking region to gene mapping without
     # assuming anything about genes (outside of dynamic status)
-    if "abc.hic" in links_dir:
-        filter_gene_file = rna_mat_file
-    else:
-        filter_gene_file = None
+    #if "abc.hic" in links_dir:
+    #    filter_gene_file = rna_mat_file
+    #else:
+    #    filter_gene_file = None
 
     if "proximity" in links_dir:
         score_filter = 0.5
@@ -115,7 +115,7 @@ def run_traj_linking_workflow(args, prefix, links_dir):
         traj_dir,
         region_signal_file=atac_mat_file,
         rna_signal_file=rna_mat_file,
-        filter_gene_file=filter_gene_file,
+        filter_gene_file=rna_mat_file, #filter_gene_file,
         filter_by_score=score_filter,
         run_enrichments=True,
         background_gene_file=rna_expressed_file)
@@ -316,9 +316,9 @@ def runall(args, prefix):
     # should have dynamic effects)
     links_dirs = [
         "proximity",
-        #"proximity.corr",
-        #"abc.distance.tss"
-        #"abc.hic.celltype_avg"
+        "proximity.corr"
+        #"abc.distance.tss",
+        #"abc.hic.celltype_avg",
         #"abc.hic.celltype_avg.tss"
     ]
     

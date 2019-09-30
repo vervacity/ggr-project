@@ -741,12 +741,18 @@ def plot_clusters(
     """
     # assertions
     assert os.path.isdir(out_dir)
+
+    if "atac" in cluster_file:
+        title = "'Accessibility (ATAC)'"
+    else:
+        title = "'Expression (RNA-seq)'"
     
     # heatmap plot
     r_plot_heatmap = (
         "viz.plot_timeseries_heatmap.R "
-        "{0} {1} {2} {3}").format(
-            cluster_subsample_file, cluster_mat, out_dir, prefix)
+        "{0} {1} {2} {3} {4}").format(
+            cluster_subsample_file, cluster_mat, out_dir, prefix, title)
+    print r_plot_heatmap
     run_shell_cmd(r_plot_heatmap)
 
     # individual clusters

@@ -2,6 +2,7 @@
 
 # description: plot chrom states
 library(gplots)
+library(reshape2)
 #library(RColorBrewer)
 #library(viridis)
 #library(ggsci)
@@ -18,6 +19,10 @@ plot_file <- args[2]
 # read in data
 data <- read.table(gzfile(confusion_mat_file), sep="\t", header=TRUE, row.names=1)
 print(head(data))
+
+print(head(melt(data)))
+top_thresh <- quantile(melt(data)$value, 0.95)
+data[data > top_thresh] <- top_thresh
 
 # heatmap fn
 plot_heatmap <- function(plot_data, color_set) {

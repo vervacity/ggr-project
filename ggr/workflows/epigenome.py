@@ -566,9 +566,10 @@ def run_dynamic_epigenome_workflow(
             out_r_file = "{}.replot.pdf".format(out_file.split(".pdf")[0])
             if not os.path.isfile(out_r_file):
                 replot = (
-                    "plot.profile_heatmaps.R {0} {1} {2} {3} "
+                    "plot.profile_heatmaps.R {} {} {} {} {} "
                     "1,100 101,200 201,300").format(
                         out_mat_file,
+                        histone, 
                         row_sep_file,
                         out_r_file,
                         histone_r_color)
@@ -939,9 +940,10 @@ def run_stable_epigenome_workflow(
                 out_r_file = "{}.replot.pdf".format(out_file.split(".pdf")[0])
                 if not os.path.isfile(out_r_file):
                     replot = (
-                        "plot.profile_heatmaps.R {0} {1} {2} {3} "
+                        "plot.profile_heatmaps.R {} {} {} {} {} "
                         "1,100 101,200 201,300").format(
                             out_mat_file,
+                            histone,
                             row_sep_file,
                             out_r_file,
                             histone_r_color)

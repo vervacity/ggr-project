@@ -16,10 +16,11 @@ source(load_style_guide)
 # args
 args <- commandArgs(trailingOnly=TRUE)
 deeptools_matrix_file <- args[1]
-row_sep_file <- args[2]
-out_file <- args[3]
-rcolorbrewer_palette <- args[4]
-start_stop_sets <- args[5:length(args)]
+plot_title <- args[2]
+row_sep_file <- args[3]
+out_file <- args[4]
+rcolorbrewer_palette <- args[5]
+start_stop_sets <- args[6:length(args)]
 
 # read in data
 data <- read.table(gzfile(deeptools_matrix_file), skip=1, header=FALSE)
@@ -51,11 +52,6 @@ my_breaks <- seq(
     quantile(data_melted$value, 0.98),
     length.out=color_granularity)
 
-# consider using distribution to space out breaks?
-#data_melted_filt <- data_melted[data_melted$value <= signal_max_thresh,]
-#my_breaks <- quantile(data_melted_filt$value, seq(0,1, length.out=color_granularity))
-#my_breaks <- as.numeric(my_breaks)
-
 # colors
 my_palette <- get_ggr_assay_palette(rcolorbrewer_palette, color_granularity)
 
@@ -81,14 +77,14 @@ add_borders <- function(i) {
 }
 
 # heatmap fn
-plot_profile_heatmap <- function(plot_data, i) {
+plot_profile_heatmap <- function(plot_data, i, plot_key) {
 
     label <- c("d0", "d3", "d6")
 
     # grid
     mylmat = rbind(c(0,3,0),c(2,1,0),c(0,4,0))
-    mylwid = c(0.05,1,0.05)
-    mylhei = c(0.25,4,0.5)
+    mylwid = c(0.02,0.5,0.02)
+    mylhei = c(0.1,2,0.27)
 
     # heatmap
     heatmap.2(
@@ -98,33 +94,53 @@ plot_profile_heatmap <- function(plot_data, i) {
         dendrogram="none",
         trace="none",
         density.info="none",
+        
+        srtCol=60,
+        cexCol=0.5,
+        offsetCol=-0.5,
         labCol=c(
             rep("", floor(ncol(plot_data)/2)),
             label[i],
             rep("", ceiling(ncol(plot_data)/2)-1)),
         labRow=rep("", nrow(plot_data)),
+
+        colsep=c(0, ncol(plot_data)),
+        rowsep=rowsep,
+        sepcolor="black",
+        sepwidth=c(0.0001, 0.0001),
+
+        key=plot_key,
         keysize=0.1,
         key.title=NA,
         key.xlab=NA,
-        key.par=list(pin=c(4,0.1),
-            mar=c(2.1,0,2.1,0),
-            mgp=c(3,1,0),
-            cex.axis=1.0,
-            font.axis=2),
-        srtCol=45,
-        cexCol=1.25,
-        margins=c(1,0),
+        key.par=list(
+            mar=c(0.9,1,1,1) / (par("cex") * 0.66),
+            mgp=c(0,-0.1,0),
+            tcl=-0.1,
+            lend=2,
+            cex.axis=0.6,
+            bty="n"),
+        key.xtickfun=function() {
+            breaks <- pretty(parent.frame()$breaks)
+            breaks <- breaks[c(1,length(breaks))]
+            list(at = parent.frame()$scale01(breaks),
+                 labels = breaks)},
+
+        margins=c(0,0),
         lmat=mylmat,
         lwid=mylwid,
         lhei=mylhei,
+        
         col=my_palette,
         breaks=my_breaks,
-        rowsep=rowsep,
-        sepcolor="black",
-        add.expr=add_borders(i),
+        #add.expr=add_borders(i),
         useRaster=TRUE,
         par(xpd=FALSE)) # xpd - where plotting shows up
 
+    if (plot_key) {
+        title(plot_title, adj=0.2, outer=TRUE, line=-0.5, cex.main=0.5)
+    }
+    
 }
 
 # grab grob fn
@@ -147,16 +163,22 @@ grob_list <- lapply(
 
         # get data subset
         data_subset <- data[,start:end]
+
+        if (i == 2) {
+            plot_key <- TRUE
+        } else {
+            plot_key <- FALSE
+        }
         
         # plot heatmap and save out
-        fn <- function() plot_profile_heatmap(data_subset, i)
+        fn <- function() plot_profile_heatmap(data_subset, i, plot_key)
 
         # grab grob
         return(grab_grob(fn))
     })
 
 # plot joint heatmap
-pdf(file=out_file, height=7, width=2, onefile=FALSE, family="ArialMT")
+pdf(file=out_file, height=3, width=0.7, onefile=FALSE, family="ArialMT")
 grid.newpage()
-grid.arrange(grobs=grob_list, nrow=1, ncol=length(start_stop_sets), clip=TRUE)
+grid.arrange(grobs=grob_list, nrow=1, ncol=length(start_stop_sets), clip=FALSE)
 dev.off()
