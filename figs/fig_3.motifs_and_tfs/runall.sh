@@ -10,8 +10,10 @@ PWM_FILE=$GGR_DIR/annotations/HOCOMOCOv11_core_pwms_HUMAN_mono.renamed.nonredund
 # help choosing
 #$SCRIPT_DIR/choose_vignette.py
 #~/git/ggr-project/figs/fig_1.datasets/plot.rna_bar.R $GGR_DIR/results/rna/timeseries/matrices/ggr.rna.counts.pc.expressed.timeseries_adj.pooled.rlog.mat.txt.gz ENSG00000189182 gene_vals.KRT77.pdf
-#$SCRIPT_DIR/plot_pwm.py $PWM_FILE TP53
+$SCRIPT_DIR/plot_pwm.py $PWM_FILE TP53
 #$SCRIPT_DIR/plot_pwm.py $PWM_FILE CEBP
+#~/git/ggr-project/figs/fig_1.datasets/plot.rna_bar.R $GGR_DIR/results/rna/timeseries/matrices/ggr.rna.counts.pc.expressed.timeseries_adj.pooled.rlog.mat.txt.gz ENSG00000073282 gene_vals.TP63.pdf
+
 
 # allelic imbalance ATAC to validate importance scores
 #$SCRIPT_DIR/fig_3-b.3.prep.py
