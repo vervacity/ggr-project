@@ -73,7 +73,7 @@ my_colors_joint <- c(my_colors_r1, my_colors_r2)
 p <- ggplot(pca_data, aes(x=x, y=y, colour=group, fill=day)) +
     geom_tile() + 
     geom_tile(fill="white", show.legend=FALSE) +
-    geom_point(size=0.50, show.legend=FALSE) + # size=0.25
+    geom_point(size=1, show.legend=FALSE) + # size=0.25
     labs(x="PC1", y="PC2", title=title) + 
     scale_color_manual(values=my_colors_joint, guide="none") +
     scale_fill_manual(values=my_colors) +
