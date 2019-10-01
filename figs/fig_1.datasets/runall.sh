@@ -28,3 +28,4 @@ GGR_DIR=/mnt/lab_data/kundaje/users/dskim89/ggr/integrative/v1.0.0a
 #$SCRIPT_DIR/plot_trajs.py $GGR_DIR
 
 # linking plots
+$SCRIPT_DIR/plot_linking.py $GGR_DIR

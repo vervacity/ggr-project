@@ -3,9 +3,6 @@
 # description: plot chrom states
 library(gplots)
 library(reshape2)
-#library(RColorBrewer)
-#library(viridis)
-#library(ggsci)
 
 # load style guide
 load_style_guide <- system("which ggr_style_guide.R", intern=TRUE)
@@ -18,9 +15,8 @@ plot_file <- args[2]
 
 # read in data
 data <- read.table(gzfile(confusion_mat_file), sep="\t", header=TRUE, row.names=1)
-print(head(data))
 
-print(head(melt(data)))
+# thresh
 top_thresh <- quantile(melt(data)$value, 0.95)
 data[data > top_thresh] <- top_thresh
 
@@ -33,8 +29,8 @@ plot_heatmap <- function(plot_data, color_set) {
         c(0,0,2,0),
         c(4,1,3,0),
         c(0,0,6,0))
-    mylwid = c(0.05,0.25,4.4,0.05)
-    mylhei = c(0.05,0.25,6,0.5)
+    mylwid = c(0.05,0.15,1,0.05)
+    mylhei = c(0.05,0.15,1.5,0.5)
 
     # get GGR colors
     granularity <- 49
@@ -44,12 +40,11 @@ plot_heatmap <- function(plot_data, color_set) {
     col_colors <- get_trajectory_palette(11)
     
     # sep
-    rowsep <- 1:nrow(plot_data)
-    colsep <- 1:ncol(plot_data)
+    rowsep <- 0:nrow(plot_data)
+    colsep <- 0:ncol(plot_data)
 
     # adjust color range
     my_breaks <- seq(0.0, max(plot_data), length.out=granularity+1)
-    #my_breaks <- seq(min(plot_data), max(plot_data), length.out=granularity+1)
     
     # heatmap
     heatmap.2(
@@ -59,37 +54,45 @@ plot_heatmap <- function(plot_data, color_set) {
         dendrogram="none",
         trace="none",
         density.info="none",
-        #labCol=c(
-        #    rep("", floor(ncol(plot_data)/2)),
-        #    label[i],
-        #    rep("", ceiling(ncol(plot_data)/2)-1)),
+        
+        labCol=rep("", ncol(plot_data)),        
         labRow=rep("", nrow(plot_data)),
+        
         keysize=0.1,
         key.title=NA,
         key.xlab=NA,
-        key.par=list(pin=c(4,0.1),
-            mar=c(2.1,0,2.1,0),
-            mgp=c(3,1,0),
-            cex.axis=1.0,
-            font.axis=2),
-        srtCol=45,
-        cexCol=1.25,
-        margins=c(1,0),
+        key.par=list(
+            mar=c(2,1,0.5,1),
+            mgp=c(0,-0.1,0),
+            cex.axis=0.6,
+            tcl=-0.1,
+            lend=2,
+            bty="n"),
+        key.xtickfun=function() {
+            breaks <- pretty(parent.frame()$breaks)
+            breaks <- breaks[c(1,length(breaks))]
+            list(at = parent.frame()$scale01(breaks),
+                 labels = breaks)},
+
+        margins=c(0,0),
         lmat=mylmat,
         lwid=mylwid,
         lhei=mylhei,
+        
         col=my_palette,
         breaks=my_breaks,
         rowsep=rowsep,
         colsep=colsep,
+        sepcolor="black",
+        sepwidth=c(0.0001, 0.0001),
+        
         RowSideColors=row_colors,
-        ColSideColors=col_colors,
-        sepcolor="black")
+        ColSideColors=col_colors)
 
 }
 
 
 # plot joint heatmap
-pdf(file=plot_file, height=9, width=9, onefile=FALSE, family="ArialMT")
+pdf(file=plot_file, height=2, width=1.25, useDingbats=FALSE, onefile=FALSE, family="ArialMT")
 plot_heatmap(data, "Blues")
 dev.off()
