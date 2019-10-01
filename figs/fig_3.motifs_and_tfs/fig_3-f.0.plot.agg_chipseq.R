@@ -46,6 +46,8 @@ x_limit <- abs(min(data$index))
 # figure out title
 title_name <- strsplit(basename(plot_file), ".", fixed=TRUE)[[1]]
 title_name <- title_name[2]
+title_name <- gsub("HCLUST-\\d+.", "", title_name)
+title_name <- gsub(".UNK.0.A", "", title_name)
 
 # plot
 ggplot(data_melted, aes(x=index, y=value, colour=variable)) +
@@ -62,8 +64,8 @@ ggplot(data_melted, aes(x=index, y=value, colour=variable)) +
         axis.title=element_text(size=6),
         axis.title.x=element_text(vjust=1, margin=margin(0,0,0,0)),
         axis.title.y=element_text(vjust=1, margin=margin(0,0,0,0)),
-        axis.text.y=element_text(size=5),
-        axis.text.x=element_text(size=5),
+        axis.text.y=element_text(size=6),
+        axis.text.x=element_text(size=6),
         axis.line=element_line(color="black", size=0.115, lineend="square"),
         axis.ticks=element_line(size=0.115),
         axis.ticks.length=unit(0.01, "in"),
@@ -74,7 +76,7 @@ ggplot(data_melted, aes(x=index, y=value, colour=variable)) +
         legend.box.margin=margin(0,0,0,0),
         legend.box.spacing=unit(0.05, "in"),
         legend.title=element_blank(),
-        legend.text=element_text(size=6),
+        legend.text=element_text(size=5),
         legend.position=c(0.9, 0.9),
         strip.background=element_blank(),
         strip.text=element_blank()) +
