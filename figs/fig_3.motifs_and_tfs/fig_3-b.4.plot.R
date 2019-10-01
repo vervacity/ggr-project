@@ -34,7 +34,7 @@ data$sig[data$sig == 1] <- sig_name
 data$sig[data$sig == 0] <- non_sig_name
 data$sig <- factor(data$sig, levels=c(non_sig_name, sig_name))
 
-plot_file <- "fig_3-b.1.imptscore_present.pdf"
+plot_file <- "fig_3.asATAC.imptscore_present.pdf"
 dodge <- position_dodge(width=0.9)
 ggplot(data, aes(x=sig, y=delta_logit, colour=sig)) +
     geom_violin(size=0.115, width=0.8, position=dodge, scale="width") +
@@ -44,15 +44,15 @@ ggplot(data, aes(x=sig, y=delta_logit, colour=sig)) +
     theme_bw() +
     theme(
         text=element_text(family="ArialMT"),
-        plot.title=element_text(size=5, margin=margin(b=0)),
+        plot.title=element_text(size=6, margin=margin(b=0)),
         plot.margin=margin(5,1,1,1),
         panel.background=element_blank(),
         panel.border=element_blank(),
         panel.grid=element_blank(),
-        axis.title.y=element_text(size=5),
+        axis.title.y=element_text(size=6),
         axis.title.x=element_blank(),
-        axis.text.y=element_text(size=4),
-        axis.text.x=element_text(size=4),
+        axis.text.y=element_text(size=6),
+        axis.text.x=element_text(size=6),
         axis.line=element_line(color="black", size=0.115, lineend="square"),
         axis.ticks=element_line(size=0.115),
         axis.ticks.length=unit(0.01, "in"),
@@ -63,7 +63,7 @@ ggplot(data, aes(x=sig, y=delta_logit, colour=sig)) +
         legend.text=element_text(size=4)) +
     scale_y_continuous(limits=c(-0.05, 1), expand=c(0,0)) + 
     scale_color_jama()
-ggsave(plot_file, width=1.25, height=1.25)
+ggsave(plot_file, width=1.75, height=1.75)
 
 
 # plot the beta max (sig only) 
@@ -88,7 +88,7 @@ data$variant.impt_score.present <- factor(
     data$variant.impt_score.present,
     levels=c(non_impt_name, impt_name))
 
-plot_file <- "fig_3-b.2.sig_only.pdf"
+plot_file <- "fig_3.asATAC.sig_only.pdf"
 dodge <- position_dodge(width=0.9)
 ggplot(data, aes(x=variant.impt_score.present, y=beta_max, colour=variant.impt_score.present)) +
     geom_violin(size=0.115, width=0.8, position=dodge, scale="width") +
@@ -98,15 +98,15 @@ ggplot(data, aes(x=variant.impt_score.present, y=beta_max, colour=variant.impt_s
     theme_bw() +
     theme(
         text=element_text(family="ArialMT"),
-        plot.title=element_text(size=5, margin=margin(b=0)),
+        plot.title=element_text(size=6, margin=margin(b=0)),
         plot.margin=margin(5,1,1,1),
         panel.background=element_blank(),
         panel.border=element_blank(),
         panel.grid=element_blank(),
-        axis.title.y=element_text(size=5),
+        axis.title.y=element_text(size=6),
         axis.title.x=element_blank(),
-        axis.text.y=element_text(size=4),
-        axis.text.x=element_text(size=4),
+        axis.text.y=element_text(size=6),
+        axis.text.x=element_text(size=6),
         axis.line=element_line(color="black", size=0.115, lineend="square"),
         axis.ticks=element_line(size=0.115),
         axis.ticks.length=unit(0.01, "in"),
@@ -117,4 +117,4 @@ ggplot(data, aes(x=variant.impt_score.present, y=beta_max, colour=variant.impt_s
         legend.text=element_text(size=4)) +
     scale_y_continuous(limits=c(1.35, 3), expand=c(0,0)) +
     scale_color_jama()
-ggsave(plot_file, width=1.25, height=1.25)
+ggsave(plot_file, width=1.75, height=1.75)
