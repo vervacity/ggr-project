@@ -1,6 +1,5 @@
 #!/usr/bin/env Rscript
 
-# fig 1b - plot
 # description - plot out the datasets
 # data: /users/dskim89/git/ggr-project/ggr/data
 
@@ -14,7 +13,7 @@ source(load_style_guide)
 # args
 args <- commandArgs(trailingOnly=TRUE)
 dataset_file <- args[1] # "~/git/ggr-project/ggr/data/ggr_datasets.txt"
-plot_file <- "fig_1-b.pdf"
+plot_file <- "fig_1.datasets.matrix.pdf"
 
 # read in file
 data <- read.table(dataset_file, sep="\t", header=TRUE)
@@ -71,10 +70,16 @@ p <- p +
     theme_bw() + 
     theme(
         text=element_text(family="ArialMT"),
-        axis.text.x=element_text(size=6, angle=30, hjust=1, colour="black"),
-        axis.text.y=element_text(size=6, colour="black"),
-        axis.title.x=element_text(size=6),
+        plot.margin=margin(5,5,1,5),
+        panel.background=element_blank(),
+        panel.border=element_rect(size=0.230),
         panel.grid.minor=element_blank(),
+        axis.title=element_text(size=6),
+        axis.text.y=element_text(size=6, colour="black"),
+        axis.text.x=element_text(size=6, angle=60, hjust=1, colour="black"),
+        axis.line=element_line(color="black", size=0.115, lineend="square"),
+        axis.ticks=element_line(size=0.115),
+        axis.ticks.length=unit(0.01, "in"),
         legend.position="none")
 
 # save
