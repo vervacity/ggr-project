@@ -12,15 +12,12 @@ source(load_style_guide)
 
 # args
 args <- commandArgs(trailingOnly=TRUE)
-plot_file <- args[1] # "fig_1-c.atac.pdf"
+plot_file <- args[1]
 mat_files <- args[2:length(args)]
 
 # load data
 for (i in 1:length(mat_files)) {
-    #print(mat_files[i])
-    
     data <- read.table(gzfile(mat_files[i]), sep="\t", header=TRUE, row.names=1)
-
     if (i == 1) {
         all_data <- data
     } else {
@@ -28,8 +25,6 @@ for (i in 1:length(mat_files)) {
     }
     
 }
-
-#all_data <- all_data[,order(names(all_data))]
 
 # just keep the top percentile?
 if (FALSE) {
@@ -39,29 +34,23 @@ if (FALSE) {
     all_data <- all_data[all_data_max > cutoff,]
 }
 
-#print(head(all_data))
-#print(dim(all_data))
-
 # put into pca
 pca_obj <- prcomp(t(all_data), center=TRUE, scale=TRUE)
 pc1 <- pca_obj$x[,1]
 pc2 <- pca_obj$x[,2]
-
 pca_data <- data.frame(x=pc1, y=pc2)
-
 
 # adjust group names
 group_levels <- colnames(all_data)
 group_levels <- gsub("0_", ".0 ", group_levels)
 group_levels <- gsub("5_", ".5 ", group_levels)
-#print(group_levels)
+
 pca_data$group <- row.names(pca_data)
 pca_data$group <- gsub("0_", ".0 ", pca_data$group)
 pca_data$group <- gsub("5_", ".5 ", pca_data$group)
-#print(head(pca_data))
+
 pca_data$group <- factor(pca_data$group, levels=group_levels)
 pca_data$day <- factor(gsub(" b.", "", pca_data$group))
-#pca_data$day <- gsub("d", "", pca_data$day)
 
 pca_data$rep <- as.character(gsub(".+ ", "", pca_data$group))
 
@@ -73,7 +62,6 @@ if (grepl("rna", plot_file, fixed=TRUE)) {
 } else {
     mid_idx <- 9
 }
-
 my_colors_r1 <- my_colors
 my_colors_r1 <- lighten(my_colors, amount=0.2)
 my_colors_r2 <- darken(my_colors, amount=0.2)
@@ -87,19 +75,17 @@ p <- ggplot(pca_data, aes(x=x, y=y, colour=group, fill=day)) +
     labs(x="PC1", y="PC2") + 
     scale_color_manual(values=my_colors_joint, guide="none") +
     scale_fill_manual(values=my_colors) +
-    #guides(size=FALSE, colour=FALSE) +        
     theme_bw() +
     theme(
+        aspect.ratio=1,
         text=element_text(family="ArialMT"),
         title=element_text(size=6),
-        aspect.ratio=1,
         plot.margin=margin(0,0,0,0),
         plot.title=element_text(margin=margin(0,0,0,0)),
         panel.background=element_blank(),
         panel.border=element_blank(),
         panel.grid.major=element_blank(),
         panel.grid.minor=element_blank(),
-        #panel.border=element_rect(size=0.1155),
         axis.title=element_text(size=6, margin=margin(0,0,0,0)),
         axis.title.x=element_text(vjust=1.5),
         axis.title.y=element_text(vjust=-1),
@@ -125,4 +111,4 @@ if (!grepl("rna", plot_file, fixed=TRUE)) {
     p <- p + ggtitle("RNA-seq")
 }
 
-ggsave(plot_file, height=0.95, width=1.5, units="in", useDingbats=FALSE)
+ggsave(plot_file, height=1.5, width=1.5, useDingbats=FALSE)
