@@ -13,7 +13,7 @@ source(load_style_guide)
 # args
 args <- commandArgs(trailingOnly=TRUE)
 gsea_summary_file <- args[1]
-line_plot_file <- "fig_1-c.gsea.pdf"
+line_plot_file <- "fig_1.gsea.pdf"
 
 # read in data
 gsea_summary <- read.table(gsea_summary_file, sep="\t", header=TRUE)
@@ -41,27 +41,11 @@ gsea_summary$timepoints <- gsub("0$", ".0", gsea_summary$timepoints)
 gsea_summary$timepoints <- gsub("5$", ".5", gsea_summary$timepoints)
 gsea_summary$timepoints <- gsub("d", "", gsea_summary$timepoints)
 
-
 # get colors
 ggr_colors <- get_ggr_timepoint_colors()
 ggr_colors <- ggr_colors[3:length(ggr_colors)]
 name_colors <- pal_nejm("default")(3)
 ggr_colors <- c(ggr_colors, name_colors)
-
-if (FALSE) {
-    ggplot(gsea_summary, aes(x=timepoints, y=NAME)) +
-                                        #geom_point(aes(colour=sig, size=NES)) +
-        geom_point(aes(colour=NES, size=sig)) +
-                                        #scale_color_viridis()
-            scale_color_viridis(limits=c(-9,9))
-                                        #scale_colour_gradient2(
-                                        #    low="blue",
-                                        #    mid="white",
-                                        #    high="red",
-                                        #    guide="colorbar",
-                                        #    limits=c(-3,3))
-    ggsave(dot_plot_file, width=14, height=7)
-}
 
 # plot as line plots
 ggplot(gsea_summary, aes(x=timepoints, y=NES, group=NAME)) +
@@ -71,20 +55,18 @@ ggplot(gsea_summary, aes(x=timepoints, y=NES, group=NAME)) +
     labs(x="Timepoint (day)") +
     theme_bw() +
     theme(
-        text=element_text(family="ArialMT"),
-        title=element_text(size=6),
-        plot.title=element_text(margin=margin(0,0,0,0)),
         aspect.ratio=1,
-        panel.grid.major=element_blank(),
-        panel.grid.minor=element_blank(),
+        text=element_text(family="ArialMT"),
+        plot.title=element_text(size=8, margin=margin(b=1)),
         panel.background=element_blank(),
         panel.border=element_blank(),
-        #panel.border=element_rect(size=0.25),
+        panel.grid.major=element_blank(),
+        panel.grid.minor=element_blank(),
         axis.title=element_text(size=6, margin=margin(0,0,0,0)),
         axis.line=element_line(color="black", size=0.115, lineend="square"),
         axis.ticks=element_line(size=0.115),
         axis.text=element_text(size=6),
-        axis.text.x=element_text(angle=30, hjust=1),
+        axis.text.x=element_text(angle=60, hjust=1),
         legend.title=element_blank(),
         legend.text=element_text(size=5),
         legend.justification=c(0,1),
@@ -94,6 +76,4 @@ ggplot(gsea_summary, aes(x=timepoints, y=NES, group=NAME)) +
     scale_color_manual(values=ggr_colors) +
     scale_y_continuous(limits=c(3.5, 6), expand=c(0,0)) +
 
-ggsave(line_plot_file, height=2, width=2.5, useDingbats=FALSE) # width 14
-
-# plot just the best subset
+ggsave(line_plot_file, height=2, width=2.5, useDingbats=FALSE)
