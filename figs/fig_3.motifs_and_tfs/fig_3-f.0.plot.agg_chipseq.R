@@ -41,7 +41,8 @@ if (dim(data)[2] == 3) {
 
 # make pretty limits
 y_limit <- ceiling(2*max(abs(data_melted$value))) / 2
-x_limit <- abs(min(data$index))
+#x_limit <- abs(min(data$index))
+x_limit <- 500
 
 # figure out title
 title_name <- strsplit(basename(plot_file), ".", fixed=TRUE)[[1]]
@@ -81,7 +82,11 @@ ggplot(data_melted, aes(x=index, y=value, colour=variable)) +
         strip.background=element_blank(),
         strip.text=element_blank()) +
     scale_color_manual(values=ggr_colors) +
-    scale_x_continuous(limits=c(-x_limit,x_limit), expand=c(0,0)) +
+    scale_x_continuous(
+        limits=c(-x_limit,x_limit),
+        expand=c(0,0),
+        breaks=seq(-x_limit,x_limit,by=x_limit),
+        labels=c(-x_limit, 0, x_limit)) +
     scale_y_continuous(limits=c(0, y_limit), expand=c(0,0)) #+
     #facet_grid(. ~ variable)
 
