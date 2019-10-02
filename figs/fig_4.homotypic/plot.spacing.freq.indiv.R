@@ -72,7 +72,7 @@ ggplot(data_melt, aes(x=position, y=value, colour=variable)) +
             breaks=seq(left_clip, right_clip, 10),
             expand=c(0,0)) +
         color_fn()
-ggsave(plot_file, height=1, width=2)
+ggsave(plot_file, height=1, width=2, useDingbats=FALSE)
 
 
 

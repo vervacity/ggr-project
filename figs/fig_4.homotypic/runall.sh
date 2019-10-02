@@ -54,7 +54,7 @@ RNA_SIGNAL_MAT=$GGR_DIR/results/rna/timeseries/matrices/ggr.rna.counts.pc.expres
 
 # set up links
 OUT_DIR=linking
-$SCRIPT_DIR/setup_links.py $ATAC_MASTER_BED $TSS_BED $ATAC_SIGNAL_MAT $RNA_SIGNAL_MAT $OUT_DIR
+#$SCRIPT_DIR/setup_links.py $ATAC_MASTER_BED $TSS_BED $ATAC_SIGNAL_MAT $RNA_SIGNAL_MAT $OUT_DIR
 #LINKS_FILE=$OUT_DIR/links.bed.gz
 LINKS_FILE=$OUT_DIR/links.proximity.k-2.d-25000.bed.gz 
 
@@ -67,8 +67,8 @@ LATE_MOTIFS=/mnt/lab_data/kundaje/users/dskim89/ggr/nn/inference.2019-02-05/moti
 MULTIPLICITY_GENE_DIR=genome.multiplicity.gene_sets
 # run as early/mid/late?
 #$SCRIPT_DIR/analyze.genome.multiplicity.genes.py $MULTIPLICITY_GENE_DIR $SIG_PWMS_FILE $LINKS_FILE $BACKGROUND_GENES_FILE $EARLY_MOTIFS $MID_MOTIFS $LATE_MOTIFS
-$SCRIPT_DIR/analyze.genome.multiplicity.genes.py genome.multiplicity.gene_sets.late $SIG_PWMS_FILE $LINKS_FILE $BACKGROUND_GENES_FILE $LATE_MOTIFS
-
+#$SCRIPT_DIR/analyze.genome.multiplicity.genes.py genome.multiplicity.gene_sets.late $SIG_PWMS_FILE $LINKS_FILE $BACKGROUND_GENES_FILE $LATE_MOTIFS
+$SCRIPT_DIR/analyze.genome.solo_regions.py $MULTIPLICITY_GENE_DIR $SIG_PWMS_FILE $LINKS_FILE $TSS_BED $BACKGROUND_GENES_FILE $EARLY_MOTIFS $MID_MOTIFS $LATE_MOTIFS
 
 SPACING_GENE_DIR=genome.spacing.gene_sets
 #$SCRIPT_DIR/spacing_to_genes.py $SPACING_GENE_DIR $SIG_PWMS_FILE $LINKS_FILE $BACKGROUND_GENES_FILE $EARLY_MOTIFS $MID_MOTIFS $LATE_MOTIFS
