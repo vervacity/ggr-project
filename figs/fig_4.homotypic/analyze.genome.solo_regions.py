@@ -68,7 +68,7 @@ def main():
     sig_pwms_file = sys.argv[2]
     links_file = sys.argv[3]
     tss_file = sys.argv[4]
-    background_gene_set_file = sys.argv[5]
+    background_gene_file = sys.argv[5]
     motifs_files = sys.argv[6:]
 
     # dirs
@@ -127,7 +127,7 @@ def main():
 
         # skip
         #continue
-        if "GATA3" not in pwm_name_clean:
+        if "SMAD3" not in pwm_name_clean:
             continue
         
         # check to see which have this pwm and adjust indices
@@ -192,10 +192,6 @@ def main():
         metadata = metadata[keep_indices]
         pwm_hit_count = pwm_hit_count[keep_indices]
         
-        # now use fract to choose a cutoff and only keep those above cutoff
-        import ipdb
-        ipdb.set_trace()
-
         # look at different count levels
         count_thresholds = range(1, 6)
         for count_threshold in count_thresholds:
@@ -223,12 +219,11 @@ def main():
 
             # gprofiler
             gprofiler_dir = "{}/enrichments.{}".format(OUT_DIR, pwm_name_clean)
-            run_shell_cmd("mkdir -p {}".format(gprofiler_dir))
-            if run_enrichments:
+            os.system("mkdir -p {}".format(gprofiler_dir))
+            if True:
                 run_gprofiler(
                     gene_set_file, background_gene_file,
                     gprofiler_dir, ordered=True, header=True)
-            
 
         quit()
         summary_df = None

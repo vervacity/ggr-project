@@ -56,7 +56,8 @@ RNA_SIGNAL_MAT=$GGR_DIR/results/rna/timeseries/matrices/ggr.rna.counts.pc.expres
 OUT_DIR=linking
 #$SCRIPT_DIR/setup_links.py $ATAC_MASTER_BED $TSS_BED $ATAC_SIGNAL_MAT $RNA_SIGNAL_MAT $OUT_DIR
 #LINKS_FILE=$OUT_DIR/links.bed.gz
-LINKS_FILE=$OUT_DIR/links.proximity.k-2.d-25000.bed.gz 
+#LINKS_FILE=$OUT_DIR/links.proximity.k-2.d-25000.bed.gz
+LINKS_FILE=$GGR_DIR/results/linking/proximity/ggr.linking.ALL.overlap.interactions.txt.gz
 
 # genome: multiplicity 1-3 motifs and gene sets (use dynamic regions)
 BACKGROUND_GENES_FILE=/mnt/lab_data/kundaje/users/dskim89/ggr/integrative/v1.0.0a/data/ggr.rna.counts.pc.expressed.mat.txt.gz
