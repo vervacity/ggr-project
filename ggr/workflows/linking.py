@@ -107,7 +107,7 @@ def run_traj_linking_workflow(args, prefix, links_dir):
         score_filter = 0.5
     else:
         score_filter = 2
-        
+
     region_clusters_to_genes(
         atac_clusters_file,
         interactions_file,
@@ -316,10 +316,10 @@ def runall(args, prefix):
     # should have dynamic effects)
     links_dirs = [
         "proximity",
-        "proximity.corr"
-        #"abc.distance.tss",
-        #"abc.hic.celltype_avg",
-        #"abc.hic.celltype_avg.tss"
+        "proximity.corr",
+        "abc.distance.tss",
+        "abc.hic.celltype_avg",
+        "abc.hic.celltype_avg.tss"
     ]
     
     for links_dir in links_dirs:

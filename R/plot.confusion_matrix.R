@@ -15,6 +15,7 @@ plot_file <- args[2]
 
 # read in data
 data <- read.table(gzfile(confusion_mat_file), sep="\t", header=TRUE, row.names=1)
+data[is.na(data)] <- 0
 
 # thresh
 top_thresh <- quantile(melt(data)$value, 0.95)

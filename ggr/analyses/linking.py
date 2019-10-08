@@ -974,17 +974,12 @@ def build_confusion_matrix(
             
     # save out results
     results = pd.DataFrame(data=results)
-    print results
     if False:
         results = results.div(results.sum(axis=0), axis=1) # normalize columns (gene count and linking expectations)
         results = results.div(results.sum(axis=1), axis=0) # normalize rows (prob across rows)
     else:
         results = results.div(results.sum(axis=1), axis=0) # normalize rows (prob across rows)
-        print results
         results = results.div(results.sum(axis=0), axis=1) # normalize columns (gene count and linking expectations)
-
-        
-    print results
     
     out_file = "{}.mat.txt.gz".format(prefix)
     results.to_csv(out_file, sep="\t", compression="gzip")
