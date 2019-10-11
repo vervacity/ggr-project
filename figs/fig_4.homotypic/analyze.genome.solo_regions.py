@@ -127,8 +127,8 @@ def main():
 
         # skip
         #continue
-        if "SMAD3" not in pwm_name_clean:
-            continue
+        #if "SMAD3" not in pwm_name_clean:
+        #    continue
         
         # check to see which have this pwm and adjust indices
         example_indices = []
@@ -225,7 +225,7 @@ def main():
                     gene_set_file, background_gene_file,
                     gprofiler_dir, ordered=True, header=True)
 
-        quit()
+        continue
         summary_df = None
         for position_range in position_ranges:
             print ">> range:", position_range

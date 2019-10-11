@@ -14,15 +14,13 @@ plot_file <- paste(out_prefix, ".pdf", sep="")
 data <- read.table(gzfile(data_file), header=TRUE, sep="\t")
 
 # clip
-left_clip <- -50
-right_clip <- 50
-left_clip <- -70
-right_clip <- 70
-data <- data[data$variable > left_clip,]
-data <- data[data$variable < right_clip,]
+left_clip <- -130
+right_clip <- 130
+data <- data[data$position > left_clip,]
+data <- data[data$position < right_clip,]
 
 # blank out zero point
-data <- data[data$variable != 0,]
+data <- data[data$position != 0,]
 
 # signal specific adjustments
 adjust_labels <- function(x) x
@@ -46,7 +44,7 @@ if (grepl("H3K27ac_SIGNALS", data_file)) {
 # plot
 title <- unlist(strsplit(basename(data_file), ".", fixed=TRUE))[2:4]
 title <- paste(title, collapse="; ")
-ggplot(data, aes(x=variable, y=value)) +
+ggplot(data, aes(x=position, y=score)) +
     geom_point(
         shape=20,
         stroke=0,

@@ -65,11 +65,18 @@ EARLY_MOTIFS=/mnt/lab_data/kundaje/users/dskim89/ggr/nn/inference.2019-02-05/mot
 MID_MOTIFS=/mnt/lab_data/kundaje/users/dskim89/ggr/nn/inference.2019-02-05/motifs.input_x_grad.mid/ggr.scanmotifs.h5
 LATE_MOTIFS=/mnt/lab_data/kundaje/users/dskim89/ggr/nn/inference.2019-02-05/motifs.input_x_grad.late/ggr.scanmotifs.h5
 
+EARLY_MOTIFS=/mnt/lab_data/kundaje/users/dskim89/ggr/nn/inference.2019-10-08/motifs.input_x_grad.dynamic.early/ggr.scanmotifs.h5
+MID_MOTIFS=/mnt/lab_data/kundaje/users/dskim89/ggr/nn/inference.2019-10-08/motifs.input_x_grad.dynamic.mid/ggr.scanmotifs.h5
+LATE_MOTIFS=/mnt/lab_data/kundaje/users/dskim89/ggr/nn/inference.2019-10-08/motifs.input_x_grad.dynamic.late/ggr.scanmotifs.h5
+
+
 MULTIPLICITY_GENE_DIR=genome.multiplicity.gene_sets
 # run as early/mid/late?
 #$SCRIPT_DIR/analyze.genome.multiplicity.genes.py $MULTIPLICITY_GENE_DIR $SIG_PWMS_FILE $LINKS_FILE $BACKGROUND_GENES_FILE $EARLY_MOTIFS $MID_MOTIFS $LATE_MOTIFS
 #$SCRIPT_DIR/analyze.genome.multiplicity.genes.py genome.multiplicity.gene_sets.late $SIG_PWMS_FILE $LINKS_FILE $BACKGROUND_GENES_FILE $LATE_MOTIFS
-$SCRIPT_DIR/analyze.genome.solo_regions.py $MULTIPLICITY_GENE_DIR $SIG_PWMS_FILE $LINKS_FILE $TSS_BED $BACKGROUND_GENES_FILE $EARLY_MOTIFS $MID_MOTIFS $LATE_MOTIFS
+#$SCRIPT_DIR/analyze.genome.solo_regions.py genome.multiplicity.solo_regions $SIG_PWMS_FILE $LINKS_FILE $TSS_BED $BACKGROUND_GENES_FILE $EARLY_MOTIFS $MID_MOTIFS $LATE_MOTIFS
+$SCRIPT_DIR/analyze.genome.spacing.v2.py genome.spacing.v4 $SIG_PWMS_FILE $LINKS_FILE $TSS_BED $BACKGROUND_GENES_FILE $EARLY_MOTIFS $MID_MOTIFS $LATE_MOTIFS
+
 
 SPACING_GENE_DIR=genome.spacing.gene_sets
 #$SCRIPT_DIR/spacing_to_genes.py $SPACING_GENE_DIR $SIG_PWMS_FILE $LINKS_FILE $BACKGROUND_GENES_FILE $EARLY_MOTIFS $MID_MOTIFS $LATE_MOTIFS
