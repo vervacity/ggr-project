@@ -151,7 +151,7 @@ def main():
         # reverse is in second half of indices
         rc_idx = pwm_global_idx + num_pwms
 
-        if "RELA" not in pwm_name_clean:
+        if "GRHL" not in pwm_name_clean:
             continue
 
         # results dict
@@ -176,14 +176,13 @@ def main():
                 elif orientation_b == "REV":
                     pwm_indices.append(rc_idx)
                     
-                print pwm_indices
                 assert len(pwm_indices) == 2
                 results_key = "{}_{}".format(orientation_a, orientation_b)
-                print results_key
+                print results_key, pwm_indices
                 
                 # build aligned array around first pwm
                 aligned_results = analyze_syntax(
-                    motifs_files, pwm_indices) # TODO add in solo filter here?
+                    motifs_files, pwm_indices, solo_filter=False)
                 
                 if aligned_results is None:
                     continue
@@ -200,7 +199,6 @@ def main():
         # 5) IN: in_x_in - fwd_REV(+) + rev_FWD(-)
         # 6) OUT: out_x_out - rev_FWD(+) + fwd_REV(-)
         # NOTE: ignoring rev_BOTH and fwd_BOTH - same as 2,3
-
         adjustments = {
             "BOTH_BOTH": (
                 ["FWD_FWD", "FWD_REV", "REV_FWD", "REV_REV"],
@@ -230,6 +228,9 @@ def main():
                 adjustments[adj_key][0],
                 adjustments[adj_key][1],
                 signal_keys)
+
+            # debug
+            print adj_key, results_adjusted[adj_key]["scores"].shape[0]
             
             # plot results
             plot_prefix = "{}/{}.{}".format(
