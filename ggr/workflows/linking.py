@@ -35,11 +35,16 @@ def run_replicate_consistent_links_workflow(
     replicated_link_dir = "{}/{}".format(results_dir, out_dir)
     os.system("mkdir -p {}".format(replicated_link_dir))
 
+    if "hichip" in link_key:
+        add_mirrored_interactions = True
+    else:
+        add_mirrored_interactions = False
+    
     # go through each day
     for link_day in link_days:
+        print link_day
         pooled_file = glob.glob(
             "{}/*{}*pooled*.gz".format(link_dir, link_day))
-        print pooled_file
         assert len(pooled_file) == 1
         pooled_file = pooled_file[0]
         rep_link_files = sorted(
@@ -52,7 +57,8 @@ def run_replicate_consistent_links_workflow(
             pooled_file,
             rep_link_files,
             link_prefix,
-            idr_thresh=args.inputs["params"]["linking"][out_dir]["idr_thresh"])
+            idr_thresh=args.inputs["params"]["linking"][out_dir]["idr_thresh"],
+            add_mirrored_interactions=add_mirrored_interactions)
 
     # and reconcile across timepoints
     all_prefix = "{}/{}.ALL".format(replicated_link_dir, prefix)
@@ -95,19 +101,20 @@ def run_traj_linking_workflow(args, prefix, links_dir):
     rna_expressed_file = args.outputs["data"]["rna.counts.pc.expressed.mat"]
     
     # first, per cluster, get gene sets and enrichments
-    # only use dynamic genes
     # DONT run a correlation filter since we're checking region to gene mapping without
     # assuming anything about genes (outside of dynamic status)
-    #if "abc.hic" in links_dir:
-    #    filter_gene_file = rna_mat_file
-    #else:
-    #    filter_gene_file = None
-
     if "proximity" in links_dir:
         score_filter = 0.5
+    elif "hichip" in links_dir:
+        score_filter = None
     else:
         score_filter = 2
 
+    if "hichip" in links_dir:
+        extend_len = 2500
+    else:
+        extend_len = 0
+        
     region_clusters_to_genes(
         atac_clusters_file,
         interactions_file,
@@ -115,10 +122,12 @@ def run_traj_linking_workflow(args, prefix, links_dir):
         traj_dir,
         region_signal_file=atac_mat_file,
         rna_signal_file=rna_mat_file,
-        filter_gene_file=rna_mat_file, #filter_gene_file,
+        filter_gene_file=rna_mat_file, # only use dynamic genes
         filter_by_score=score_filter,
         run_enrichments=True,
-        background_gene_file=rna_expressed_file)
+        background_gene_file=rna_expressed_file,
+        chromsizes=args.inputs["annot"][args.cluster]["chromsizes"],
+        extend_len=extend_len)
 
     # then, use the gene set files and overlap with rna clusters
     # to get counts per cluster
@@ -311,15 +320,25 @@ def runall(args, prefix):
             link_key="hic.celltype_avg.tss",
             out_dir=abc_avg_hic_dir)
 
+    # average hiC based ABC w TSS focus
+    logger.info("ANALYSIS: build replicate consistent ABC links - hichip")
+    hichip_dir = "hichip"
+    if not os.path.isdir("{}/{}".format(results_dir, hichip_dir)):
+        run_replicate_consistent_links_workflow(
+            args,
+            prefix,
+            results_dir,
+            link_key="hichip",
+            out_dir=hichip_dir)
+        
     # analyze trajectories (ATAC to RNA)
-    # TODO consider a light filter for correlation (since we assume dynamic regions
-    # should have dynamic effects)
     links_dirs = [
         "proximity",
         "proximity.corr",
         "abc.distance.tss",
         "abc.hic.celltype_avg",
-        "abc.hic.celltype_avg.tss"
+        "abc.hic.celltype_avg.tss",
+        "hichip"
     ]
     
     for links_dir in links_dirs:

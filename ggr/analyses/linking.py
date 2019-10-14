@@ -567,7 +567,8 @@ def _convert_to_interaction_format(mat_file, out_file, score_val="pooled"):
 def get_replicate_consistent_links(
         pooled_file, links_files, out_prefix,
         idr_thresh=0.10,
-        colnames=["pooled", "rep1", "rep2"]):
+        colnames=["pooled", "rep1", "rep2"],
+        add_mirrored_interactions=False):
     """get replicate consistent links, using pooled results as a guide
     note: includes flipped interactions (start_x_end and end_x_start)
     """
@@ -577,6 +578,22 @@ def get_replicate_consistent_links(
     os.system("mkdir -p {}".format(tmp_dir))
     out_mat_file = "{}.overlap.mat.txt.gz".format(out_prefix)
 
+    # mirror here if needed
+    if add_mirrored_interactions:
+        orig_pooled_file = pooled_file
+        pooled_file = "{}/{}.add_mirrored.txt.gz".format(
+            tmp_dir,
+            os.path.basename(orig_pooled_file).split(".bed")[0].split(".txt")[0])
+        _add_mirrored_interactions(orig_pooled_file, pooled_file)
+
+        for links_file_idx in range(len(links_files)):
+            orig_link_file = links_files[links_file_idx]
+            link_file = "{}/{}.add_mirrored.txt.gz".format(
+                tmp_dir,
+                os.path.basename(orig_link_file).split(".bed")[0].split(".txt")[0])
+            _add_mirrored_interactions(orig_link_file, link_file)
+            links_files[links_file_idx] = link_file
+    
     # first reconcile interaction coords, mapping to pooled links
     matched_links_files = reconcile_interactions(
         [pooled_file] + links_files, tmp_dir, method="pooled")
@@ -735,10 +752,15 @@ def regions_to_genes(
         region_file, links_file, tss_file, out_file,
         tmp_dir=None,
         filter_by_score=None,
-        filter_genes=[]):
+        filter_genes=[],
+        chromsizes=None,
+        extend_len=0):
     """goes from a region set to a linked gene set
     note that region id file must match ids in region signals if using
     """
+    if extend_len > 0:
+        assert chromsizes is not None
+    
     if tmp_dir is None:
         tmp_dir = os.path.dirname(out_file)
     
@@ -778,17 +800,28 @@ def regions_to_genes(
         header=False, index=False)
     
     # overlap linked regions with TSS file (generally, all expressed)
+    # extend overlap distance as needed
     tmp_genes_file = "{}/{}.region_to_tss.tmp.txt.gz".format(
         tmp_dir,
         os.path.basename(out_file).split(".txt")[0])
-    intersect_cmd = (
-        "bedtools intersect -wo -a {} -b {} | "
-        "gzip -c > {}").format(
-            tss_file, tmp_bed_file, tmp_genes_file)
+    if extend_len > 0:
+        intersect_cmd = (
+            "bedtools slop -i {0} -g {1} -b {2} | "
+            "bedtools intersect -wo -a {3} -b - | "
+            "gzip -c > {4}").format(
+                tmp_bed_file, chromsizes, extend_len, tss_file, tmp_genes_file)
+    else:
+        intersect_cmd = (
+            "bedtools intersect -wo -a {} -b {} | "
+            "gzip -c > {}").format(
+                tss_file, tmp_bed_file, tmp_genes_file)
     run_shell_cmd(intersect_cmd)
     
     # read in and clean up
-    genes = pd.read_csv(tmp_genes_file, sep="\t", header=None)
+    try:
+        genes = pd.read_csv(tmp_genes_file, sep="\t", header=None)
+    except pd.errors.EmptyDataError:
+        return None
     genes = genes[[3,9]]
     genes.columns = ["gene_id", "region_ids"]
     genes = genes.groupby("gene_id")["region_ids"].apply(list).reset_index()
@@ -828,6 +861,8 @@ def region_clusters_to_genes(
         filter_by_score=None,
         run_enrichments=True,
         background_gene_file=None,
+        chromsizes=None,
+        extend_len=0,
         is_ggr=True):
     """take a cluster file, split to present clusters and get gene sets
     including signal files will output mean signals for regions and signals
@@ -898,7 +933,9 @@ def region_clusters_to_genes(
             gene_set_file,
             tmp_dir=tmp_dir,
             filter_genes=filter_genes,
-            filter_by_score=filter_by_score)
+            filter_by_score=filter_by_score,
+            chromsizes=chromsizes,
+            extend_len=extend_len)
         
         # run gprofiler
         gprofiler_dir = "{}/cluster-{}.enrichments".format(out_dir, cluster_id)
