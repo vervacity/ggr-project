@@ -21,6 +21,7 @@ from ggr.analyses.rna import convert_gene_list_to_tss
 from ggr.analyses.rna import add_clusters_to_tss_file
 from ggr.analyses.rna import run_rdavid
 from ggr.analyses.rna import run_gsea_on_series
+from ggr.analyses.rna import filter_for_hgnc_ids
 
 from ggr.analyses.utils import build_id_matching_mat
 from ggr.analyses.utils import plot_PCA
@@ -529,7 +530,27 @@ def runall(args, prefix):
                 single_cluster_file,
                 args.outputs["annotations"]["geneids.pc.list"],
                 go_dir)
-    
+
+    # ------------------------------------------------
+    # ANALYSIS - Biomarker QC
+    # input: rna matrix
+    # output: plot of biomarkers across timepoints
+    # ------------------------------------------------
+
+    biomarker_mat_file = "{}/biomarkers.mat.txt.gz".format(plot_dir)
+    if not os.path.isfile(biomarker_mat_file):
+        hgnc_ids_file = "{}/biomarkers.hgnc_ids.tmp.txt.gz".format(plot_dir)
+        pd.DataFrame(data=args.inputs["params"]["qc_biomarkers"]).to_csv(
+            hgnc_ids_file, sep="\t", header=False, index=False, compression="gzip")
+        filter_for_hgnc_ids(
+            args.outputs["data"]["rna.counts.pc.expressed.timeseries_adj.pooled.rlog.mat"],
+            hgnc_ids_file,
+            args.outputs["annotations"]["geneids.mappings.mat"],
+            biomarker_mat_file)
+        # plot fn
+        plot_cmd = "Rscript ~/git/ggr-project/R/plot.gene_mat_subset.R {}".format(biomarker_mat_file)
+        run_shell_cmd(plot_cmd)
+            
     logger.info("MASTER_WORKFLOW: DONE")
     
     return args

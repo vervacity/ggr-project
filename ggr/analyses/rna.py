@@ -7,7 +7,29 @@ import gzip
 import pandas as pd
 import numpy as np
 
+from ggr.analyses.filtering import filter_for_ids
 from ggr.util.utils import run_shell_cmd
+
+
+def filter_for_hgnc_ids(mat_file, keep_ids_file, mapping_file, out_file):
+    """given an hgnc id list, using the mapping file to get ensembl ids and
+    return the filtered matrix
+    """
+    # first, do the mapping
+    hgnc_ids = pd.read_csv(keep_ids_file, header=None).iloc[:,0].values.tolist()
+    mappings = pd.read_csv(mapping_file, sep="\t", header=0, index_col=False)
+    matches = mappings[mappings["hgnc_symbol"].isin(hgnc_ids)]
+    matches = matches.drop("entrezgene", axis=1)
+    matches = matches.set_index("ensembl_gene_id")
+
+    # then filter mat file
+    data = pd.read_csv(mat_file, sep="\t", header=0, index_col=0)
+    data_filt = matches.merge(data, how="inner", left_index=True, right_index=True).reset_index()
+
+    # save out
+    data_filt.to_csv(out_file, sep="\t", compression="gzip", header=True, index=False)
+    
+    return
 
 
 def make_rsem_matrix(quant_files, out_file, colname="expected_count"):

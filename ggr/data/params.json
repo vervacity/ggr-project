@@ -15,6 +15,16 @@
     
     "drop_timepoints_for_timeseries": ["d05_b1", "d05_b2"],
 
+    "qc_biomarkers": [
+	"KRT1", "KRT10", "TGM1", "DSG1",
+	"CDSN", "ALOXE3", "ELOVL4", "ATP2C2",
+	"LOR", "LCE1E", "ZNF750", "KLF4",
+	"GRHL3", "PRDM1", "GRHL1", "CEBPA",
+	"TP63",
+	"CDK1", "CDC25A", "PRMT1", "DNMT1",
+	"ACTL6A", "KRT5", "KRT14",
+	"COL17A1", "ITGB4", "ITGA6"],
+    
     "known_tfs_hgnc": [
 	"TP63", "KLF4", "ZNF750", "MAF", "MAFB",
 	"OVOL1", "GRHL3", "CEBP", "EHF",
