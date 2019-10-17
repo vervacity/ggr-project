@@ -86,7 +86,7 @@ def runall(args, prefix):
     outputs = args.outputs["annotations"]
     
     # assertions
-    assert inputs.get("gencode_proteincoding_gtf") is not None
+    assert inputs.get("gencode_all_gtf") is not None
     assert inputs.get("fantom5_transcriptionfactor_csv") is not None
     assert outputs.get("dir") is not None
 
@@ -106,7 +106,7 @@ def runall(args, prefix):
         out_dir, prefix)
     if not os.path.isfile(outputs[geneids_pc_key]):
         get_proteincoding_gene_list_from_gtf(
-            inputs["gencode_proteincoding_gtf"],
+            inputs["gencode_all_gtf"],
             outputs[geneids_pc_key])
         
     # -------------------------------------------------
@@ -135,7 +135,7 @@ def runall(args, prefix):
         out_dir, prefix)
     if not os.path.isfile(outputs[tss_pc_key]):
         get_proteincoding_tss_bed_from_gtf(
-            inputs["gencode_proteincoding_gtf"],
+            inputs["gencode_all_gtf"],
             outputs[tss_pc_key])
 
     # -------------------------------------------------

@@ -23,7 +23,7 @@ grch37 <- useMart(
 # grep('.*ntrez.*', grch37_attr$name)
 
 conversion_table <- getBM(
-    attributes=c("ensembl_gene_id", "hgnc_symbol", "entrezgene"),
+    attributes=c("ensembl_gene_id", "hgnc_symbol", "entrezgene_id"),
     filters='ensembl_gene_id',
     values=ensembl_ids,
     mart=grch37)
