@@ -9,15 +9,18 @@ import signal
 
 import pandas as pd
 
-from ggr.util.utils import run_shell_cmd
 from ggr.analyses.counting import make_count_matrix
+from ggr.analyses.counting import pull_single_replicate
+from ggr.analyses.utils import build_id_matching_mat
+from ggr.analyses.utils import plot_PCA
 
 from ggr.workflows.timeseries import run_timeseries_enumeration_workflow
 
 from ggr.util.bed_utils import merge_regions
 from ggr.util.bed_utils import get_midpoint_and_extend
-
 from ggr.util.diff import join_diff_region_lists_to_mat
+from ggr.util.utils import run_shell_cmd
+
 
 
 def runall(args, prefix):
@@ -141,5 +144,71 @@ def runall(args, prefix):
             subtype_key=histone,
             master_regions_key=master_regions_key,
             mat_key=counts_key)
-           
+
+        # -------------------------------------------
+        # ANALYSIS - make PCA plots
+        # input: count matrix
+        # output: pca plot
+        # -------------------------------------------
+        logger.info("ANALYSIS:{}: PCA plots...".format(histone))
+
+        # pull the replicates apart
+        mat_key = "{}.counts.mat".format(histone)
+        counts_prefix = out_data[mat_key].split(".mat")[0]
+        rep_handles = []
+        
+        # rep1
+        handle = "{}.rep1.mat".format(mat_key.split(".mat")[0])
+        out_data[handle] = "{}.rep1.mat.txt.gz".format(counts_prefix)
+        if not os.path.isfile(out_data[handle]):
+            pull_single_replicate(out_data[mat_key], out_data[handle], rep="b1")
+        rep_handles.append(handle)
+            
+        # rep2
+        handle = "{}.rep2.mat".format(mat_key.split(".mat")[0])
+        out_data[handle] = "{}.rep2.mat.txt.gz".format(counts_prefix)
+        if not os.path.isfile(out_data[handle]):
+            pull_single_replicate(out_data[mat_key], out_data[handle], rep="b2")
+        rep_handles.append(handle)
+
+        # normalize
+        rep1_rlog_mat_file = "{}.rlog.mat.txt.gz".format(out_data[rep_handles[0]].split(".mat")[0])
+        if not os.path.isfile(rep1_rlog_mat_file):
+            run_rlogs = "normalize.rlog.master_and_transfer.R {0} {1} {2}".format(
+                out_data[mat_key], *[out_data[handle] for handle in rep_handles])
+            run_shell_cmd(run_rlogs)
+
+        # get PCA
+        plot_dir = "{}/plots".format(histone_dir)
+        if not os.path.isdir(plot_dir):
+            run_shell_cmd("mkdir -p {}".format(plot_dir))
+
+            # pull the two reps
+            histone_mat_files = sorted(glob.glob(
+                "{}/ggr.histone.{}.*.rep*rlog.mat.txt.gz".format(
+                    args.outputs["data"]["dir"], histone)))
+            
+            # and build filtered mat files based on final dynamic set
+            final_dynamic_list = args.outputs["results"]["histones"][histone]["timeseries"][
+                "ggr.histone.{}.dynamic.ids.list".format(histone)]
+            
+            filt_mat_files = []
+            for histone_mat_file in histone_mat_files:
+                filt_histone_mat_file = "{}/{}.filt.mat.txt.gz".format(
+                    plot_dir,
+                    os.path.basename(histone_mat_file).split(".mat")[0])
+                build_id_matching_mat(
+                    final_dynamic_list,
+                    histone_mat_file,
+                    filt_histone_mat_file,
+                    keep_cols=[],
+                    primary_id_col=None)
+                filt_mat_files.append(filt_histone_mat_file)
+
+            # plot PCA/correlation (bio reps separately and pooled)
+            pca_file = "{}/{}.pca.pdf".format(
+                plot_dir,
+                os.path.basename(histone_mat_files[0]).split(".rep")[0])
+            plot_PCA(filt_mat_files, pca_file)
+        
     return args

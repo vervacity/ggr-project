@@ -1,5 +1,7 @@
 # description: basic useful analyses
 
+import os
+
 import numpy as np
 import pandas as pd
 
@@ -70,7 +72,7 @@ def plot_PCA(mat_files, out_file):
     """
     pca_cmd = "plot.pca.R {} {}".format(out_file, " ".join(mat_files))
     print pca_cmd
-    #os.system(pca_cmd)
+    os.system(pca_cmd)
     
     return
 
