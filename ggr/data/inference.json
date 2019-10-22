@@ -1,0 +1,21 @@
+{
+    "kundaje": {
+	"eval_dir": "/mnt/lab_data/kundaje/users/dskim89/ggr/nn/evals.2018-12-03",
+	
+	"scanmotifs_dir": "/mnt/lab_data/kundaje/users/dskim89/ggr/nn/inference.2019-10-08",
+	"scanmotifs_early_dir": "motifs.input_x_grad.dynamic.early",
+	"scanmotifs_mid_dir": "motifs.input_x_grad.dynamic.mid",
+	"scanmotifs_late_dir": "motifs.input_x_grad.dynamic.late",
+
+	"sig_pwms_dir": "/mnt/lab_data/kundaje/users/dskim89/ggr/nn/inference.2019-10-08/motifs.sig/motifs.adjust.diff.rna_filt/summary",
+	"sig_pwms.rna_filt.corr_filt": "ggr.pwms_patterens.summary.txt",
+	
+	"mutatemotifs_dir": "/mnt/lab_data/kundaje/users/dskim89/ggr/nn/inference.2019-10-08"
+	
+	
+	
+    },
+    "sherlock": {
+    }
+
+}

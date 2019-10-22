@@ -69,7 +69,7 @@ def run_replicate_consistent_links_workflow(
                 replicated_link_dir)))
         get_timepoint_consistent_links(
             links_files, all_prefix)
-
+        
     return args
 
 
@@ -197,7 +197,10 @@ def runall(args, prefix):
     
     # naive proximity
     proximity_links_dir = "{}/proximity".format(results_dir)
-    if not os.path.isdir(proximity_links_dir):
+    all_prefix = "{}/{}.ALL".format(proximity_links_dir, prefix)
+    all_interactions_file = "{}.overlap.interactions.txt.gz".format(all_prefix)
+    out_results["links.proximity"] = all_interactions_file
+    if not os.path.isfile(all_interactions_file):
         run_shell_cmd("mkdir -p {}".format(proximity_links_dir))
         method_type = "proximity"
         k_nearest = args.inputs["params"]["linking"][method_type]["k_nearest"]
@@ -234,10 +237,7 @@ def runall(args, prefix):
             links_files.append(day_links_file)
 
         # and reconcile across timepoints
-        all_prefix = "{}/{}.ALL".format(proximity_links_dir, prefix)
-        all_interactions_file = "{}.interactions.txt.gz".format(all_prefix)
-        if not os.path.isfile(all_interactions_file):
-            get_timepoint_consistent_links(links_files, all_prefix)
+        get_timepoint_consistent_links(links_files, all_prefix)
 
     # proximity with corr
     proximity_corr_links_dir = "{}/proximity.corr".format(results_dir)
@@ -342,7 +342,9 @@ def runall(args, prefix):
     ]
     
     for links_dir in links_dirs:
-        # run workflow for using links to get from ATAC traj to RNA traj        
-        run_traj_linking_workflow(args, prefix, "{}/{}".format(results_dir, links_dir))
+        # run workflow for using links to get from ATAC traj to RNA traj
+        traj_dir = "{}/{}/traj.linking".format(results_dir, links_dir)
+        if not os.path.isdir(traj_dir):
+            run_traj_linking_workflow(args, prefix, "{}/{}".format(results_dir, links_dir))
 
     return args

@@ -132,6 +132,11 @@ def main():
     # run deep learning workflow
     from ggr.workflows.learning import runall
     args = runall(args, "ggr")
+
+    # TODO run postprocessing results
+    if True:
+        from ggr.workflows.inference import runall
+        args = runall(args, "ggr")
     
     # save outputs dict to json
     with open("outputs.json", "w") as fp:
