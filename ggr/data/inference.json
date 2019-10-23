@@ -1,5 +1,17 @@
 {
+    "traj_to_group": {
+	"TRAJ-0": "early",
+	"TRAJ-7": "early",
+	"TRAJ-8-10-11": "early",
+	"TRAJ-9": "early",
+	"TRAJ-12-13": "mid",
+	"TRAJ-14": "mid",
+	"TRAJ-1": "mid",
+	"TRAJ-2": "late",
+	"TRAJ-3-4": "late",
+	"TRAJ-5": "late"},
     "kundaje": {
+	"signal_keys": ["ATAC_SIGNALS", "H3K27ac_SIGNALS"],
 	"eval_dir": "/mnt/lab_data/kundaje/users/dskim89/ggr/nn/evals.2018-12-03",
 	
 	"scanmotifs_dir": "/mnt/lab_data/kundaje/users/dskim89/ggr/nn/inference.2019-10-08",
@@ -8,11 +20,9 @@
 	"scanmotifs_late_dir": "motifs.input_x_grad.dynamic.late",
 
 	"sig_pwms_dir": "/mnt/lab_data/kundaje/users/dskim89/ggr/nn/inference.2019-10-08/motifs.sig/motifs.adjust.diff.rna_filt/summary",
-	"sig_pwms.rna_filt.corr_filt": "ggr.pwms_patterens.summary.txt",
+	"sig_pwms.rna_filt.corr_filt": "ggr.pwms_present_summary.txt",
 	
 	"mutatemotifs_dir": "/mnt/lab_data/kundaje/users/dskim89/ggr/nn/inference.2019-10-08"
-	
-	
 	
     },
     "sherlock": {

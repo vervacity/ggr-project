@@ -849,6 +849,66 @@ def regions_to_genes(
     return None
 
 
+def regions_to_genes_w_correlation_filtering(
+        region_file, links_file, tss_file, out_file,
+        region_signal,
+        rna_signal,
+        tmp_dir=None,
+        filter_by_score=None,
+        filter_genes=[],
+        chromsizes=None,
+        extend_len=0,
+        corr_thresh=0,
+        pval_thresh=1):
+    """extends regions to genes with correlation filtering
+    """
+    # set up
+    if tmp_dir is None:
+        tmp_dir = os.path.dirname(out_file)
+
+    # get region ids
+    region_ids = list(set(
+        pd.read_csv(region_file, sep="\t", header=None)[3].values.tolist()))
+        
+    # first run regions_to_genes and read in
+    tmp_out_file = "{}/{}.linked_genes.txt.gz".format(
+        tmp_dir, os.path.basename(region_file).split(".bed")[0].split(".txt")[0])
+    regions_to_genes(
+        region_file, links_file, tss_file, tmp_out_file,
+        tmp_dir=tmp_dir,
+        filter_by_score=filter_by_score,
+        filter_genes=filter_genes,
+        chromsizes=chromsizes,
+        extend_len=extend_len)
+    linked_genes = pd.read_csv(tmp_out_file, sep="\t", header=0, index_col=0)
+
+    # filter vs atac signal pattern
+    region_signal = region_signal_mat.loc[region_ids]
+    rna_signal = rna_signal_mat.loc[linked_genes.index.values.tolist()]
+
+    # get corr and pval
+    keep_genes = pd.DataFrame(
+        rna_signal.apply(
+            lambda x: pearsonr(x, region_signal.mean(axis=0)),
+            axis=1).values.tolist(),
+        columns=["corr", "pval"],
+        index=rna_signal.index)
+
+    # threshold
+    keep_genes = keep_genes[keep_genes["corr"] > corr_thresh]
+    keep_genes = keep_genes[keep_genes["pval"] < pval_thresh]
+
+    # filter
+    rna_signal = rna_signal[rna_signal.index.isin(keep_genes.index)]
+    linked_genes = linked_genes[linked_genes.index.isin(keep_genes.index)]
+    linked_genes = linked_genes.sort_values("score", ascending=False)
+
+    # save out
+    linked_genes.to_csv(out_file, sep="\t")
+    
+    return linked_genes, rna_signal
+    
+
 def region_clusters_to_genes(
         cluster_file,
         links_file,
