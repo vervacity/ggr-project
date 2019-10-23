@@ -845,14 +845,17 @@ def regions_to_genes(
     # save out
     print "genes linked: ", genes.shape[0]
     genes.to_csv(out_file, sep="\t", compression="gzip", header=True, index=False)
+
+    # clean up
+    os.system("rm {} {} {}".format(tmp_file, tmp_bed_file, tmp_genes_file))
     
     return None
 
 
 def regions_to_genes_w_correlation_filtering(
         region_file, links_file, tss_file, out_file,
-        region_signal,
-        rna_signal,
+        region_signal_mat,
+        rna_signal_mat,
         tmp_dir=None,
         filter_by_score=None,
         filter_genes=[],
@@ -896,7 +899,7 @@ def regions_to_genes_w_correlation_filtering(
 
     # threshold
     keep_genes = keep_genes[keep_genes["corr"] > corr_thresh]
-    keep_genes = keep_genes[keep_genes["pval"] < pval_thresh]
+    keep_genes = keep_genes[keep_genes["pval"] <= pval_thresh]
 
     # filter
     rna_signal = rna_signal[rna_signal.index.isin(keep_genes.index)]
@@ -904,7 +907,11 @@ def regions_to_genes_w_correlation_filtering(
     linked_genes = linked_genes.sort_values("score", ascending=False)
 
     # save out
-    linked_genes.to_csv(out_file, sep="\t")
+    linked_genes.reset_index().to_csv(
+        out_file, columns=["gene_id"], index=False, compression="gzip")
+
+    # clean up
+    os.system("rm {}".format(tmp_out_file))
     
     return linked_genes, rna_signal
     
