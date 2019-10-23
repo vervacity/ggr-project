@@ -19,16 +19,18 @@ from ggr.util.go_utils import is_enriched
 from tronn.util.utils import DataKeys
 from tronn.util.formats import array_to_bed
 from tronn.interpretation.syntax import analyze_multiplicity
+from tronn.interpretation.syntax import analyze_syntax
+from tronn.interpretation.syntax import recombine_syntax_results
 
 
-def run_multiplicity_workflow(args, prefix, sig_pwms_file):
+def run_multiplicity_workflow(args, prefix, sig_pwms_file, out_dir):
     """for sig pwms, look at multiplicity
     """
-    _MAX_COUNT = 6
+    _MAX_COUNT = 5
     _MIN_HIT_REGIONS = 50
-    OUT_DIR = args.outputs["results"]["inference"]["dir"]
-    TMP_DIR = "{}/tmp".format(
-        args.outputs["results"]["inference"]["dir"])
+    OUT_DIR = "{}/{}".format(args.outputs["results"]["inference"]["dir"], out_dir)
+    os.system("mkdir -p {}".format(OUT_DIR))
+    TMP_DIR = "{}/tmp".format(OUT_DIR)
     os.system("mkdir -p {}".format(TMP_DIR))
             
     # set up motifs files being used
@@ -237,12 +239,16 @@ def run_multiplicity_workflow(args, prefix, sig_pwms_file):
     return new_sig_pwms_file
 
 
-def run_syntax_workflow(args, prefix, sig_pwms_file):
+def run_syntax_workflow(args, prefix, sig_pwms_file, out_dir):
     """for sig pwms, look at multiplicity
     """
-    OUT_DIR = args.outputs["results"]["inference"]["dir"]
-    TMP_DIR = "{}/tmp".format(
-        args.outputs["results"]["inference"]["dir"])
+    # params
+    _MIN_HIT_REGIONS = 50
+
+    # dirs
+    OUT_DIR = "{}/{}".format(args.outputs["results"]["inference"]["dir"], out_dir)
+    os.system("mkdir -p {}".format(OUT_DIR))
+    TMP_DIR = "{}/tmp".format(OUT_DIR)
     os.system("mkdir -p {}".format(TMP_DIR))
             
     # set up motifs files being used
@@ -324,7 +330,7 @@ def run_syntax_workflow(args, prefix, sig_pwms_file):
         rc_idx = pwm_global_idx + num_pwms
         pwm_indices = [pwm_global_idx, rc_idx]
         print pwm_indices
-
+        
         # figure out which motif files to actually load
         keys = []
         trajs = sig_pwms_trajs.loc[pwm_name]
@@ -334,6 +340,8 @@ def run_syntax_workflow(args, prefix, sig_pwms_file):
 
         # TODO consider: loading traj mutatemotifs? would then need to pull the correct
         # index to find the right mutate results
+
+        results = {}
         
         # go through orientations
         possible_orientations = ["FWD", "REV"]
@@ -360,7 +368,7 @@ def run_syntax_workflow(args, prefix, sig_pwms_file):
                 
                 # build aligned array around first pwm
                 aligned_results = analyze_syntax(
-                    motifs_files, pwm_indices, solo_filter=True)
+                    sig_motifs_files, pwm_indices, solo_filter=True)
                 
                 if aligned_results is None:
                     continue
@@ -400,22 +408,88 @@ def run_syntax_workflow(args, prefix, sig_pwms_file):
         results_adjusted = {}
         enrichments_summary = None
         for adj_key in sorted(adjustments.keys()):
-            print adj_key
+
+            # adjust for correct patterns
             results_adjusted[adj_key] = recombine_syntax_results(
                 results,
                 adjustments[adj_key][0],
                 adjustments[adj_key][1],
                 signal_keys)
 
+            # don't continue if does not exist or does not have enough regions
             if len(results_adjusted[adj_key].keys()) == 0:
                 continue
-            
+            if results_adjusted[adj_key]["scores"].shape[0] < _MIN_HIT_REGIONS:
+                continue
+
             # debug
             print adj_key, results_adjusted[adj_key]["scores"].shape[0]
+
+            # convert to BED
+            tmp_bed_file = "{}/{}.regions.oriented.{}.bed.gz".format(
+                TMP_DIR, pwm_name_clean, adj_key)
+            if not os.path.isfile(tmp_bed_file):
+                array_to_bed(
+                    results_adjusted[adj_key]["scores"].index.values,
+                    tmp_bed_file, merge=False)
+
+            # get linked genes
+            tmp_genes_file = "{}/{}.linked_genes.oriented.{}.txt.gz".format(
+                TMP_DIR, pwm_name_clean, adj_key)
+            if not os.path.isfile(tmp_genes_file):
+                regions_to_genes_w_correlation_filtering(
+                    tmp_bed_file,
+                    links_file,
+                    tss_file,
+                    tmp_genes_file,
+                    region_signal_mat,
+                    rna_signal_mat,
+                    filter_by_score=0.5,
+                    filter_genes=filter_genes,
+                    corr_thresh=0,
+                    pval_thresh=1)
+
+            # do not continue if no linked genes
+            linked_genes = pd.read_csv(tmp_genes_file, sep="\t", header=0)
+            if linked_genes.shape[0] == 0:
+                continue
+
+            # run enrichment calculation
+            enrichment_file = "{}/{}.linked_genes.oriented.{}.go_gprofiler.txt".format(
+                TMP_DIR, pwm_name_clean, adj_key)
+            if not os.path.isfile(enrichment_file):
+                run_gprofiler(
+                    tmp_genes_file,
+                    background_rna_file,
+                    TMP_DIR,
+                    ordered=True)
+
+            # check if any enrichment, if not then continue
+            if not is_enriched(enrichment_file):
+                continue
+
+            # read in file and clean
+            thresholded_summary = pd.read_csv(enrichment_file, sep="\t")
+            thresholded_summary = thresholded_summary[thresholded_summary["domain"] == "BP"]
+            thresholded_summary = thresholded_summary[
+                ["term.id", "p.value", "term.name"]]
+            syntax_enrichments["syntax"] = adj_key
+            print "term count:", thresholded_summary.shape[0]
             
-            # plot results
+            # add to summary
+            if enrichments_summary is None:
+                enrichments_summary = syntax_enrichments.copy()
+            else:
+                enrichments_summary = pd.concat([enrichments_summary, syntax_enrichments], axis=0)
+                enrichments_summary = enrichments_summary.sort_values("term.name")
+            
+            # if passed all of this, move results to not tmp
+            os.system("cp {} {}".format(
+                enrichment_file, OUT_DIR))
+            
+            # and now plot: plot prefix
             plot_prefix = "{}/{}.{}".format(
-                OUT_DIR, pwm_name_clean, adj_key)
+                TMP_DIR, pwm_name_clean, adj_key)
 
             # plot pwm scores
             score_spacing_distr_file = "{}.genome.active_pwm_scores.avg.txt.gz".format(
@@ -429,8 +503,8 @@ def run_syntax_workflow(args, prefix, sig_pwms_file):
             aligned_scores.to_csv(
                 score_spacing_distr_file,
                 sep="\t", header=True, index=False, compression="gzip")
-            plot_cmd = "{}/plot.spacing.freq.indiv.R {} {} {}".format(
-                SCRIPT_DIR, score_spacing_distr_file, num_examples, plot_prefix)
+            plot_cmd = "plot.homotypic.spacing.freq.indiv.R {} {} {}".format(
+                score_spacing_distr_file, num_examples, plot_prefix)
             print plot_cmd
             os.system(plot_cmd)
 
@@ -447,29 +521,16 @@ def run_syntax_workflow(args, prefix, sig_pwms_file):
                         out_file,
                         sep="\t", header=True, index=False, compression="gzip")
                     # plot
-                    plot_cmd = "Rscript {}/plot.spacing.signals.indiv.R {} {}".format(
-                        SCRIPT_DIR, out_file, task_prefix)
+                    plot_cmd = "plot.homotypic.spacing.signals.indiv.R {} {}".format(
+                        out_file, task_prefix)
                     print plot_cmd
                     
                     os.system(plot_cmd)
                     
-            # and take region sets and get gene set enrichments
-            # TODO - adjust this, maybe even make wrapper to make consistent with multiplicity?
-            syntax_enrichments = _get_gene_set_enrichment(
-                results_adjusted[adj_key]["scores"].index.values,
-                links_file,
-                tss_file,
-                background_gene_set_file,
-                plot_prefix,
-                OUT_DIR)
-            syntax_enrichments["syntax"] = adj_key
-            
-            # add to summary
-            if enrichments_summary is None:
-                enrichments_summary = syntax_enrichments.copy()
-            else:
-                enrichments_summary = pd.concat([enrichments_summary, syntax_enrichments], axis=0)
-                enrichments_summary = enrichments_summary.sort_values("term.name")
+
+        # continue if nothing enriched
+        if enrichments_summary is None:
+            continue
                 
         # clean up summary
         enrichments_summary["log10pval"] = -np.log10(enrichments_summary["p.value"].values)
@@ -529,10 +590,14 @@ def runall(args, prefix):
         args.inputs["inference"][args.cluster]["sig_pwms.rna_filt.corr_filt"])
 
     # multiplicity
-    sig_pwms = run_multiplicity_workflow(args, prefix, sig_pwms)
+    multiplicity_dir = "homotypic.multiplicity"
+    #if not os.path.isdir(multiplicity_dir):
+    #    run_multiplicity_workflow(args, prefix, sig_pwms, multiplicity_dir)
 
     # orientation, spacing
-    sig_pwms = run_syntax_workflow(args, prefix, sig_pwms)
+    orientation_spacing_dir = "homotypic.orientation_spacing"
+    if not os.path.isdir(orientation_spacing_dir):
+        run_syntax_workflow(args, prefix, sig_pwms, orientation_spacing_dir)
     
     # -------------------------------------------
     # ANALYSIS - homotypic - produce motif to gene set to gene function plots
