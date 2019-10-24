@@ -23,7 +23,9 @@ from tronn.interpretation.syntax import analyze_syntax
 from tronn.interpretation.syntax import recombine_syntax_results
 
 
-def run_multiplicity_workflow(args, prefix, sig_pwms_file, out_dir):
+def run_multiplicity_workflow(
+        args, prefix, sig_pwms_file, out_dir,
+        solo_filter=False, enrichments=True, plot=True):
     """for sig pwms, look at multiplicity
     """
     _MAX_COUNT = 5
@@ -126,7 +128,7 @@ def run_multiplicity_workflow(args, prefix, sig_pwms_file, out_dir):
         # get multiplicity
         # filtering: looking for
         results = analyze_multiplicity(
-            sig_motifs_files, pwm_indices, max_count=_MAX_COUNT, solo_filter=True)
+            sig_motifs_files, pwm_indices, max_count=_MAX_COUNT, solo_filter=solo_filter)
 
         filt = 0
         if results is not None:
@@ -135,67 +137,73 @@ def run_multiplicity_workflow(args, prefix, sig_pwms_file, out_dir):
             # save to summary array
             for key in signal_keys:
                 all_results[key].append(results[key]["count"])
-        
-            # per level, get region set and do gene set enrichments
-            hits_per_region = results["hits_per_region"]
-            max_enriched_thresh = 0
-            for count_thresh in range(1, _MAX_COUNT+1):
-                # get region ids
-                thresholded = hits_per_region[hits_per_region["hits"] >= count_thresh]
-                thresholded_metadata = thresholded.index.values
-                
-                # check how many regions, do not continue if not enough regions
-                if thresholded_metadata.shape[0] < _MIN_HIT_REGIONS:
-                    continue
 
-                # convert to BED
-                tmp_bed_file = "{}/{}.regions.count_thresh-{}.bed.gz".format(
-                    TMP_DIR, pwm_name_clean, count_thresh)
-                if not os.path.isfile(tmp_bed_file):
-                    array_to_bed(thresholded_metadata, tmp_bed_file, merge=False)
-
-                # get linked genes
-                tmp_genes_file = "{}/{}.linked_genes.count_thresh-{}.txt.gz".format(
-                    TMP_DIR, pwm_name_clean, count_thresh)
-                if not os.path.isfile(tmp_genes_file):
-                    regions_to_genes_w_correlation_filtering(
-                        tmp_bed_file,
-                        links_file,
-                        tss_file,
-                        tmp_genes_file,
-                        region_signal_mat,
-                        rna_signal_mat,
-                        filter_by_score=0.5,
-                        filter_genes=filter_genes,
-                        corr_thresh=0,
-                        pval_thresh=1)
-
-                # do not continue if no linked genes
-                linked_genes = pd.read_csv(tmp_genes_file, sep="\t", header=0)
-                if linked_genes.shape[0] == 0:
-                    continue
-
-                # run enrichment calculation
-                enrichment_file = "{}/{}.linked_genes.count_thresh-{}.go_gprofiler.txt".format(
-                    TMP_DIR, pwm_name_clean, count_thresh)
-                if not os.path.isfile(enrichment_file):
-                    run_gprofiler(
-                        tmp_genes_file,
-                        background_rna_file,
-                        TMP_DIR,
-                        ordered=True)
-
-                # check if any enrichment, if not then continue
-                if not is_enriched(enrichment_file):
-                    continue
-
-                # if passed all of this, move results to not tmp
-                os.system("cp {} {}".format(
-                    enrichment_file, OUT_DIR))
-
-                # update important variables
+            # continue if not doing enrichments
+            if not enrichments:
                 filt = 1
-                max_enriched_thresh = count_thresh
+                max_enriched_thresh = _MAX_COUNT
+            else:
+                
+                # per level, get region set and do gene set enrichments
+                hits_per_region = results["hits_per_region"]
+                max_enriched_thresh = 0
+                for count_thresh in range(1, _MAX_COUNT+1):
+                    # get region ids
+                    thresholded = hits_per_region[hits_per_region["hits"] >= count_thresh]
+                    thresholded_metadata = thresholded.index.values
+
+                    # check how many regions, do not continue if not enough regions
+                    if thresholded_metadata.shape[0] < _MIN_HIT_REGIONS:
+                        continue
+
+                    # convert to BED
+                    tmp_bed_file = "{}/{}.regions.count_thresh-{}.bed.gz".format(
+                        TMP_DIR, pwm_name_clean, count_thresh)
+                    if not os.path.isfile(tmp_bed_file):
+                        array_to_bed(thresholded_metadata, tmp_bed_file, merge=False)
+
+                    # get linked genes
+                    tmp_genes_file = "{}/{}.linked_genes.count_thresh-{}.txt.gz".format(
+                        TMP_DIR, pwm_name_clean, count_thresh)
+                    if not os.path.isfile(tmp_genes_file):
+                        regions_to_genes_w_correlation_filtering(
+                            tmp_bed_file,
+                            links_file,
+                            tss_file,
+                            tmp_genes_file,
+                            region_signal_mat,
+                            rna_signal_mat,
+                            filter_by_score=0.5,
+                            filter_genes=filter_genes,
+                            corr_thresh=0,
+                            pval_thresh=1)
+
+                    # do not continue if no linked genes
+                    linked_genes = pd.read_csv(tmp_genes_file, sep="\t", header=0)
+                    if linked_genes.shape[0] == 0:
+                        continue
+
+                    # run enrichment calculation
+                    enrichment_file = "{}/{}.linked_genes.count_thresh-{}.go_gprofiler.txt".format(
+                        TMP_DIR, pwm_name_clean, count_thresh)
+                    if not os.path.isfile(enrichment_file):
+                        run_gprofiler(
+                            tmp_genes_file,
+                            background_rna_file,
+                            TMP_DIR,
+                            ordered=True)
+
+                    # check if any enrichment, if not then continue
+                    if not is_enriched(enrichment_file):
+                        continue
+
+                    # if passed all of this, move results to not tmp
+                    os.system("cp {} {}".format(
+                        enrichment_file, OUT_DIR))
+
+                    # update important variables
+                    filt = 1
+                    max_enriched_thresh = count_thresh
 
             if max_enriched_thresh >= 2:
                 keep_sig_pwm_names.append(pwm_name)
@@ -231,11 +239,14 @@ def run_multiplicity_workflow(args, prefix, sig_pwms_file, out_dir):
     new_sig_pwms.to_csv(new_sig_pwms_file, sep="\t", compression="gzip")
     
     # and plot
-    plot_cmd = "{}/plot.results.multiplicity.summary.R {} {}/genome.homotypic.multiplicity TRUE {}".format(
-        "~/git/ggr-project/figs/fig_4.homotypic", h5_results_file,
-        args.outputs["results"]["inference"]["dir"],
-        " ".join(signal_keys))
-    
+    if plot:
+        plot_cmd = "{}/plot.results.multiplicity.summary.R {} {}/genome.homotypic.multiplicity TRUE {}".format(
+            "~/git/ggr-project/figs/fig_4.homotypic", h5_results_file,
+            args.outputs["results"]["inference"]["dir"],
+            " ".join(signal_keys))
+        print plot_cmd
+        os.system(plot_cmd)
+        
     return new_sig_pwms_file
 
 
@@ -578,32 +589,92 @@ def runall(args, prefix):
     args.outputs["results"][results_dirname] = {"dir": results_dir}
     run_shell_cmd("mkdir -p {}".format(results_dir))
     out_results = args.outputs["results"][results_dirname]
+
+    # -------------------------------------------
+    # NN ANALYSIS - scanmotifs, get differential
+    # input: dynamic traj data
+    # output: differential motifs, scanned examples
+    # -------------------------------------------
+
+    # DONE EXTERNAL TO CODEBASE - SEE TRONN SCRIPTS
+    
+    # sig pwms file
+    sig_pwms = "{}/{}".format(
+        args.inputs["inference"][args.cluster]["sig_pwms_dir"],
+        args.inputs["inference"][args.cluster]["sig_pwms.rna_filt.corr_filt"])
     
     # -------------------------------------------
     # ANALYSIS - homotypic - look at multiplicity
     # input: scanmotifs files
     # output: syntax results
     # -------------------------------------------
-    sig_pwms = "{}/{}".format(
-        args.inputs["inference"][args.cluster]["sig_pwms_dir"],
-        args.inputs["inference"][args.cluster]["sig_pwms.rna_filt.corr_filt"])
 
-    # multiplicity
-    multiplicity_dir = "homotypic.multiplicity"
+    # observing multiplicity (homotypic clusters, no higher syntax) in the genome
+
+    # 1) across dynamic instances, do we see homotypic clusters of motifs?
+    # do not use solo filter, just care about if we see them dispersed in dynamic
+    # regulatory regions. NOTE that this will give you GO enrichments
+    # ANSWER: yes.
+    analysis_dir = "homotypic.dynamic.all.multiplicity"
+    if not os.path.isdir(analysis_dir):
+        run_multiplicity_workflow(
+            args, prefix, sig_pwms, analysis_dir,
+            solo_filter=False, enrichments=True, plot=False)
+
+    quit()
+        
+    # 2) can they drive accessibility alone?
+    # ANSWER yes, in some cases
+    analysis_dir = "homotypic.dynamic.single_motif_attribution.multiplicity"
     #if not os.path.isdir(multiplicity_dir):
-    #    run_multiplicity_workflow(args, prefix, sig_pwms, multiplicity_dir)
+    #    run_multiplicity_workflow(args, prefix, sig_pwms, analysis_dir, solo_filter=True, plot=False, enrichments=False)
 
-    # orientation, spacing
-    orientation_spacing_dir = "homotypic.orientation_spacing"
-    if not os.path.isdir(orientation_spacing_dir):
-        run_syntax_workflow(args, prefix, sig_pwms, orientation_spacing_dir)
+    # 3) confirm with simulations
+    # NN ANALYSIS - run multiplicity simulations
+    # determine thresholds for activation AND which ones activate accessibility alone    
+    # NOTE that simulations provide the threshold (manually collect) and ability to drive accessibility alone
     
     # -------------------------------------------
-    # ANALYSIS - homotypic - produce motif to gene set to gene function plots
+    # ANALYSIS - homotypic - look at orientation/spacing
     # input: scanmotifs files
     # output: syntax results
     # -------------------------------------------
 
+    # observing orientation/spacing in the genome
+
+    # 1) across dynamic instances, do we see orientation/spacing constraints (leading
+    # to accessibility/modification differences) on motifs? do they drive accessibility alone?
+    # use solo filter, this is the only way to remove effect of other TFs
+    # use enrichment, which then tells us if this orientation/spacing matters
+    # ANSWER: no to orientation, soft spacing constraint. yes they drive accessibility alone in some cases
+    analysis_dir = "homotypic.dynamic.single_motif_attribution.orientation_spacing"
+    if not os.path.isdir(orientation_spacing_dir):
+        run_syntax_workflow(args, prefix, sig_pwms, analysis_dir, solo_filter=True)
+
+    # 2) confirm with simulations
+    # NN ANALYSIS - run orientation/spacing simulations
+    # use to determin spacing constraints AND which ones activate accessibility alone
+
+    # 3) rerun with all regions (ex GRHL)
+    
+    
+    # TODO build a manual summary: tells an aggregator fn which ones to grab
+    
+    
+        
+    # -------------------------------------------
+    # ANALYSIS - homotypic - produce motif to gene set to gene function plots
+    # input: scanmotifs files
+    # output: gene function chart
+    # -------------------------------------------
+        
+    # first, determine if multiplicity/orientation/spacing are enriched in the genome for each motif
+    # given above, we conclude that multiplicity is a thing, orientation not, spacing yes
+
+    # also use sims to give us predicted threshs and which ones activate on their own
+    # (hence can drive downstream function)
+    
+    # build a manual summary file that will grab the appropriate gene function chart
 
     
 
