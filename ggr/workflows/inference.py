@@ -422,6 +422,8 @@ def run_syntax_workflow(args, prefix, sig_pwms_file, out_dir):
             if results_adjusted[adj_key]["scores"].shape[0] < _MIN_HIT_REGIONS:
                 continue
 
+            # TODO consider spacing here somehow?
+            
             # debug
             print adj_key, results_adjusted[adj_key]["scores"].shape[0]
 
@@ -469,12 +471,12 @@ def run_syntax_workflow(args, prefix, sig_pwms_file, out_dir):
                 continue
 
             # read in file and clean
-            thresholded_summary = pd.read_csv(enrichment_file, sep="\t")
-            thresholded_summary = thresholded_summary[thresholded_summary["domain"] == "BP"]
-            thresholded_summary = thresholded_summary[
+            syntax_enrichments = pd.read_csv(enrichment_file, sep="\t")
+            syntax_enrichments = syntax_enrichments[syntax_enrichments["domain"] == "BP"]
+            syntax_enrichments = syntax_enrichments[
                 ["term.id", "p.value", "term.name"]]
             syntax_enrichments["syntax"] = adj_key
-            print "term count:", thresholded_summary.shape[0]
+            print "term count:", syntax_enrichments.shape[0]
             
             # add to summary
             if enrichments_summary is None:
@@ -527,7 +529,6 @@ def run_syntax_workflow(args, prefix, sig_pwms_file, out_dir):
                     
                     os.system(plot_cmd)
                     
-
         # continue if nothing enriched
         if enrichments_summary is None:
             continue
@@ -535,30 +536,28 @@ def run_syntax_workflow(args, prefix, sig_pwms_file, out_dir):
         # clean up summary
         enrichments_summary["log10pval"] = -np.log10(enrichments_summary["p.value"].values)
         enrichments_summary = enrichments_summary.drop("p.value", axis=1)
-        summary_file = "{}/{}.summary.txt.gz".format(tmp_dir, pwm_name_clean)
+        summary_file = "{}/{}.summary.txt.gz".format(OUT_DIR, pwm_name_clean)
         enrichments_summary.to_csv(summary_file, sep="\t", index=False, header=True, compression="gzip")
-                
-        # remove substrings
-        for substring in REMOVE_SUBSTRINGS:
-            keep = [False if substring in term else True
+
+        # TODO adjust cleanup
+        if False:
+            # remove substrings
+            for substring in REMOVE_SUBSTRINGS:
+                keep = [False if substring in term else True
+                        for term in enrichments_summary["term.name"]]
+                keep_indices = np.where(keep)[0]
+                enrichments_summary = enrichments_summary.iloc[keep_indices]
+
+            # remove exact strings
+            keep = [False if term in REMOVE_EXACT_STRINGS else True
                     for term in enrichments_summary["term.name"]]
             keep_indices = np.where(keep)[0]
             enrichments_summary = enrichments_summary.iloc[keep_indices]
+            enrichments_summary = enrichments_summary.sort_values(["term.name", "log10pval"])
+            summary_file = "{}/{}.summary.filt.txt.gz".format(OUT_DIR, pwm_name_clean)
+            enrichments_summary.to_csv(summary_file, sep="\t", index=False, header=True, compression="gzip")
 
-        # remove exact strings
-        keep = [False if term in REMOVE_EXACT_STRINGS else True
-                for term in enrichments_summary["term.name"]]
-        keep_indices = np.where(keep)[0]
-        enrichments_summary = enrichments_summary.iloc[keep_indices]
-        enrichments_summary = enrichments_summary.sort_values(["term.name", "log10pval"])
-        summary_file = "{}/{}.summary.filt.txt.gz".format(OUT_DIR, pwm_name_clean)
-        enrichments_summary.to_csv(summary_file, sep="\t", index=False, header=True, compression="gzip")
-
-        # TODO - here we are able to consider multiplicity too
-        # NOTE though that here we don't capture solo with 1 motif regions
-        # so then need to do this in another script i think
-
-    return sig_pwms_file
+    return None
 
 
 
