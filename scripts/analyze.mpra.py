@@ -206,103 +206,14 @@ def counts_to_mat(counts_files, out_prefix, metadata_file=None, norm_method="rlo
     return None
 
 
-def test_grammar_trajectories(data_file, out_dir, drop_rep="b4"):
-    """take in data file and look at values
-    """
-    # load data
-    data = pd.read_csv(data_file, sep="\t", header=0)
-    data["grammar"] = [re.sub("\\.\\d+$", "", name) for name in data["example_id"]]
-
-    # filter? if so filter for just synergy set (remove distant and non-sig)
-    data["synergy.max"] = data["synergy.scores.diff.sig.0"].apply(
-        lambda x: np.max([int(val) for val in x.split(",")]))
-    data = data[data["synergy.max"] != 0]
-    
-    # which headers to keep
-    signal_headers = [name for name in data.columns if "_b" in name]
-    if drop_rep is not None:
-        signal_headers = [name for name in signal_headers if drop_rep not in name]
-    metadata_headers = [
-        "example_id",
-        "combos"]
-    
-    # get hypotheses
-    grammars = list(set(data["grammar"].values.tolist()))
-    grammars = sorted([name for name in grammars if "ggr" in name])
-
-    # go through hypotheses
-    for grammar in grammars:
-        print grammar
-        grammar_prefix = "{}/{}".format(out_dir, grammar)
-        
-        # extract relevant data
-        grammar_data = data[data["grammar"] == grammar]
-        grammar_data = grammar_data[signal_headers+metadata_headers]
-
-        # remove low signal barcodes
-        # TODO this is across all, but really should be done per sample?
-        signal_thresh = 0.5
-        grammar_data = grammar_data.set_index(metadata_headers)
-        grammar_data = grammar_data[grammar_data.max(axis=1) > signal_thresh]
-        grammar_data = grammar_data.reset_index()
-        
-        # average the barcodes
-        grammar_data_avg = grammar_data.groupby(metadata_headers).mean()
-
-        # normalize by example?
-        # hack for now
-        grammar_data_avg["d3_b1"] = grammar_data_avg["d3_b1"] - grammar_data_avg["d0_b1"]
-        grammar_data_avg["d6_b1"] = grammar_data_avg["d6_b1"] - grammar_data_avg["d0_b1"]
-        grammar_data_avg["d0_b1"] = grammar_data_avg["d0_b1"] - grammar_data_avg["d0_b1"]
-
-        grammar_data_avg["d3_b2"] = grammar_data_avg["d3_b2"] - grammar_data_avg["d0_b2"]
-        grammar_data_avg["d6_b2"] = grammar_data_avg["d6_b2"] - grammar_data_avg["d0_b2"]
-        grammar_data_avg["d0_b2"] = grammar_data_avg["d0_b2"] - grammar_data_avg["d0_b2"]
-
-        grammar_data_avg["d3_b3"] = grammar_data_avg["d3_b3"] - grammar_data_avg["d0_b3"]
-        grammar_data_avg["d6_b3"] = grammar_data_avg["d6_b3"] - grammar_data_avg["d0_b3"]
-        grammar_data_avg["d0_b3"] = grammar_data_avg["d0_b3"] - grammar_data_avg["d0_b3"]
-
-        # average across reps here
-        days = ["d0", "d3", "d6"]
-        for day in days:
-            day_headers = [header for header in signal_headers if day in header]
-            grammar_data_avg["{}_AVG".format(day)] = grammar_data_avg[day_headers].mean(axis=1)
-        grammar_data_avg = grammar_data_avg.drop(signal_headers, axis=1)
-        
-        # reset index
-        grammar_data_avg = grammar_data_avg.reset_index()
-        
-        # and only keep the 0,0
-        grammar_data_avg = grammar_data_avg[grammar_data_avg["combos"] == "0,0"]
-        grammar_data_avg = grammar_data_avg.drop("combos", axis=1)
-        grammar_data_avg = grammar_data_avg.set_index("example_id")
-        
-        # save this out to plot in R
-        plot_data_file = "{}.agg_data.txt.gz".format(grammar_prefix)
-        grammar_data_avg.to_csv(
-            plot_data_file, sep="\t", compression="gzip", header=True, index=True)
-
-        # plot cmd
-        plot_file = "{}.endogenous.traj.pdf".format(grammar_prefix)
-        plot_cmd = "./plot.mpra.hypothesis.traj.R {} {}".format(
-            plot_data_file, plot_file)
-        print plot_cmd
-        os.system(plot_cmd)
-
-    return
-
-
-def test_mutational_hypotheses(
-        data_file, out_dir,
-        signal_thresh=0.5, drop_reps=["b4"], filter_synergy=True):
-    """test mutational hypotheses
+def _load_data_and_setup(data_file, drop_reps, filter_synergy):
+    """load data and set up
     """
     # load data, make grammar col
     data = pd.read_csv(data_file, sep="\t", header=0)
     data["grammar"] = [re.sub("\\.\\d+$", "", name) for name in data["example_id"]]
     
-    # filter? if so filter for just synergy set (remove distant and non-sig)
+    # if filter, then get just synergy set (remove distant and non-sig)
     if filter_synergy:
         data["synergy.max"] = data["synergy.scores.diff.sig.0"].apply(
             lambda x: np.max([int(val) for val in x.split(",")]))
@@ -312,13 +223,54 @@ def test_mutational_hypotheses(
     signal_headers = [name for name in data.columns if "_b" in name]
     for drop_rep in drop_reps:
         signal_headers = [name for name in signal_headers if drop_rep not in name]
-    metadata_headers = [
-        "example_id",
-        "combos"]
 
     # get hypotheses
     grammars = list(set(data["grammar"].values.tolist()))
     grammars = sorted([name for name in grammars if "ggr" in name])
+
+    return data, signal_headers, grammars
+
+
+def _average_data(
+        data, signal_headers, metadata_headers, signal_thresh,
+        days=["d0", "d3", "d6"]):
+    """assumes you have signal data and corresponding metadata
+    """
+    # select out signal data and relevant metadata
+    data = data[signal_headers+metadata_headers]
+    
+    # apply signal thresh and remove rows of zeros
+    data = data.set_index(metadata_headers)
+    data[data < signal_thresh] = 0.0
+    data = data[data.max(axis=1) > 0]
+    data = data.reset_index()
+        
+    # average the barcoded fragments in each REP first
+    # this is because different reps may have different barcodes
+    data = data.replace(0, np.NaN) # ignore zeros, was not seen in replicate
+    data = data.groupby(metadata_headers).mean()
+    data = data.reset_index()
+        
+    # then average the reps
+    data = data.set_index(metadata_headers)
+    for day in days:
+        day_headers = [header for header in signal_headers if day in header]
+        data["{}_AVG".format(day)] = data[day_headers].mean(axis=1)
+    data = data.drop(signal_headers, axis=1)
+    data = data.reset_index()
+    
+    return data
+
+
+
+def test_grammar_trajectories(
+        data_file, out_dir,
+        signal_thresh=0.5, drop_reps=["b4"], filter_synergy=True):
+    """take in data file and look at values
+    """
+    data, signal_headers, grammars = _load_data_and_setup(
+        data_file, drop_reps, filter_synergy)
+    metadata_headers = ["example_id", "combos"]
 
     # go through hypotheses
     for grammar in grammars:
@@ -327,34 +279,98 @@ def test_mutational_hypotheses(
         
         # extract relevant data
         grammar_data = data[data["grammar"] == grammar]
-        grammar_data = grammar_data[signal_headers+metadata_headers]
+        grammar_data_avg = _average_data(
+            grammar_data, signal_headers, metadata_headers, signal_thresh)
+        
+        # and only keep the 0,0
+        grammar_data_avg = grammar_data_avg[grammar_data_avg["combos"] == "0,0"]
+        grammar_data_avg = grammar_data_avg.drop("combos", axis=1)
+        grammar_data_avg = grammar_data_avg.set_index("example_id")
 
-        # apply signal thresh and remove rows of zeros
-        grammar_data = grammar_data.set_index(metadata_headers)
-        grammar_data[grammar_data < signal_thresh] = 0.0
-        grammar_data = grammar_data[grammar_data.max(axis=1) > 0]
-        grammar_data = grammar_data.reset_index()
+        # normalize to the mean value
+        grammar_data_avg[:] = np.subtract(
+            grammar_data_avg.values,
+            np.expand_dims(np.nanmean(grammar_data_avg.values, axis=1), axis=-1))
         
-        # average the barcoded fragments in each REP first
-        # this is because different reps may have different barcodes
-        grammar_data = grammar_data.replace(0, np.NaN) # ignore zeros, was not seen in replicate
-        grammar_data = grammar_data.groupby(metadata_headers).mean()
-        grammar_data = grammar_data.reset_index()
+        # save this out to plot in R
+        plot_data_file = "{}.agg_data.txt.gz".format(grammar_prefix)
+        grammar_data_avg.to_csv(
+            plot_data_file, sep="\t", compression="gzip", header=True, index=True)
+
+        # plot cmd
+        plot_file = "{}.endogenous.traj.pdf".format(grammar_prefix)
+        plot_cmd = "/users/dskim89/git/ggr-project/R/plot.mpra.hypothesis.traj.R {} {}".format(
+            plot_data_file, plot_file)
+        print plot_cmd
+        os.system(plot_cmd)
+
+    return
+
+
+
+def _normalize_for_mutational_test(grammar_data_avg, metadata_headers):
+    """clean up examples
+    """
+    examples = sorted(list(set(grammar_data_avg["example_id"].values.tolist())))
+    grammar_data_norm = []
+    for example in examples:
+        # get example data
+        example_data = grammar_data_avg[grammar_data_avg["example_id"] == example]
+
+        # check that all necessary examples exist
+        if example_data[example_data["combos"] == "1,1"].shape[0] != 1:
+            continue
+
+        # ignore triples
+        if "0,0,0" in example_data["combos"].values.tolist():
+            continue
+
+        if False:
+            # extract 1,1 (background) and subtract
+            tmp_data = example_data.drop("example_id", axis=1)
+            background_vals = tmp_data[tmp_data["combos"] == "1,1"].drop(
+                "combos", axis=1)
+            example_data = example_data.set_index(metadata_headers)
+            example_data[:] = np.subtract(example_data.values, background_vals.values)
+            example_data = example_data.reset_index()
+        else:
+            example_data = example_data.set_index(metadata_headers)
+            example_data[:] = np.subtract(
+                example_data.values,
+                np.mean(example_data.values, axis=0))
+            example_data = example_data.reset_index()
+
+        # append
+        grammar_data_norm.append(example_data)
+
+    if len(grammar_data_norm) == 0:
+        print "no examples, can't run analysis"
+        return None
+
+    # concat
+    grammar_data_norm = pd.concat(grammar_data_norm, axis=0)
+
+    return grammar_data_norm
+
+
+def test_mutational_hypotheses(
+        data_file, out_dir,
+        signal_thresh=0.5, drop_reps=["b4"], filter_synergy=True):
+    """test mutational hypotheses
+    """
+    data, signal_headers, grammars = _load_data_and_setup(
+        data_file, drop_reps, filter_synergy)
+    metadata_headers = ["example_id", "combos"]
+    
+    # go through hypotheses
+    for grammar in grammars:
+        print grammar
+        grammar_prefix = "{}/{}".format(out_dir, grammar)
         
-        # then average the reps
-        grammar_data = grammar_data.set_index(metadata_headers)
-        days = ["d0", "d3", "d6"]
-        for day in days:
-            day_headers = [header for header in signal_headers if day in header]
-            grammar_data["{}_AVG".format(day)] = grammar_data[day_headers].mean(axis=1)
-        grammar_data = grammar_data.drop(signal_headers, axis=1)
-        grammar_data = grammar_data.reset_index()
-        
-        grammar_data_avg = grammar_data.copy()
-        
-        # filter barcodes again here
-        #grammar_data = grammar_data[grammar_data.max(axis=1) > signal_thresh]
-        #grammar_data = grammar_data.reset_index()
+        # extract relevant data and average
+        grammar_data = data[data["grammar"] == grammar]
+        grammar_data_avg = _average_data(
+            grammar_data, signal_headers, metadata_headers, signal_thresh)
         
         # then per example need to normalize
         # per example subtract relative to background
@@ -367,9 +383,6 @@ def test_mutational_hypotheses(
             # check that all necessary examples exist
             if example_data[example_data["combos"] == "1,1"].shape[0] != 1:
                 continue
-            
-            #if example_data[example_data["combos"] != "-1"].shape[0] != 4:
-            #    continue
 
             # ignore triples
             if "0,0,0" in example_data["combos"].values.tolist():
@@ -410,12 +423,132 @@ def test_mutational_hypotheses(
 
         # plot cmd
         plot_prefix = "{}.endogenous.mutational".format(grammar_prefix)
-        plot_cmd = "./plot.mpra.hypothesis.mut.R {} {}".format(
+        plot_cmd = "plot.mpra.hypothesis.mut.R {} {}".format(
             plot_data_file, plot_prefix)
         print plot_cmd
         os.system(plot_cmd)
         
     return
+
+
+def analyze_combinations(
+        data_file, out_dir,
+        signal_thresh=0.5, drop_reps=["b4"], filter_synergy=True):
+    """
+    """
+    # load data and set up
+    data, signal_headers, grammars = _load_data_and_setup(
+        data_file, drop_reps, filter_synergy)
+    metadata_headers = ["example_id", "combos"]
+
+    # go through hypotheses
+    for grammar in grammars:
+        print grammar
+        grammar_prefix = "{}/{}".format(out_dir, grammar)
+        
+        # extract relevant data
+        grammar_data = data[data["grammar"] == grammar]
+        grammar_data_avg = _average_data(
+            grammar_data, signal_headers, metadata_headers, signal_thresh)
+
+        # ----------------------
+        # trajectory hypothesis
+        # ----------------------
+        # and only keep the 0,0
+        grammar_data_traj = grammar_data_avg[grammar_data_avg["combos"] == "0,0"]
+        grammar_data_traj = grammar_data_traj.drop("combos", axis=1)
+        grammar_data_traj = grammar_data_traj.set_index("example_id")
+
+        # normalize to the mean value
+        grammar_data_traj[:] = np.subtract(
+            grammar_data_traj.values,
+            np.expand_dims(np.nanmean(grammar_data_traj.values, axis=1), axis=-1))
+        
+        # plot
+        plot_data_file = "{}.traj.agg_data.txt.gz".format(grammar_prefix)
+        plot_file = "{}.traj.pdf".format(grammar_prefix)
+        grammar_data_traj.to_csv(
+            plot_data_file, sep="\t", compression="gzip", header=True, index=True)
+        plot_cmd = "/users/dskim89/git/ggr-project/R/plot.mpra.hypothesis.traj.R {} {}".format(
+            plot_data_file, plot_file)
+        print plot_cmd
+        os.system(plot_cmd)
+
+        # ----------------------
+        # mutational hypothesis
+        # ----------------------
+        grammar_data_mut = _normalize_for_mutational_test(
+            grammar_data_avg, metadata_headers)
+        if grammar_data_mut is None:
+            continue
+
+        # TODO consider dropping -1 combo from the plot
+        
+        # plot
+        plot_data_file = "{}.mut.agg_data.txt.gz".format(grammar_prefix)
+        plot_prefix = "{}.mut".format(grammar_prefix)
+        grammar_data_mut.to_csv(
+            plot_data_file, sep="\t", compression="gzip", header=True, index=False)
+        plot_cmd = "/users/dskim89/git/ggr-project/R/plot.mpra.hypothesis.mut.R {} {}".format(
+            plot_data_file, plot_prefix)
+        print plot_cmd
+        os.system(plot_cmd)
+
+        # ----------------------
+        # check if rule passes validation
+        # ----------------------
+        traj_to_day = {
+            "0": "d0",
+            "7": "d0",
+            "8-10-11": "d0",
+            "9": "d0",
+            "12-13": "d3",
+            "14": "d3",
+            "1": "d3",
+            "2": "d6",
+            "3-4": "d6",
+            "5": "d6"}
+
+        traj_val = grammar.split(".grammar")[0].split("ggr.")[1].split("TRAJ_LABELS-")[1]
+        try:
+            day = traj_to_day[traj_val]
+        except:
+            print "ADD IN INTERSECTION {}".format(grammar)
+            continue
+        day_key = "{}_AVG".format(day)
+        
+        # TODO check if headed in right direction (need a traj dict)
+
+
+        # check if additive or synergistic
+        check_data = grammar_data_mut.set_index(
+            metadata_headers)[[day_key]].reset_index()
+        check_data = check_data.pivot(index="example_id", columns="combos")[day_key].reset_index()
+        check_data = check_data.set_index("example_id")
+        check_data = check_data.drop("-1", axis=1)
+        
+        # remove nans
+        check_data = check_data[~np.any(np.isnan(check_data), axis=1)]
+
+        # get expected vals
+        expected = check_data["0,1"] + check_data["1,0"] - 2*check_data["1,1"]
+        actual = check_data["0,0"]
+        
+        # actual - expected
+        diff = actual - expected
+        diff_sum = np.sum(diff)
+
+        # stats
+        # TODO consider a non-paired test
+        from scipy.stats import wilcoxon
+        stat, pval = wilcoxon(diff)
+        
+        if pval < 0.10:
+            print "SYNERGY"
+        else:
+            print "ADDITIVE"
+            
+    return None
 
 
 
@@ -566,18 +699,38 @@ def main():
         counts_to_mat(counts_files, out_prefix, metadata_file=metadata_file)
         
     # run QC
-    qc_cmd = "./run_qc.R {} {}".format(count_mat_file, signal_mat_file)
+    qc_cmd = "./qc.mpra.R {} {}".format(count_mat_file, signal_mat_file)
     #print qc_cmd
     #os.system(qc_cmd)
     
     # signal file w metadata
     signal_mat_file = "{}.signal.w_metadata.mat.txt.gz".format(out_prefix)
+
+    # analyze
+    results_dir = "{}/combinatorial_rules".format(OUT_DIR)
+    os.system("mkdir -p {}".format(results_dir))
+    analyze_combinations(
+        signal_mat_file,
+        results_dir,
+        signal_thresh=2,
+        drop_reps=[],
+        filter_synergy=True)
+
+    quit()
+
     
     # now try check hypotheses:
     # endogenous seq - trajectories
     traj_dir = "{}/hypotheses.trajectories".format(OUT_DIR)
     os.system("mkdir -p {}".format(traj_dir))
-    #test_grammar_trajectories(signal_mat_file, traj_dir)
+    test_grammar_trajectories(
+        signal_mat_file,
+        traj_dir,
+        signal_thresh=2,
+        drop_reps=[],
+        filter_synergy=True)
+
+    quit()
     
     # mutational analyses
     mut_dir = "{}/hypotheses.mutational".format(OUT_DIR)
