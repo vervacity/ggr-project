@@ -6,6 +6,7 @@ import gzip
 
 import numpy as np
 import pandas as pd
+import networkx as nx
 
 
 def trim_and_attach_umi(fastq1, fastq2, fastq_out):
@@ -262,53 +263,7 @@ def _average_data(
     return data
 
 
-
-def test_grammar_trajectories(
-        data_file, out_dir,
-        signal_thresh=0.5, drop_reps=["b4"], filter_synergy=True):
-    """take in data file and look at values
-    """
-    data, signal_headers, grammars = _load_data_and_setup(
-        data_file, drop_reps, filter_synergy)
-    metadata_headers = ["example_id", "combos"]
-
-    # go through hypotheses
-    for grammar in grammars:
-        print grammar
-        grammar_prefix = "{}/{}".format(out_dir, grammar)
-        
-        # extract relevant data
-        grammar_data = data[data["grammar"] == grammar]
-        grammar_data_avg = _average_data(
-            grammar_data, signal_headers, metadata_headers, signal_thresh)
-        
-        # and only keep the 0,0
-        grammar_data_avg = grammar_data_avg[grammar_data_avg["combos"] == "0,0"]
-        grammar_data_avg = grammar_data_avg.drop("combos", axis=1)
-        grammar_data_avg = grammar_data_avg.set_index("example_id")
-
-        # normalize to the mean value
-        grammar_data_avg[:] = np.subtract(
-            grammar_data_avg.values,
-            np.expand_dims(np.nanmean(grammar_data_avg.values, axis=1), axis=-1))
-        
-        # save this out to plot in R
-        plot_data_file = "{}.agg_data.txt.gz".format(grammar_prefix)
-        grammar_data_avg.to_csv(
-            plot_data_file, sep="\t", compression="gzip", header=True, index=True)
-
-        # plot cmd
-        plot_file = "{}.endogenous.traj.pdf".format(grammar_prefix)
-        plot_cmd = "/users/dskim89/git/ggr-project/R/plot.mpra.hypothesis.traj.R {} {}".format(
-            plot_data_file, plot_file)
-        print plot_cmd
-        os.system(plot_cmd)
-
-    return
-
-
-
-def _normalize_for_mutational_test(grammar_data_avg, metadata_headers):
+def _normalize_for_mutational_test(grammar_data_avg, metadata_headers, example_background_norm=True):
     """clean up examples
     """
     examples = sorted(list(set(grammar_data_avg["example_id"].values.tolist())))
@@ -324,8 +279,8 @@ def _normalize_for_mutational_test(grammar_data_avg, metadata_headers):
         # ignore triples
         if "0,0,0" in example_data["combos"].values.tolist():
             continue
-
-        if False:
+        
+        if example_background_norm:
             # extract 1,1 (background) and subtract
             tmp_data = example_data.drop("example_id", axis=1)
             background_vals = tmp_data[tmp_data["combos"] == "1,1"].drop(
@@ -333,7 +288,9 @@ def _normalize_for_mutational_test(grammar_data_avg, metadata_headers):
             example_data = example_data.set_index(metadata_headers)
             example_data[:] = np.subtract(example_data.values, background_vals.values)
             example_data = example_data.reset_index()
-        else:
+            
+        # mean center
+        if False:
             example_data = example_data.set_index(metadata_headers)
             example_data[:] = np.subtract(
                 example_data.values,
@@ -349,91 +306,15 @@ def _normalize_for_mutational_test(grammar_data_avg, metadata_headers):
 
     # concat
     grammar_data_norm = pd.concat(grammar_data_norm, axis=0)
-
-    return grammar_data_norm
-
-
-def test_mutational_hypotheses(
-        data_file, out_dir,
-        signal_thresh=0.5, drop_reps=["b4"], filter_synergy=True):
-    """test mutational hypotheses
-    """
-    data, signal_headers, grammars = _load_data_and_setup(
-        data_file, drop_reps, filter_synergy)
-    metadata_headers = ["example_id", "combos"]
     
-    # go through hypotheses
-    for grammar in grammars:
-        print grammar
-        grammar_prefix = "{}/{}".format(out_dir, grammar)
-        
-        # extract relevant data and average
-        grammar_data = data[data["grammar"] == grammar]
-        grammar_data_avg = _average_data(
-            grammar_data, signal_headers, metadata_headers, signal_thresh)
-        
-        # then per example need to normalize
-        # per example subtract relative to background
-        examples = sorted(list(set(grammar_data_avg["example_id"].values.tolist())))
-        grammar_data_norm = []
-        for example in examples:
-            # get example data
-            example_data = grammar_data_avg[grammar_data_avg["example_id"] == example]
-            
-            # check that all necessary examples exist
-            if example_data[example_data["combos"] == "1,1"].shape[0] != 1:
-                continue
-
-            # ignore triples
-            if "0,0,0" in example_data["combos"].values.tolist():
-                continue
-
-            if False:
-                # extract 1,1 (background) and subtract
-                tmp_data = example_data.drop("example_id", axis=1)
-                background_vals = tmp_data[tmp_data["combos"] == "1,1"].drop(
-                    "combos", axis=1)
-                example_data = example_data.set_index(metadata_headers)
-                example_data[:] = np.subtract(example_data.values, background_vals.values)
-                example_data = example_data.reset_index()
-            else:
-                example_data = example_data.set_index(metadata_headers)
-                example_data[:] = np.subtract(
-                    example_data.values,
-                    np.mean(example_data.values, axis=0))
-                example_data = example_data.reset_index()
-
-            # TODO consider: should I also drop the endogenous seqs that are not
-            # positive after this normalization?
-                
-            # append
-            grammar_data_norm.append(example_data)
-
-        if len(grammar_data_norm) == 0:
-            print "no examples, can't run analysis"
-            continue
-
-        # concat
-        grammar_data_norm = pd.concat(grammar_data_norm, axis=0)
-        
-        # save this out to plot in R
-        plot_data_file = "{}.agg_data.txt.gz".format(grammar_prefix)
-        grammar_data_norm.to_csv(
-            plot_data_file, sep="\t", compression="gzip", header=True, index=False)
-
-        # plot cmd
-        plot_prefix = "{}.endogenous.mutational".format(grammar_prefix)
-        plot_cmd = "plot.mpra.hypothesis.mut.R {} {}".format(
-            plot_data_file, plot_prefix)
-        print plot_cmd
-        os.system(plot_cmd)
-        
-    return
+    return grammar_data_norm
 
 
 def analyze_combinations(
         data_file, out_dir,
-        signal_thresh=0.5, drop_reps=["b4"], filter_synergy=True):
+        signal_thresh=0.5,
+        drop_reps=["b4"],
+        filter_synergy=True):
     """
     """
     # load data and set up
@@ -441,62 +322,28 @@ def analyze_combinations(
         data_file, drop_reps, filter_synergy)
     metadata_headers = ["example_id", "combos"]
 
+    # results
+    results = {
+        "grammar": [],
+        "day": [],
+        "traj.medians": [],
+        "mut.medians": [],
+        "actual": [],
+        "expected": [],
+        "diff": [],
+        "interaction": []}
+    
     # go through hypotheses
+    num_synergy = 0
+    num_buffer = 0
+    num_additive = 0
+    total = 0
+    traj_fail = 0
     for grammar in grammars:
         print grammar
         grammar_prefix = "{}/{}".format(out_dir, grammar)
         
-        # extract relevant data
-        grammar_data = data[data["grammar"] == grammar]
-        grammar_data_avg = _average_data(
-            grammar_data, signal_headers, metadata_headers, signal_thresh)
-
-        # ----------------------
-        # trajectory hypothesis
-        # ----------------------
-        # and only keep the 0,0
-        grammar_data_traj = grammar_data_avg[grammar_data_avg["combos"] == "0,0"]
-        grammar_data_traj = grammar_data_traj.drop("combos", axis=1)
-        grammar_data_traj = grammar_data_traj.set_index("example_id")
-
-        # normalize to the mean value
-        grammar_data_traj[:] = np.subtract(
-            grammar_data_traj.values,
-            np.expand_dims(np.nanmean(grammar_data_traj.values, axis=1), axis=-1))
-        
-        # plot
-        plot_data_file = "{}.traj.agg_data.txt.gz".format(grammar_prefix)
-        plot_file = "{}.traj.pdf".format(grammar_prefix)
-        grammar_data_traj.to_csv(
-            plot_data_file, sep="\t", compression="gzip", header=True, index=True)
-        plot_cmd = "/users/dskim89/git/ggr-project/R/plot.mpra.hypothesis.traj.R {} {}".format(
-            plot_data_file, plot_file)
-        print plot_cmd
-        os.system(plot_cmd)
-
-        # ----------------------
-        # mutational hypothesis
-        # ----------------------
-        grammar_data_mut = _normalize_for_mutational_test(
-            grammar_data_avg, metadata_headers)
-        if grammar_data_mut is None:
-            continue
-
-        # TODO consider dropping -1 combo from the plot
-        
-        # plot
-        plot_data_file = "{}.mut.agg_data.txt.gz".format(grammar_prefix)
-        plot_prefix = "{}.mut".format(grammar_prefix)
-        grammar_data_mut.to_csv(
-            plot_data_file, sep="\t", compression="gzip", header=True, index=False)
-        plot_cmd = "/users/dskim89/git/ggr-project/R/plot.mpra.hypothesis.mut.R {} {}".format(
-            plot_data_file, plot_prefix)
-        print plot_cmd
-        os.system(plot_cmd)
-
-        # ----------------------
-        # check if rule passes validation
-        # ----------------------
+        # get traj to day
         traj_to_day = {
             "0": "d0",
             "7": "d0",
@@ -508,48 +355,242 @@ def analyze_combinations(
             "2": "d6",
             "3-4": "d6",
             "5": "d6"}
-
-        traj_val = grammar.split(".grammar")[0].split("ggr.")[1].split("TRAJ_LABELS-")[1]
+        traj_val = grammar.split(".grammar")[0].split("_x")[0].split("ggr.")[1].split("TRAJ_LABELS-")[1]
         try:
             day = traj_to_day[traj_val]
         except:
             print "ADD IN INTERSECTION {}".format(grammar)
             continue
         day_key = "{}_AVG".format(day)
+
+        # save
+        results["grammar"].append(grammar)
+        results["day"].append(day)
         
-        # TODO check if headed in right direction (need a traj dict)
+        # extract relevant data
+        grammar_data = data[data["grammar"] == grammar]
+        grammar_data_avg = _average_data(
+            grammar_data, signal_headers, metadata_headers, signal_thresh)
+
+        # ----------------------
+        # trajectory hypothesis
+        # ----------------------
+        # only keep the 0,0 and mean center
+        # TODO also plot 1,1 (the null)
+        grammar_data_traj = grammar_data_avg[grammar_data_avg["combos"] == "0,0"]
+        grammar_data_traj = grammar_data_traj.drop("combos", axis=1)
+        grammar_data_traj = grammar_data_traj.set_index("example_id")
+        grammar_data_traj[:] = np.subtract(
+            grammar_data_traj.values,
+            np.expand_dims(np.nanmean(grammar_data_traj.values, axis=1), axis=-1))
+        
+        # plot
+        plot_data_file = "{}.traj.agg_data.txt.gz".format(grammar_prefix)
+        plot_file = "{}.traj.pdf".format(grammar_prefix)
+        grammar_data_traj.to_csv(
+            plot_data_file, sep="\t", compression="gzip", header=True, index=True)
+        plot_cmd = "/users/dskim89/git/ggr-project/R/plot.mpra.hypothesis.traj.R {} {}".format(
+            plot_data_file, plot_file)
+        #print plot_cmd
+        #os.system(plot_cmd)
 
 
-        # check if additive or synergistic
+        
+        # save
+        traj_medians = grammar_data_traj.median()
+        results["traj.medians"].append(traj_medians)
+        
+        # ----------------------
+        # mutational hypothesis
+        # ----------------------
+        grammar_data_mut = _normalize_for_mutational_test(
+            grammar_data_avg, metadata_headers)
+        if grammar_data_mut is None:
+            results["mut.medians"].append(np.array([0,0,0,0]))
+            results["actual"].append(0)
+            results["expected"].append(0)
+            results["diff"].append(0)
+            results["interaction"].append("FAILED.TRAJ")
+            continue
+
+        # TODO consider dropping -1 combo from the plot
+        if True:
+            grammar_data_mut = grammar_data_mut[grammar_data_mut["combos"] != "-1"]
+        
+        # plot
+        plot_data_file = "{}.mut.agg_data.txt.gz".format(grammar_prefix)
+        plot_prefix = "{}.mut".format(grammar_prefix)
+        grammar_data_mut.to_csv(
+            plot_data_file, sep="\t", compression="gzip", header=True, index=False)
+        plot_cmd = "/users/dskim89/git/ggr-project/R/plot.mpra.hypothesis.mut.R {} {} {}".format(
+            plot_data_file, day, plot_prefix)
+        #print plot_cmd
+        #os.system(plot_cmd)
+        
+        # ----------------------
+        # check if rule passes validation
+        # ----------------------
+        
+        # check if headed in right direction - check which is highest
+        traj_match = np.max(traj_medians) == traj_medians[day_key]
+        
+        if not traj_match:
+            # check again, d3 vs d6 confusion
+            if day_key == "d3_AVG":
+                check_match = np.max(traj_medians) == traj_medians["d6_AVG"]
+                if check_match:
+                    day_key = "d6_AVG"
+            elif day_key == "d6_AVG":
+                check_match = np.max(traj_medians) == traj_medians["d3_AVG"]
+                if check_match:
+                    day_key = "d3_AVG"
+            else:
+                check_match = False
+
+            if not (check_match or traj_match):
+                print "does not match traj pattern"
+                traj_fail += 1
+                results["mut.medians"].append(np.array([0,0,0,0]))
+                results["actual"].append(0)
+                results["expected"].append(0)
+                results["diff"].append(0)
+                results["interaction"].append("FAILED.TRAJ")
+                continue
+        
+        # check if additive or synergistic or buffer
         check_data = grammar_data_mut.set_index(
             metadata_headers)[[day_key]].reset_index()
         check_data = check_data.pivot(index="example_id", columns="combos")[day_key].reset_index()
         check_data = check_data.set_index("example_id")
-        check_data = check_data.drop("-1", axis=1)
-        
-        # remove nans
-        check_data = check_data[~np.any(np.isnan(check_data), axis=1)]
 
+        # remove nans
+        if False:
+            check_data = check_data[~np.any(np.isnan(check_data), axis=1)]
+
+        # don't continue if endogenous is not positive
+        if True:
+            if (np.mean(check_data["0,0"]) < 0) or (np.median(check_data["0,0"]) < 0):
+                print "background higher than endogenous, not well controlled, continue"
+                results["mut.medians"].append(np.array([0,0,0,0]))
+                results["actual"].append(0)
+                results["expected"].append(0)
+                results["diff"].append(0)
+                results["interaction"].append("FAILED.NEGATIVE_ENDOG")
+                continue
+        total += 1
+
+        # save mut medians here
+        mut_medians = check_data.median()
+        results["mut.medians"].append(mut_medians.values)
+        
         # get expected vals
-        expected = check_data["0,1"] + check_data["1,0"] - 2*check_data["1,1"]
+        pval_thresh = 0.10
+        method = "wilcox_unpaired"
+        #method = "wilcox_paired"
+
+        # expected and actual
+        # background already removed
+        expected = check_data["0,1"] + check_data["1,0"]
         actual = check_data["0,0"]
         
-        # actual - expected
-        diff = actual - expected
-        diff_sum = np.sum(diff)
+        if method == "wilcox_paired":
+            # paired, no normality constraint
+            from scipy.stats import wilcoxon
+            diff = actual - expected
+            stat, pval = wilcoxon(diff)
+            diff_sum = np.mean(diff)
+        elif method == "wilcox_unpaired":
+            # wilcox - unpaired, no normality constraint
+            from scipy.stats import wilcoxon
+            diff = actual - expected.mean()
+            diff = diff[~np.isnan(diff)]
+            stat, pval = wilcoxon(diff)
+            diff_sum = np.mean(diff)
 
-        # stats
-        # TODO consider a non-paired test
-        from scipy.stats import wilcoxon
-        stat, pval = wilcoxon(diff)
-        
-        if pval < 0.10:
-            print "SYNERGY"
+        # summary info
+        if (pval < pval_thresh) and (diff_sum > 0):
+            print "SYNERGY", diff_sum
+            num_synergy += 1
+            interaction = "SYNERGY"
+        elif (pval < pval_thresh) and (diff_sum < 0):
+            print "BUFFER", diff_sum
+            num_buffer += 1
+            interaction = "BUFFER"
         else:
-            print "ADDITIVE"
+            print "ADDITIVE", diff_sum
+            num_additive += 1
+            interaction = "ADDITIVE"
             
+        results["actual"].append(actual.mean())
+        results["expected"].append(expected.mean())
+        #results["expected"].append(np.mean(check_data["0,1"] + np.mean(check_data["1,0"])))
+        results["diff"].append((actual - expected).mean())
+        results["interaction"].append(interaction)
+        
+    # create summary
+    results_adj = []
+    days = ["d0", "d3", "d6"]
+    for key in sorted(results.keys()):
+        data = np.stack(results[key], axis=0)
+        print key, data.shape
+        if "traj.medians" in key:
+            header = ["{}.{}".format(key, day) for day in days]
+            data = pd.DataFrame(data=data, columns=header)
+        elif "mut.medians" in key:
+            header = ["0,0", "0,1", "1,0", "1,1"]
+            data = pd.DataFrame(data=data, columns=header)
+        else:
+            data = pd.DataFrame(data=data, columns=[key])
+        results_adj.append(data)
+    results = pd.concat(results_adj, axis=1)
+    #results = results.sort_values(["interaction", "diff"])
+    results = results.sort_values(["0,1", "1,0"])
+    results = results.sort_values(["expected"])
+    
+    # save out
+    summary_file = "{}/summary.txt.gz".format(out_dir)
+    results.to_csv(summary_file, sep="\t", compression="gzip", index=False, header=True)
+    
     return None
 
+
+def add_metadata(summary_file, grammar_dir, out_file):
+    """add in pwm names and match to mut order
+    """
+    # data
+    data = pd.read_csv(summary_file, sep="\t")
+    data["pwm1_clean"] = "NA"
+    data["pwm2_clean"] = "NA"
+    data["pwm1"] = "NA"
+    data["pwm2"] = "NA"
+    
+    # attach node names
+    for grammar_idx in data.index:
+        grammar_prefix =  data["grammar"][grammar_idx]
+        grammar_gml = "{}/{}.gml".format(grammar_dir, grammar_prefix)
+        grammar = nx.read_gml(grammar_gml)
+
+        # get nodes and order by idx
+        nodes = list(grammar.nodes.data("pwmidx"))
+        nodes.sort(key=lambda x: x[1])
+        
+        # 0,1 means the first pwm (index order) is still present
+        data.loc[grammar_idx, "pwm1"] = nodes[0][0]
+        data.loc[grammar_idx, "pwm2"] = nodes[1][0]
+
+        # clean
+        clean1 = re.sub("HCLUST-\\d+_", "", nodes[0][0])
+        clean1 = re.sub(".UNK.0.A", "", clean1)
+        data.loc[grammar_idx, "pwm1_clean"] = clean1
+        
+        clean2 = re.sub("HCLUST-\\d+_", "", nodes[1][0])
+        clean2 = re.sub(".UNK.0.A", "", clean2)
+        data.loc[grammar_idx, "pwm2_clean"] = clean2
+
+    # save out
+    data.to_csv(out_file, sep="\t", compression="gzip", header=True, index=False)
+    
+    return
 
 
 def main():
@@ -561,6 +602,7 @@ def main():
     OUT_DIR = "./results"
     ref_fasta_file = "./raw/annotations/sequences.fa"
     metadata_file = "./raw/annotations/mpra.seqs.run-0.txt"
+    grammar_dir = "/mnt/lab_data/kundaje/users/dskim89/ggr/nn/inference.2019-03-12/dmim.shuffle/grammars.annotated.manual_filt.merged.final"
     
     os.system("mkdir -p {}".format(OUT_DIR))
     
@@ -709,38 +751,21 @@ def main():
     # analyze
     results_dir = "{}/combinatorial_rules".format(OUT_DIR)
     os.system("mkdir -p {}".format(results_dir))
-    analyze_combinations(
-        signal_mat_file,
-        results_dir,
-        signal_thresh=2,
-        drop_reps=[],
-        filter_synergy=True)
-
-    quit()
-
+    if True:
+        analyze_combinations(
+            signal_mat_file,
+            results_dir,
+            signal_thresh=0,
+            drop_reps=[],
+            filter_synergy=True)
+        
+    # overlap with metadata to get pwm names (and ordering)
+    summary_file = "{}/summary.txt.gz".format(results_dir)
+    summary_annot_file = "{}/summary.annotated.txt.gz".format(results_dir)
+    add_metadata(summary_file, grammar_dir, summary_annot_file)
     
-    # now try check hypotheses:
-    # endogenous seq - trajectories
-    traj_dir = "{}/hypotheses.trajectories".format(OUT_DIR)
-    os.system("mkdir -p {}".format(traj_dir))
-    test_grammar_trajectories(
-        signal_mat_file,
-        traj_dir,
-        signal_thresh=2,
-        drop_reps=[],
-        filter_synergy=True)
-
-    quit()
-    
-    # mutational analyses
-    mut_dir = "{}/hypotheses.mutational".format(OUT_DIR)
-    os.system("mkdir -p {}".format(mut_dir))
-    test_mutational_hypotheses(
-        signal_mat_file,
-        mut_dir,
-        signal_thresh=2, # rlog norm thresh
-        drop_reps=[],
-        filter_synergy=True) # trying none
+    # plotting results
+    os.system("Rscript ~/git/ggr-project/R/plot.mpra.testing.R {}".format(summary_annot_file))
     
     return
 
