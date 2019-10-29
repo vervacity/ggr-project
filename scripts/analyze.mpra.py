@@ -8,6 +8,9 @@ import numpy as np
 import pandas as pd
 import networkx as nx
 
+from scipy.stats import wilcoxon
+from scipy.stats import ranksums
+
 
 def trim_and_attach_umi(fastq1, fastq2, fastq_out):
     """set up dependent, here the UMI is the first 15 bp of read1, but we want the
@@ -263,8 +266,40 @@ def _average_data(
     return data
 
 
-def _normalize_for_mutational_test(grammar_data_avg, metadata_headers, example_background_norm=True):
-    """clean up examples
+def _normalize_for_trajectory_tests(grammar_data_avg, metadata_headers):
+    """normalize for trajectory plots/analysis
+    """
+    # mean center
+    grammar_data_traj = grammar_data_avg.set_index(metadata_headers)
+    grammar_data_traj[:] = np.subtract(
+        grammar_data_traj.values,
+        np.expand_dims(np.nanmean(grammar_data_traj.values, axis=1), axis=-1))
+    grammar_data_traj = grammar_data_traj.reset_index()
+
+    # melt
+    grammar_data_traj = grammar_data_traj.melt(id_vars=metadata_headers)
+    grammar_data_traj = grammar_data_traj.dropna(axis=0)
+    grammar_data_traj["day"] = grammar_data_traj["variable"].apply(
+        lambda x: re.sub("_.+", "", x))
+        
+    # then adjust to 0 median
+    combos = ["-1", "0,0", "1,0", "0,1", "1,1"]
+    days = ["d0_AVG", "d3_AVG", "d6_AVG"]
+    for combo in combos:
+        d0_median = grammar_data_traj[
+            (grammar_data_traj["combos"] == combo) &
+            (grammar_data_traj["day"] == "d0")]["value"].median()
+        grammar_data_traj.loc[grammar_data_traj["combos"] == combo, "value"] = grammar_data_traj.loc[
+            grammar_data_traj["combos"] == combo, "value"] - d0_median
+
+    return grammar_data_traj
+
+
+def _normalize_for_mutational_test(
+        grammar_data_avg, metadata_headers,
+        example_background_norm=True):
+    """normalize for mutational plots/analysis
+    normalize each example separately
     """
     examples = sorted(list(set(grammar_data_avg["example_id"].values.tolist())))
     grammar_data_norm = []
@@ -276,12 +311,8 @@ def _normalize_for_mutational_test(grammar_data_avg, metadata_headers, example_b
         if example_data[example_data["combos"] == "1,1"].shape[0] != 1:
             continue
 
-        # ignore triples
-        if "0,0,0" in example_data["combos"].values.tolist():
-            continue
-        
+        # normalize relative to baseline (1,1)
         if example_background_norm:
-            # extract 1,1 (background) and subtract
             tmp_data = example_data.drop("example_id", axis=1)
             background_vals = tmp_data[tmp_data["combos"] == "1,1"].drop(
                 "combos", axis=1)
@@ -289,14 +320,6 @@ def _normalize_for_mutational_test(grammar_data_avg, metadata_headers, example_b
             example_data[:] = np.subtract(example_data.values, background_vals.values)
             example_data = example_data.reset_index()
             
-        # mean center
-        if False:
-            example_data = example_data.set_index(metadata_headers)
-            example_data[:] = np.subtract(
-                example_data.values,
-                np.mean(example_data.values, axis=0))
-            example_data = example_data.reset_index()
-
         # append
         grammar_data_norm.append(example_data)
 
@@ -310,9 +333,117 @@ def _normalize_for_mutational_test(grammar_data_avg, metadata_headers, example_b
     return grammar_data_norm
 
 
+def _check_traj_endogenous_vs_double_mut(
+        data_traj,
+        pval_thresh=0.10,
+        method="ranksums",
+        days=["d0", "d3", "d6"]):
+    """check for each time point, return true if different in at least one
+    """
+    passed = False
+    for day in days:
+        # pivot
+        data_day = data_traj[data_traj["day"] == day]
+        data_day = data_day.pivot(
+            index="example_id", columns="combos")["value"].reset_index()
+
+        # stats
+        if method == "ranksums":
+            endogenous = data_day["0,0"].dropna()
+            double_mut = data_day["1,1"].dropna()
+            stat, pval = ranksums(endogenous.values, double_mut.values)
+        else:
+            # only use those that have 1,1 and 0,0
+            data_day = data_day[
+                ~pd.isna(data_day["1,1"]) &
+                ~pd.isna(data_day["0,0"])]
+            endogenous = data_day["0,0"]
+            double_mut = data_day["1,1"]
+            diff = endogenous - double_mut.mean()
+        
+            # test
+            stat, pval = wilcoxon(diff.values)
+            
+        # passed
+        if pval < pval_thresh:
+            passed = True
+            
+    return passed
+
+
+def _check_traj_pattern(traj_medians, day_key):
+    """make sure maximal expression at right point
+    """
+    # check if headed in right direction - check which is highest
+    traj_match = np.max(traj_medians) == traj_medians[day_key]
+
+    # if not, check again (d3 vs d6)
+    if not traj_match:
+        if day_key == "d3_AVG":
+            check_match = np.max(traj_medians) == traj_medians["d6_AVG"]
+            if check_match:
+                day_key = "d6_AVG"
+        elif day_key == "d6_AVG":
+            check_match = np.max(traj_medians) == traj_medians["d3_AVG"]
+            if check_match:
+                day_key = "d3_AVG"
+        else:
+            check_match = False
+
+    # compare
+    traj_match = traj_match or check_match
+            
+    return traj_match, day_key
+
+
+def _check_mut_interaction(
+        expected, actual,
+        pval_thresh=0.10,
+        method="ranksums"):
+    """determine if interaction is synergy, additive, buffer
+    """
+    if method == "wilcox_paired":
+        diff = actual - expected
+        stat, pval = wilcoxon(diff)
+        diff_sum = np.mean(diff)
+    elif method == "wilcox_unpaired":
+        diff = actual - expected.mean()
+        diff = diff[~np.isnan(diff)]
+        stat, pval = wilcoxon(diff)
+        diff_sum = np.mean(diff)
+    elif method == "ranksums":
+        stat, pval = ranksums(actual, expected)
+        diff = actual - expected.mean()
+        diff = diff[~np.isnan(diff)]
+        diff_sum = np.mean(diff)
+        
+    # summary info
+    if (pval < pval_thresh) and (diff_sum > 0):
+        interaction = "SYNERGY"
+    elif (pval < pval_thresh) and (diff_sum < 0):
+        interaction = "BUFFER"
+    else:
+        interaction = "ADDITIVE"
+        
+    return interaction, pval
+
+
+def _attach_null_result(results, interaction_msg):
+    """attach null result
+    """
+    results["mut.medians"].append(np.array([0,0,0,0,0]))
+    results["actual"].append(0)
+    results["expected"].append(0)
+    results["diff"].append(0)
+    results["interaction"].append(interaction_msg)
+
+    return results
+
+
 def analyze_combinations(
         data_file, out_dir,
         signal_thresh=0.5,
+        mut_pval_thresh=0.10,
         drop_reps=["b4"],
         filter_synergy=True):
     """
@@ -327,6 +458,7 @@ def analyze_combinations(
         "grammar": [],
         "day": [],
         "traj.medians": [],
+        "traj.sig": [],
         "mut.medians": [],
         "actual": [],
         "expected": [],
@@ -334,11 +466,6 @@ def analyze_combinations(
         "interaction": []}
     
     # go through hypotheses
-    num_synergy = 0
-    num_buffer = 0
-    num_additive = 0
-    total = 0
-    traj_fail = 0
     for grammar in grammars:
         print grammar
         grammar_prefix = "{}/{}".format(out_dir, grammar)
@@ -362,168 +489,115 @@ def analyze_combinations(
             print "ADD IN INTERSECTION {}".format(grammar)
             continue
         day_key = "{}_AVG".format(day)
-
-        # save
-        results["grammar"].append(grammar)
-        results["day"].append(day)
         
         # extract relevant data
         grammar_data = data[data["grammar"] == grammar]
         grammar_data_avg = _average_data(
             grammar_data, signal_headers, metadata_headers, signal_thresh)
 
+        # ignore triplets for now
+        if "0,0" not in grammar_data_avg["combos"].values.tolist():
+            continue
+
+        # start saving results
+        results["grammar"].append(grammar)
+        results["day"].append(day)
+
         # ----------------------
         # trajectory hypothesis
         # ----------------------
-        # only keep the 0,0 and mean center
-        # TODO also plot 1,1 (the null)
-        grammar_data_traj = grammar_data_avg[grammar_data_avg["combos"] == "0,0"]
-        grammar_data_traj = grammar_data_traj.drop("combos", axis=1)
-        grammar_data_traj = grammar_data_traj.set_index("example_id")
-        grammar_data_traj[:] = np.subtract(
-            grammar_data_traj.values,
-            np.expand_dims(np.nanmean(grammar_data_traj.values, axis=1), axis=-1))
+        plot_prefix = "{}.traj".format(grammar_prefix)
+        
+        # normalize
+        grammar_data_traj = _normalize_for_trajectory_tests(
+            grammar_data_avg, metadata_headers)
         
         # plot
-        plot_data_file = "{}.traj.agg_data.txt.gz".format(grammar_prefix)
-        plot_file = "{}.traj.pdf".format(grammar_prefix)
+        plot_data_file = "{}.traj.data.txt.gz".format(grammar_prefix)
         grammar_data_traj.to_csv(
-            plot_data_file, sep="\t", compression="gzip", header=True, index=True)
+            plot_data_file, sep="\t", compression="gzip", header=True, index=False)
         plot_cmd = "/users/dskim89/git/ggr-project/R/plot.mpra.hypothesis.traj.R {} {}".format(
-            plot_data_file, plot_file)
-        #print plot_cmd
+            plot_data_file, plot_prefix)
+        print plot_cmd
         #os.system(plot_cmd)
-
-
         
-        # save
-        traj_medians = grammar_data_traj.median()
+        # save out medians for endogenous seq
+        endog_norm = grammar_data_traj[grammar_data_traj["combos"]=="0,0"].drop(
+            ["combos", "day"], axis=1)
+        endog_norm = endog_norm.pivot(
+            index="example_id", columns="variable")["value"].reset_index()
+        traj_medians = endog_norm.median()
         results["traj.medians"].append(traj_medians)
+
+        # testing (don't quit here, save out as much as possible)
+        passed_traj_vs_double_mut = _check_traj_endogenous_vs_double_mut(
+            grammar_data_traj, days=["d0", "d3", "d6"])
+        passed_traj_pattern, day_key = _check_traj_pattern(traj_medians, day_key)
+
+        # don't continue if failed tests
+        if not passed_traj_pattern:
+            results = _attach_null_result(results, "FAILED.TRAJ_PATTERN")
+            continue
+
+        # separately consider traj sig
+        if passed_traj_vs_double_mut:
+            results["traj.sig"].append(1)
+        else:
+            results["traj.sig"].append(0)
         
         # ----------------------
         # mutational hypothesis
         # ----------------------
+        plot_prefix = "{}.mut.{}".format(grammar_prefix, day_key)
+        
+        # normalize and only keep those that have 1,1 (baseline val)
         grammar_data_mut = _normalize_for_mutational_test(
             grammar_data_avg, metadata_headers)
+        
+        # don't continue if no examples
         if grammar_data_mut is None:
-            results["mut.medians"].append(np.array([0,0,0,0]))
-            results["actual"].append(0)
-            results["expected"].append(0)
-            results["diff"].append(0)
-            results["interaction"].append("FAILED.TRAJ")
+            results = _attach_null_result(results, "FAILED.CANT_TEST")
             continue
-
-        # TODO consider dropping -1 combo from the plot
-        if True:
-            grammar_data_mut = grammar_data_mut[grammar_data_mut["combos"] != "-1"]
         
         # plot
         plot_data_file = "{}.mut.agg_data.txt.gz".format(grammar_prefix)
-        plot_prefix = "{}.mut".format(grammar_prefix)
         grammar_data_mut.to_csv(
             plot_data_file, sep="\t", compression="gzip", header=True, index=False)
         plot_cmd = "/users/dskim89/git/ggr-project/R/plot.mpra.hypothesis.mut.R {} {} {}".format(
-            plot_data_file, day, plot_prefix)
-        #print plot_cmd
+            plot_data_file, day_key, plot_prefix)
+        print plot_cmd
         #os.system(plot_cmd)
         
-        # ----------------------
-        # check if rule passes validation
-        # ----------------------
-        
-        # check if headed in right direction - check which is highest
-        traj_match = np.max(traj_medians) == traj_medians[day_key]
-        
-        if not traj_match:
-            # check again, d3 vs d6 confusion
-            if day_key == "d3_AVG":
-                check_match = np.max(traj_medians) == traj_medians["d6_AVG"]
-                if check_match:
-                    day_key = "d6_AVG"
-            elif day_key == "d6_AVG":
-                check_match = np.max(traj_medians) == traj_medians["d3_AVG"]
-                if check_match:
-                    day_key = "d3_AVG"
-            else:
-                check_match = False
-
-            if not (check_match or traj_match):
-                print "does not match traj pattern"
-                traj_fail += 1
-                results["mut.medians"].append(np.array([0,0,0,0]))
-                results["actual"].append(0)
-                results["expected"].append(0)
-                results["diff"].append(0)
-                results["interaction"].append("FAILED.TRAJ")
-                continue
-        
-        # check if additive or synergistic or buffer
+        # testing - pivot table
         check_data = grammar_data_mut.set_index(
             metadata_headers)[[day_key]].reset_index()
         check_data = check_data.pivot(index="example_id", columns="combos")[day_key].reset_index()
         check_data = check_data.set_index("example_id")
-
-        # remove nans
-        if False:
-            check_data = check_data[~np.any(np.isnan(check_data), axis=1)]
-
+        
         # don't continue if endogenous is not positive
-        if True:
-            if (np.mean(check_data["0,0"]) < 0) or (np.median(check_data["0,0"]) < 0):
-                print "background higher than endogenous, not well controlled, continue"
-                results["mut.medians"].append(np.array([0,0,0,0]))
-                results["actual"].append(0)
-                results["expected"].append(0)
-                results["diff"].append(0)
-                results["interaction"].append("FAILED.NEGATIVE_ENDOG")
-                continue
-        total += 1
+        #endog_over_background_thresh = -0.25
+        passed_positive_over_double_mut = (
+            check_data["0,0"].mean() >= 0) and (check_data["0,0"].median() >= 0)
+        if not passed_positive_over_double_mut:
+            print "background higher than endogenous, not well controlled, continue"
+            results = _attach_null_result(results, "FAILED.NEGATIVE_ENDOG")
+            continue
 
-        # save mut medians here
+        # mut medians
         mut_medians = check_data.median()
         results["mut.medians"].append(mut_medians.values)
-        
-        # get expected vals
-        pval_thresh = 0.10
-        method = "wilcox_unpaired"
-        #method = "wilcox_paired"
 
-        # expected and actual
-        # background already removed
+        # determine if expected and actual differ
         expected = check_data["0,1"] + check_data["1,0"]
         actual = check_data["0,0"]
-        
-        if method == "wilcox_paired":
-            # paired, no normality constraint
-            from scipy.stats import wilcoxon
-            diff = actual - expected
-            stat, pval = wilcoxon(diff)
-            diff_sum = np.mean(diff)
-        elif method == "wilcox_unpaired":
-            # wilcox - unpaired, no normality constraint
-            from scipy.stats import wilcoxon
-            diff = actual - expected.mean()
-            diff = diff[~np.isnan(diff)]
-            stat, pval = wilcoxon(diff)
-            diff_sum = np.mean(diff)
+        interaction, pval = _check_mut_interaction(
+            expected, actual,
+            pval_thresh=mut_pval_thresh,
+            method="wilcox_unpaired")
 
-        # summary info
-        if (pval < pval_thresh) and (diff_sum > 0):
-            print "SYNERGY", diff_sum
-            num_synergy += 1
-            interaction = "SYNERGY"
-        elif (pval < pval_thresh) and (diff_sum < 0):
-            print "BUFFER", diff_sum
-            num_buffer += 1
-            interaction = "BUFFER"
-        else:
-            print "ADDITIVE", diff_sum
-            num_additive += 1
-            interaction = "ADDITIVE"
-            
+        # save out
         results["actual"].append(actual.mean())
         results["expected"].append(expected.mean())
-        #results["expected"].append(np.mean(check_data["0,1"] + np.mean(check_data["1,0"])))
         results["diff"].append((actual - expected).mean())
         results["interaction"].append(interaction)
         
@@ -531,13 +605,14 @@ def analyze_combinations(
     results_adj = []
     days = ["d0", "d3", "d6"]
     for key in sorted(results.keys()):
+        print key
         data = np.stack(results[key], axis=0)
         print key, data.shape
         if "traj.medians" in key:
             header = ["{}.{}".format(key, day) for day in days]
             data = pd.DataFrame(data=data, columns=header)
         elif "mut.medians" in key:
-            header = ["0,0", "0,1", "1,0", "1,1"]
+            header = ["-1", "0,0", "0,1", "1,0", "1,1"]
             data = pd.DataFrame(data=data, columns=header)
         else:
             data = pd.DataFrame(data=data, columns=[key])
@@ -765,7 +840,9 @@ def main():
     add_metadata(summary_file, grammar_dir, summary_annot_file)
     
     # plotting results
-    os.system("Rscript ~/git/ggr-project/R/plot.mpra.testing.R {}".format(summary_annot_file))
+    summary_plot_file = "{}/summary.expected_v_actual.pdf".format(results_dir)
+    os.system("Rscript ~/git/ggr-project/R/plot.mpra.testing.R {} {}".format(
+        summary_annot_file, summary_plot_file))
     
     return
 
