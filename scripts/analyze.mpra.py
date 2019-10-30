@@ -266,7 +266,8 @@ def _average_data(
     return data
 
 
-def _normalize_for_trajectory_tests(grammar_data_avg, metadata_headers):
+def _normalize_for_trajectory_tests(
+        grammar_data_avg, metadata_headers, method="d0_norm"):
     """normalize for trajectory plots/analysis
     """
     # mean center
@@ -281,17 +282,31 @@ def _normalize_for_trajectory_tests(grammar_data_avg, metadata_headers):
     grammar_data_traj = grammar_data_traj.dropna(axis=0)
     grammar_data_traj["day"] = grammar_data_traj["variable"].apply(
         lambda x: re.sub("_.+", "", x))
-        
-    # then adjust to 0 median
-    combos = ["-1", "0,0", "1,0", "0,1", "1,1"]
-    days = ["d0_AVG", "d3_AVG", "d6_AVG"]
-    for combo in combos:
-        d0_median = grammar_data_traj[
-            (grammar_data_traj["combos"] == combo) &
-            (grammar_data_traj["day"] == "d0")]["value"].median()
-        grammar_data_traj.loc[grammar_data_traj["combos"] == combo, "value"] = grammar_data_traj.loc[
-            grammar_data_traj["combos"] == combo, "value"] - d0_median
 
+    if method == "d0_norm":
+        # then adjust to 0 median for each combo
+        combos = ["-1", "0,0", "1,0", "0,1", "1,1"]
+        for combo in combos:
+            d0_median = grammar_data_traj[
+                (grammar_data_traj["combos"] == combo) &
+                (grammar_data_traj["day"] == "d0")]["value"].median()
+            grammar_data_traj.loc[grammar_data_traj["combos"] == combo, "value"] = grammar_data_traj.loc[
+                grammar_data_traj["combos"] == combo, "value"] - d0_median
+    elif method == "d0_endog_norm":
+        # normalize all to 0 median for endogenous
+        d0_median = grammar_data_traj[
+            (grammar_data_traj["combos"] == "0,0") &
+            (grammar_data_traj["day"] == "d0")]["value"].median()
+        grammar_data_traj["value"] = grammar_data_traj["value"] - d0_median
+    elif method == "d0_double_mut_norm":
+        # normalize all to 0 median for double mut
+        d0_median = grammar_data_traj[
+            (grammar_data_traj["combos"] == "1,1") &
+            (grammar_data_traj["day"] == "d0")]["value"].median()
+        grammar_data_traj["value"] = grammar_data_traj["value"] - d0_median
+    else:
+        raise ValueError, "method not implemented!"
+        
     return grammar_data_traj
 
 
@@ -435,19 +450,25 @@ def _attach_null_result(results, interaction_msg):
     results["actual"].append(0)
     results["expected"].append(0)
     results["diff"].append(0)
+    results["traj.sig"].append(0)
     results["interaction"].append(interaction_msg)
 
     return results
 
 
 def analyze_combinations(
-        data_file, out_dir,
+        data_file,
+        grammar_dir,
+        out_dir,
         signal_thresh=0.5,
         mut_pval_thresh=0.10,
         drop_reps=["b4"],
-        filter_synergy=True):
+        filter_synergy=True,
+        plot=True):
+    """analyze results and do statistical tests
     """
-    """
+    r_dir = "/users/dskim89/git/ggr-project/R"
+    
     # load data and set up
     data, signal_headers, grammars = _load_data_and_setup(
         data_file, drop_reps, filter_synergy)
@@ -457,6 +478,10 @@ def analyze_combinations(
     results = {
         "grammar": [],
         "day": [],
+        "pwm1": [],
+        "pwm1_clean": [],
+        "pwm2": [],
+        "pwm2_clean": [],
         "traj.medians": [],
         "traj.sig": [],
         "mut.medians": [],
@@ -469,6 +494,22 @@ def analyze_combinations(
     for grammar in grammars:
         print grammar
         grammar_prefix = "{}/{}".format(out_dir, grammar)
+
+        # pull gml, get nodes, sort
+        grammar_gml = "{}/{}.gml".format(grammar_dir, grammar)
+        grammar_graph = nx.read_gml(grammar_gml)
+        nodes = list(grammar_graph.nodes.data("pwmidx"))
+        nodes.sort(key=lambda x: x[1])
+        
+        # 0,1 means the first pwm (index order) is still present
+        pwm1 = nodes[0][0]
+        pwm2 = nodes[1][0]
+
+        # clean
+        clean1 = re.sub("HCLUST-\\d+_", "", pwm1)
+        pwm1_clean = re.sub(".UNK.0.A", "", clean1)
+        clean2 = re.sub("HCLUST-\\d+_", "", pwm2)
+        pwm2_clean = re.sub(".UNK.0.A", "", clean2)
         
         # get traj to day
         traj_to_day = {
@@ -502,25 +543,41 @@ def analyze_combinations(
         # start saving results
         results["grammar"].append(grammar)
         results["day"].append(day)
-
+        results["pwm1"].append(pwm1)
+        results["pwm1_clean"].append(pwm1_clean)
+        results["pwm2"].append(pwm2)
+        results["pwm2_clean"].append(pwm2_clean)
+        
         # ----------------------
         # trajectory hypothesis
         # ----------------------
-        plot_prefix = "{}.traj".format(grammar_prefix)
-        
-        # normalize
+        # normalize to each combos' day 0 and plot
+        # note that since the results are now relative to day 0,
+        # it's important to normalize each combo to its day 0
+        # and NOT normalize all to endog's day 0
         grammar_data_traj = _normalize_for_trajectory_tests(
-            grammar_data_avg, metadata_headers)
-        
-        # plot
-        plot_data_file = "{}.traj.data.txt.gz".format(grammar_prefix)
-        grammar_data_traj.to_csv(
-            plot_data_file, sep="\t", compression="gzip", header=True, index=False)
-        plot_cmd = "/users/dskim89/git/ggr-project/R/plot.mpra.hypothesis.traj.R {} {}".format(
-            plot_data_file, plot_prefix)
-        print plot_cmd
-        #os.system(plot_cmd)
-        
+            grammar_data_avg, metadata_headers, method="d0_norm")
+        if plot:
+            # drop 1 max and 1 min value (for extreme outliers)
+            plot_data_file = "{}.traj.data.txt.gz".format(grammar_prefix)
+            plot_data = grammar_data_traj.copy()
+            plot_data = plot_data[plot_data["value"] != plot_data["value"].max()]
+            plot_data = plot_data[plot_data["value"] != plot_data["value"].min()]
+            # adjust combo names
+            plot_data["pwms"] = "scr-CTL"
+            plot_data.loc[plot_data["combos"] == "0,0", "pwms"] = "{0},{1}".format(pwm1_clean,pwm2_clean)
+            plot_data.loc[plot_data["combos"] == "0,1", "pwms"] = "{0},{1}-scr".format(pwm1_clean,pwm2_clean)
+            plot_data.loc[plot_data["combos"] == "1,0", "pwms"] = "{0}-scr,{1}".format(pwm1_clean,pwm2_clean)
+            plot_data.loc[plot_data["combos"] == "1,1", "pwms"] = "double scramble"
+            plot_data.loc[plot_data["combos"] == "-1", "pwms"] = "scr-CTL"
+            plot_data.to_csv(
+                plot_data_file, sep="\t", compression="gzip", header=True, index=False)
+            plot_cmd = "{}/plot.mpra.hypothesis.traj.R {} {}.traj".format(
+                r_dir, plot_data_file, grammar_prefix)
+            print plot_cmd
+            os.system(plot_cmd)
+            os.system("rm {}".format(plot_data_file))
+            
         # save out medians for endogenous seq
         endog_norm = grammar_data_traj[grammar_data_traj["combos"]=="0,0"].drop(
             ["combos", "day"], axis=1)
@@ -530,26 +587,18 @@ def analyze_combinations(
         results["traj.medians"].append(traj_medians)
 
         # testing (don't quit here, save out as much as possible)
-        passed_traj_vs_double_mut = _check_traj_endogenous_vs_double_mut(
-            grammar_data_traj, days=["d0", "d3", "d6"])
         passed_traj_pattern, day_key = _check_traj_pattern(traj_medians, day_key)
-
-        # don't continue if failed tests
         if not passed_traj_pattern:
             results = _attach_null_result(results, "FAILED.TRAJ_PATTERN")
             continue
 
-        # separately consider traj sig
-        if passed_traj_vs_double_mut:
-            results["traj.sig"].append(1)
-        else:
-            results["traj.sig"].append(0)
+        # run test here, results saved out later
+        passed_traj_vs_double_mut = _check_traj_endogenous_vs_double_mut(
+            grammar_data_traj, days=["d0", "d3", "d6"])
         
         # ----------------------
         # mutational hypothesis
         # ----------------------
-        plot_prefix = "{}.mut.{}".format(grammar_prefix, day_key)
-        
         # normalize and only keep those that have 1,1 (baseline val)
         grammar_data_mut = _normalize_for_mutational_test(
             grammar_data_avg, metadata_headers)
@@ -560,14 +609,31 @@ def analyze_combinations(
             continue
         
         # plot
-        plot_data_file = "{}.mut.agg_data.txt.gz".format(grammar_prefix)
-        grammar_data_mut.to_csv(
-            plot_data_file, sep="\t", compression="gzip", header=True, index=False)
-        plot_cmd = "/users/dskim89/git/ggr-project/R/plot.mpra.hypothesis.mut.R {} {} {}".format(
-            plot_data_file, day_key, plot_prefix)
-        print plot_cmd
-        #os.system(plot_cmd)
-        
+        if plot:
+            # remove 1 max and 1 min val (extreme outliers)
+            plot_data_file = "{}.mut.agg_data.txt.gz".format(grammar_prefix)
+            plot_data = grammar_data_mut.copy()
+            day_keys = ["d0_AVG", "d3_AVG", "d6_AVG"]
+            max_val = plot_data[day_keys].max().max()
+            min_val = plot_data[day_keys].min().min()
+            for day in day_keys:
+                plot_data.loc[plot_data[day] == max_val, day] = np.nan
+                plot_data.loc[plot_data[day] == min_val, day] = np.nan
+            # adjust combo names
+            plot_data["pwms"] = "scr-CTL"
+            plot_data.loc[plot_data["combos"] == "0,0", "pwms"] = "{0},{1}".format(pwm1_clean,pwm2_clean)
+            plot_data.loc[plot_data["combos"] == "0,1", "pwms"] = "{0},scr".format(pwm1_clean,pwm2_clean)
+            plot_data.loc[plot_data["combos"] == "1,0", "pwms"] = "scr,{1}".format(pwm1_clean,pwm2_clean)
+            plot_data.loc[plot_data["combos"] == "1,1", "pwms"] = "double scramble".format(pwm1_clean,pwm2_clean)
+            plot_data.loc[plot_data["combos"] == "-1", "pwms"] = "scr-CTL"
+            plot_data.to_csv(
+                plot_data_file, sep="\t", compression="gzip", header=True, index=False)
+            plot_cmd = "{0}/plot.mpra.hypothesis.mut.R {1} {2} {3}.mut.{2}".format(
+                r_dir, plot_data_file, day_key, grammar_prefix)
+            print plot_cmd
+            os.system(plot_cmd)
+            os.system("rm {}".format(plot_data_file))
+
         # testing - pivot table
         check_data = grammar_data_mut.set_index(
             metadata_headers)[[day_key]].reset_index()
@@ -575,7 +641,6 @@ def analyze_combinations(
         check_data = check_data.set_index("example_id")
         
         # don't continue if endogenous is not positive
-        #endog_over_background_thresh = -0.25
         passed_positive_over_double_mut = (
             check_data["0,0"].mean() >= 0) and (check_data["0,0"].median() >= 0)
         if not passed_positive_over_double_mut:
@@ -600,6 +665,13 @@ def analyze_combinations(
         results["expected"].append(expected.mean())
         results["diff"].append((actual - expected).mean())
         results["interaction"].append(interaction)
+
+        # separately consider traj sig        
+        if passed_traj_vs_double_mut:
+            results["traj.sig"].append(1)
+        else:
+            results["traj.sig"].append(0)
+
         
     # create summary
     results_adj = []
@@ -618,9 +690,11 @@ def analyze_combinations(
             data = pd.DataFrame(data=data, columns=[key])
         results_adj.append(data)
     results = pd.concat(results_adj, axis=1)
-    #results = results.sort_values(["interaction", "diff"])
-    results = results.sort_values(["0,1", "1,0"])
-    results = results.sort_values(["expected"])
+
+    # some extra calcs
+    traj_headers = ["traj.medians.{}".format(day) for day in days]
+    results["max_diff"] = results[traj_headers].abs().max(axis=1)
+    results = results.sort_values(["interaction", "max_diff"])
     
     # save out
     summary_file = "{}/summary.txt.gz".format(out_dir)
@@ -629,7 +703,7 @@ def analyze_combinations(
     return None
 
 
-def add_metadata(summary_file, grammar_dir, out_file):
+def add_metadata_OLD(summary_file, grammar_dir, out_file):
     """add in pwm names and match to mut order
     """
     # data
@@ -829,6 +903,7 @@ def main():
     if True:
         analyze_combinations(
             signal_mat_file,
+            grammar_dir,
             results_dir,
             signal_thresh=0,
             drop_reps=[],
@@ -836,13 +911,13 @@ def main():
         
     # overlap with metadata to get pwm names (and ordering)
     summary_file = "{}/summary.txt.gz".format(results_dir)
-    summary_annot_file = "{}/summary.annotated.txt.gz".format(results_dir)
-    add_metadata(summary_file, grammar_dir, summary_annot_file)
+    #summary_annot_file = "{}/summary.annotated.txt.gz".format(results_dir)
+    #add_metadata(summary_file, grammar_dir, summary_annot_file)
     
     # plotting results
     summary_plot_file = "{}/summary.expected_v_actual.pdf".format(results_dir)
     os.system("Rscript ~/git/ggr-project/R/plot.mpra.testing.R {} {}".format(
-        summary_annot_file, summary_plot_file))
+        summary_file, summary_plot_file))
     
     return
 

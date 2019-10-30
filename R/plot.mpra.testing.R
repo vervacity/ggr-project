@@ -14,7 +14,7 @@ data <- read.table(gzfile(data_file), sep="\t", header=TRUE)
 # set up
 data$labels <- paste(data$pwm1_clean, data$pwm2_clean, sep=",")
 data <- data[data$interaction != "FAILED.NEGATIVE_ENDOG",]
-data <- data[data$interaction != "FAILED.TRAJ",]
+data <- data[data$interaction != "FAILED.TRAJ_PATTERN",]
 
 # plot
 ggplot(data, aes(x=expected, y=actual, colour=interaction)) +
