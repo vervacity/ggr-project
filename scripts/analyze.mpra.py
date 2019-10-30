@@ -464,7 +464,7 @@ def analyze_combinations(
         mut_pval_thresh=0.10,
         drop_reps=["b4"],
         filter_synergy=True,
-        plot=True):
+        plot=False):
     """analyze results and do statistical tests
     """
     r_dir = "/users/dskim89/git/ggr-project/R"
@@ -478,6 +478,7 @@ def analyze_combinations(
     results = {
         "grammar": [],
         "day": [],
+        "day_empirical": [],
         "pwm1": [],
         "pwm1_clean": [],
         "pwm2": [],
@@ -588,6 +589,7 @@ def analyze_combinations(
 
         # testing (don't quit here, save out as much as possible)
         passed_traj_pattern, day_key = _check_traj_pattern(traj_medians, day_key)
+        results["day_empirical"].append(day_key)
         if not passed_traj_pattern:
             results = _attach_null_result(results, "FAILED.TRAJ_PATTERN")
             continue
@@ -616,7 +618,7 @@ def analyze_combinations(
             day_keys = ["d0_AVG", "d3_AVG", "d6_AVG"]
             max_val = plot_data[day_keys].max().max()
             min_val = plot_data[day_keys].min().min()
-            for day in day_keys:
+            for day in day_keys: # NOTE: day_key is an important variable 
                 plot_data.loc[plot_data[day] == max_val, day] = np.nan
                 plot_data.loc[plot_data[day] == min_val, day] = np.nan
             # adjust combo names
@@ -701,45 +703,6 @@ def analyze_combinations(
     results.to_csv(summary_file, sep="\t", compression="gzip", index=False, header=True)
     
     return None
-
-
-def add_metadata_OLD(summary_file, grammar_dir, out_file):
-    """add in pwm names and match to mut order
-    """
-    # data
-    data = pd.read_csv(summary_file, sep="\t")
-    data["pwm1_clean"] = "NA"
-    data["pwm2_clean"] = "NA"
-    data["pwm1"] = "NA"
-    data["pwm2"] = "NA"
-    
-    # attach node names
-    for grammar_idx in data.index:
-        grammar_prefix =  data["grammar"][grammar_idx]
-        grammar_gml = "{}/{}.gml".format(grammar_dir, grammar_prefix)
-        grammar = nx.read_gml(grammar_gml)
-
-        # get nodes and order by idx
-        nodes = list(grammar.nodes.data("pwmidx"))
-        nodes.sort(key=lambda x: x[1])
-        
-        # 0,1 means the first pwm (index order) is still present
-        data.loc[grammar_idx, "pwm1"] = nodes[0][0]
-        data.loc[grammar_idx, "pwm2"] = nodes[1][0]
-
-        # clean
-        clean1 = re.sub("HCLUST-\\d+_", "", nodes[0][0])
-        clean1 = re.sub(".UNK.0.A", "", clean1)
-        data.loc[grammar_idx, "pwm1_clean"] = clean1
-        
-        clean2 = re.sub("HCLUST-\\d+_", "", nodes[1][0])
-        clean2 = re.sub(".UNK.0.A", "", clean2)
-        data.loc[grammar_idx, "pwm2_clean"] = clean2
-
-    # save out
-    data.to_csv(out_file, sep="\t", compression="gzip", header=True, index=False)
-    
-    return
 
 
 def main():
@@ -900,7 +863,7 @@ def main():
     # analyze
     results_dir = "{}/combinatorial_rules".format(OUT_DIR)
     os.system("mkdir -p {}".format(results_dir))
-    if True:
+    if False:
         analyze_combinations(
             signal_mat_file,
             grammar_dir,
@@ -908,16 +871,17 @@ def main():
             signal_thresh=0,
             drop_reps=[],
             filter_synergy=True)
-        
-    # overlap with metadata to get pwm names (and ordering)
-    summary_file = "{}/summary.txt.gz".format(results_dir)
-    #summary_annot_file = "{}/summary.annotated.txt.gz".format(results_dir)
-    #add_metadata(summary_file, grammar_dir, summary_annot_file)
     
-    # plotting results
+    # plot expected vs actual
+    summary_file = "{}/summary.txt.gz".format(results_dir)
     summary_plot_file = "{}/summary.expected_v_actual.pdf".format(results_dir)
-    os.system("Rscript ~/git/ggr-project/R/plot.mpra.testing.R {} {}".format(
-        summary_file, summary_plot_file))
+    #os.system("Rscript ~/git/ggr-project/R/plot.mpra.summary.R {} {}".format(
+    #    summary_file, summary_plot_file))
+
+    # plot rule map
+    map_plot_file = "{}/summary.rule_map.pdf".format(results_dir)
+    os.system("Rscript ~/git/ggr-project/R/plot.mpra.rule_map.R {} {}".format(
+        summary_file, map_plot_file))
     
     return
 
