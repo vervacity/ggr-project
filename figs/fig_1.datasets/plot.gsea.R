@@ -51,11 +51,10 @@ ggr_colors <- c(ggr_colors, name_colors)
 ggplot(gsea_summary, aes(x=timepoints, y=NES, group=NAME)) +
     ggtitle("Gene set enrichments") +
     geom_line(aes(colour=NAME)) +
-    geom_point(shape=21, stroke=1, fill="white", aes(colour=timepoints), show.legend=FALSE) +
-    labs(x="Timepoint (day)") +
+    geom_point(shape=21, size=1.75, stroke=0.5, fill="white", aes(colour=timepoints), show.legend=FALSE) +
+    labs(x="Timepoint (day)", y="GSEA NES") +
     theme_bw() +
     theme(
-        aspect.ratio=1,
         text=element_text(family="ArialMT"),
         plot.title=element_text(size=8, margin=margin(b=1)),
         panel.background=element_blank(),
@@ -76,4 +75,4 @@ ggplot(gsea_summary, aes(x=timepoints, y=NES, group=NAME)) +
     scale_color_manual(values=ggr_colors) +
     scale_y_continuous(limits=c(3.5, 6), expand=c(0,0)) +
 
-ggsave(line_plot_file, height=2, width=2.5, useDingbats=FALSE)
+ggsave(line_plot_file, height=1.9, width=2.2, useDingbats=FALSE)

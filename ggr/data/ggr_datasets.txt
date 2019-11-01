@@ -5,6 +5,8 @@ H3K27ac ChIP-seq	1						1						1
 H3K4me1 ChIP-seq	1						1						1
 H3K27me3 ChIP-seq	1						1						1
 CTCF ChIP-seq	1						1						1
+HiChIP	1						1						1
 RAMPAGE	1	1	1	1	1	1	1	1	1	1	1	1	1
 RNA-seq (polyA+)	1						1						1
 RNA-seq (Ribo-Zero)	1						1						1
+

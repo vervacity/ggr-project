@@ -66,7 +66,7 @@ p <- p + geom_point(
 # cleanup
 p <- p + 
     ylab(NULL) + 
-    xlab("Timepoint (days)") + 
+    xlab("Timepoint (day)") + 
     theme_bw() + 
     theme(
         text=element_text(family="ArialMT"),

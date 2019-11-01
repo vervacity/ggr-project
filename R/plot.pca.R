@@ -47,11 +47,11 @@ pca_data$group <- row.names(pca_data)
 group_levels <- colnames(all_data)
 
 if (!grepl("histone", plot_file, fixed=TRUE)) {
-    group_levels <- gsub("0_", ".0 ", group_levels)
-    group_levels <- gsub("5_", ".5 ", group_levels)
+    group_levels <- gsub("0_", ".0_", group_levels)
+    group_levels <- gsub("5_", ".5_", group_levels)
 
-    pca_data$group <- gsub("0_", ".0 ", pca_data$group)
-    pca_data$group <- gsub("5_", ".5 ", pca_data$group)
+    pca_data$group <- gsub("0_", ".0_", pca_data$group)
+    pca_data$group <- gsub("5_", ".5_", pca_data$group)
 }
 
 pca_data$group <- factor(pca_data$group, levels=group_levels)
@@ -84,13 +84,15 @@ my_colors_joint <- c(my_colors_r1, my_colors_r2)
 p <- ggplot(pca_data, aes(x=x, y=y, colour=group, fill=day)) +
     geom_tile() + 
     geom_tile(size=1.1, fill="white", colour="white", show.legend=FALSE) +
-    geom_point(size=1, show.legend=FALSE) + # size=0.25
+    #geom_point(size=1, show.legend=FALSE) + # size=0.25
+    geom_point(shape=21, fill="white", size=1.75, stroke=0.5, show.legend=FALSE) +
     labs(x="PC1", y="PC2", title=title) + 
     scale_color_manual(values=my_colors_joint, guide="none") +
     scale_fill_manual(values=my_colors) +
+    coord_fixed() +
     theme_bw() +
     theme(
-        aspect.ratio=1,
+        #aspect.ratio=1,
         text=element_text(family="ArialMT"),
         plot.margin=margin(5,20,1,0),
         plot.title=element_text(size=8, margin=margin(b=1)),
@@ -132,8 +134,8 @@ if (grepl("H3K27me3", plot_file, fixed=TRUE)) {
 }
 
 
-p <- p + scale_x_continuous(limits=c(-scale_lim, scale_lim), expand=c(0,0)) +
-    scale_y_continuous(limits=c(-scale_lim, scale_lim), expand=c(0,0))
+p <- p + scale_x_continuous(limits=c(-scale_lim, scale_lim), expand=c(0,0)) #+
+    #scale_y_continuous(limits=c(-scale_lim, scale_lim), expand=c(0,0))
 
 
-ggsave(plot_file, height=2, width=2.5, useDingbats=FALSE)
+ggsave(plot_file, height=1.75, width=2.5, useDingbats=FALSE)
