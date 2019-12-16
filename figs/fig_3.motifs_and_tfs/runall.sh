@@ -24,38 +24,19 @@ SCANMOTIFS="/srv/scratch/dskim89/ggr/ggr.tronn.2019-06-17.footprinting/motifs.in
 MAPCHAIN_FILE="/srv/scratch/dskim89/ggr/ggr.tronn.2019-07-15.chipseq/hg19ToHg38.over.chain.gz"
 
 BIGWIG_FILE="/srv/scratch/dskim89/ggr/ggr.tronn.2019-04-30.cistrome/cistrome.44759.TP63.hg38.bw"
-python /users/dskim89/git/tronn/scripts/ggr/ggr_agg_chipseq_signal.py \
-       --motif_list $MOTIFS \
-       --data_file $SCANMOTIFS \
-       --motif_string TP53 \
-       --bigwig_files $BIGWIG_FILE \
-       --mapchain $MAPCHAIN_FILE \
-       -o chipseq \
-       --prefix chipseq
+#python /users/dskim89/git/tronn/scripts/ggr/ggr_agg_chipseq_signal.py --motif_list $MOTIFS --data_file $SCANMOTIFS --motif_string TP53 --bigwig_files $BIGWIG_FILE --mapchain $MAPCHAIN_FILE -o chipseq --prefix chipseq
 
 BIGWIG_FILE="/srv/scratch/dskim89/ggr/ggr.tronn.2019-04-30.cistrome/cistrome.48800.KLF4.hg38.bw"
-python /users/dskim89/git/tronn/scripts/ggr/ggr_agg_chipseq_signal.py \
-       --motif_list $MOTIFS \
-       --data_file $SCANMOTIFS \
-       --motif_string KLF12 \
-       --bigwig_files $BIGWIG_FILE \
-       --mapchain $MAPCHAIN_FILE \
-       -o chipseq \
-       --prefix chipseq
-
+#python /users/dskim89/git/tronn/scripts/ggr/ggr_agg_chipseq_signal.py --motif_list $MOTIFS --data_file $SCANMOTIFS --motif_string KLF12 --bigwig_files $BIGWIG_FILE --mapchain $MAPCHAIN_FILE -o chipseq --prefix chipseq
 
 BIGWIG_FILE="/srv/scratch/dskim89/ggr/ggr.tronn.2019-04-30.cistrome/cistrome.48799.ZNF750.hg38.bw"
-python /users/dskim89/git/tronn/scripts/ggr/ggr_agg_chipseq_signal.py \
-       --motif_list $MOTIFS \
-       --data_file $SCANMOTIFS \
-       --motif_string TFAP2A \
-       --bigwig_files $BIGWIG_FILE \
-       --mapchain $MAPCHAIN_FILE \
-       -o chipseq \
-       --prefix chipseq
+#python /users/dskim89/git/tronn/scripts/ggr/ggr_agg_chipseq_signal.py --motif_list $MOTIFS --data_file $SCANMOTIFS --motif_string TFAP2A --bigwig_files $BIGWIG_FILE --mapchain $MAPCHAIN_FILE -o chipseq --prefix chipseq
 
 # footprinting plots
-
+D0_BAM="/mnt/lab_data/kundaje/projects/skin/data/bds/processed.atac.2019-06-04.bams_bp-resolution/primary_keratinocyte-d00.GGR.Stanford_Greenleaf.ATAC-seq.pooled.fixedtrim.PE2SE.nodup.bam"
+D3_BAM="/mnt/lab_data/kundaje/projects/skin/data/bds/processed.atac.2019-06-04.bams_bp-resolution/primary_keratinocyte-d30.GGR.Stanford_Greenleaf.ATAC-seq.pooled.fixedtrim.PE2SE.nodup.bam"
+D6_BAM="/mnt/lab_data/kundaje/projects/skin/data/bds/processed.atac.2019-06-04.bams_bp-resolution/primary_keratinocyte-d60.GGR.Stanford_Greenleaf.ATAC-seq.pooled.fixedtrim.PE2SE.nodup.bam"
+python /users/dskim89/git/tronn/scripts/ggr/ggr_footprint_motifs.py --motif_list $MOTIFS --data_file $SCANMOTIFS --bam_files $D0_BAM $D3_BAM $D6_BAM -o footprints --prefix ggr --filter_motifs NFKB NFAT GRHL
 
 # pwm x rna (supplement)
 PVALS_FILE=$SIG_MOTIFS_DIR/pvals.rna_filt.corr_filt.h5

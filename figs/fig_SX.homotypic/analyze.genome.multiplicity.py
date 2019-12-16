@@ -125,8 +125,9 @@ def main():
     signal_keys = ["ATAC_SIGNALS", "H3K27ac_SIGNALS"]
     
     # read in the sig pwms
-    print "WARNING - check pwms file"
-    sig_pwms = list(pd.read_csv(sig_pwms_file, sep="\t", header=0).iloc[:,0])
+    sig_pwms = list(pd.read_csv(
+        sig_pwms_file, sep="\t", header=0, index_col=0).index.values)
+    print "{} sig pwms found".format(len(sig_pwms))
     
     # read in the list of all pwm names
     max_val_key = DataKeys.WEIGHTED_PWM_SCORES_POSITION_MAX_VAL
@@ -146,6 +147,22 @@ def main():
             [1 if pwm_name in global_name else 0
              for global_name in all_pwms])[0][0]
         print pwm_name_clean, pwm_global_idx
+
+        # reverse is in second half of indices
+        rc_idx = pwm_global_idx + num_pwms
+        pwm_indices = [pwm_global_idx, rc_idx]
+        
+        # get multiplicity
+        results = analyze_multiplicity(
+            motifs_files, pwm_indices, solo_filter=True)
+
+
+        # per level, get gene set and do gene set enrichments
+        
+        
+        quit()
+        
+        
         pwm_indices = [pwm_global_idx, pwm_global_idx]
 
         # reverse is in second half of indices

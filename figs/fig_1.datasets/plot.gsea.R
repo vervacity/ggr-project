@@ -51,7 +51,7 @@ ggr_colors <- c(ggr_colors, name_colors)
 ggplot(gsea_summary, aes(x=timepoints, y=NES, group=NAME)) +
     ggtitle("Gene set enrichments") +
     geom_line(aes(colour=NAME)) +
-    geom_point(shape=21, size=1.75, stroke=0.5, fill="white", aes(colour=timepoints), show.legend=FALSE) +
+    geom_point(shape=21, size=1.25, stroke=0.5, fill="white", aes(colour=timepoints), show.legend=FALSE) +
     labs(x="Timepoint (day)", y="GSEA NES") +
     theme_bw() +
     theme(

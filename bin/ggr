@@ -134,7 +134,7 @@ def main():
     args = runall(args, "ggr")
 
     # TODO run postprocessing results
-    if True:
+    if False:
         from ggr.workflows.inference import runall
         args = runall(args, "ggr")
     

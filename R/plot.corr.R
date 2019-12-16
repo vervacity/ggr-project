@@ -23,7 +23,7 @@ mylmat = rbind(
     c(4,1,3,0),
     c(0,0,6,0))
 mylwid = c(0.05,0.15,1,0.05)
-mylhei = c(0.05,0.15,1.5,0.5)
+mylhei = c(0.05,0.15,1.2,0.5)
 
 # pull the trajectory palettes
 row_colors <- get_trajectory_palette(15)

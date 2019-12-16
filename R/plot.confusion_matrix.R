@@ -31,12 +31,12 @@ plot_heatmap <- function(plot_data, color_set) {
         c(4,1,3,0),
         c(0,0,6,0))
     mylwid = c(0.05,0.15,1,0.05)
-    mylhei = c(0.05,0.15,1.5,0.5)
+    mylhei = c(0.05,0.15,1.2,0.5)
 
     # get GGR colors
     granularity <- 49
     my_palette <- colorRampPalette(
-        brewer.pal(9, "YlGnBu"))(granularity)
+        brewer.pal(9, "YlOrBr"))(granularity)
     row_colors <- get_trajectory_palette(15)
     col_colors <- get_trajectory_palette(11)
     
@@ -58,7 +58,7 @@ plot_heatmap <- function(plot_data, color_set) {
         
         labCol=rep("", ncol(plot_data)),        
         labRow=rep("", nrow(plot_data)),
-        
+
         keysize=0.1,
         key.title=NA,
         key.xlab=NA,
@@ -94,6 +94,7 @@ plot_heatmap <- function(plot_data, color_set) {
 
 
 # plot joint heatmap
+# NOTE: don't know how to shrinking heatmap2 smaller than this
 pdf(file=plot_file, height=2, width=1.25, useDingbats=FALSE, onefile=FALSE, family="ArialMT")
 plot_heatmap(data, "Blues")
 dev.off()

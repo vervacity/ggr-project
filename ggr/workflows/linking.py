@@ -347,4 +347,28 @@ def runall(args, prefix):
         if not os.path.isdir(traj_dir):
             run_traj_linking_workflow(args, prefix, "{}/{}".format(results_dir, links_dir))
 
+    # viz: filter hichip (loose threshold) links with proximity links
+    viz_dir = "{}/viz".format(results_dir)
+    if not os.path.isdir(viz_dir):
+        os.system("mkdir -p {}".format(viz_dir))
+        hichip_interactions = "{}/hichip/ggr.linking.ALL.overlap.interactions.txt.gz".format(results_dir)
+        proximity_interactions = "{}/proximity/ggr.linking.ALL.overlap.interactions.txt.gz".format(results_dir)
+        out_file = "{}/ggr.linking.proximity.hichip_overlap.interactions.txt.gz".format(viz_dir)
+        overlap_cmd = (
+            "bedtools slop -i {} -g {} -b {} | "
+            "bedtools intersect -u -a {} -b - | "
+            "sort -k1,1 -k2,2n | "
+            "bgzip -c > {}").format(
+                hichip_interactions,
+                args.inputs["annot"][args.cluster]["chromsizes"],
+                2500,
+                proximity_interactions,
+                out_file)
+        print overlap_cmd
+        os.system(overlap_cmd)
+        # index
+        tabix_cmd = "tabix -p bed {}".format(out_file)
+        print tabix_cmd
+        os.system(tabix_cmd)
+    
     return args

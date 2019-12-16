@@ -883,6 +883,10 @@ def regions_to_genes_w_correlation_filtering(
         filter_genes=filter_genes,
         chromsizes=chromsizes,
         extend_len=extend_len)
+
+    # read in - bug fix here for bedtools error
+    if not os.path.isfile(tmp_out_file):
+        return None, None
     linked_genes = pd.read_csv(tmp_out_file, sep="\t", header=0, index_col=0)
 
     # filter vs atac signal pattern
@@ -1047,7 +1051,7 @@ def build_confusion_matrix(
         genes = pd.read_csv(gene_file, sep="\t", index_col=0)
         genes = genes[genes.index.isin(all_rna_ids)]
         num_atac_regions = np.sum(atac["cluster"] == atac_id)
-        print "ATAC:", atac_id, num_atac_regions
+        #print "ATAC:", atac_id, num_atac_regions
         
         for rna_id in rna_cluster_ids:
             linked_genes = genes[genes.index.isin(rna.loc[rna_id])]
@@ -1072,7 +1076,7 @@ def build_confusion_matrix(
             else:
                 enrichment = linked_genes.shape[0] / float(num_possible_genes)
                 
-            print "    RNA:", rna_id, linked_genes.shape[0], num_possible_genes, enrichment, -np.log10(pval), stat
+            #print "    RNA:", rna_id, linked_genes.shape[0], num_possible_genes, enrichment, -np.log10(pval), stat
             #print table
             results[atac_id-1,rna_id-1] = stat #-np.log10(pval) # stat
             
@@ -1092,6 +1096,7 @@ def build_confusion_matrix(
     plot_file = "{}.pdf".format(prefix)
     plot_cmd = "plot.confusion_matrix.R {} {}".format(
         out_file, plot_file)
+    print plot_cmd
     run_shell_cmd(plot_cmd)
     
     return

@@ -85,7 +85,7 @@ p <- ggplot(pca_data, aes(x=x, y=y, colour=group, fill=day)) +
     geom_tile() + 
     geom_tile(size=1.1, fill="white", colour="white", show.legend=FALSE) +
     #geom_point(size=1, show.legend=FALSE) + # size=0.25
-    geom_point(shape=21, fill="white", size=1.75, stroke=0.5, show.legend=FALSE) +
+    geom_point(shape=21, fill="white", size=1.25, stroke=0.5, show.legend=FALSE) +
     labs(x="PC1", y="PC2", title=title) + 
     scale_color_manual(values=my_colors_joint, guide="none") +
     scale_fill_manual(values=my_colors) +
@@ -115,7 +115,7 @@ p <- ggplot(pca_data, aes(x=x, y=y, colour=group, fill=day)) +
         legend.key.size=unit(0.05, 'in'))
 
 # default scale (RNA)
-scale_lim <- 90
+scale_lim <- 110
 
 if (grepl("atac", plot_file, fixed=TRUE)) {
     scale_lim <- 130
@@ -133,9 +133,10 @@ if (grepl("H3K27me3", plot_file, fixed=TRUE)) {
     scale_lim <- 60
 }
 
+y_lim <- 0.75*scale_lim
 
-p <- p + scale_x_continuous(limits=c(-scale_lim, scale_lim), expand=c(0,0)) #+
-    #scale_y_continuous(limits=c(-scale_lim, scale_lim), expand=c(0,0))
+p <- p + scale_x_continuous(limits=c(-scale_lim, scale_lim), expand=c(0,0)) +
+    scale_y_continuous(limits=c(-y_lim, y_lim), expand=c(0,0))
 
 
 ggsave(plot_file, height=1.75, width=2.5, useDingbats=FALSE)

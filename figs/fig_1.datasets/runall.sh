@@ -22,28 +22,42 @@ atac_rep2_mat_file=$GGR_DIR/results/atac/timeseries/plots/ggr.atac.ends.counts.r
 
 rna_rep1_mat_file=$GGR_DIR/results/rna/timeseries/matrices/ggr.rna.counts.pc.expressed.timeseries_adj.rep1.rlog.dynamic.mat.txt.gz
 rna_rep2_mat_file=$GGR_DIR/results/rna/timeseries/matrices/ggr.rna.counts.pc.expressed.timeseries_adj.rep2.rlog.dynamic.mat.txt.gz
-$R_DIR/plot.pca.R fig_1.pca.rna.pdf $rna_rep1_mat_file $rna_rep2_mat_file
+#$R_DIR/plot.pca.R fig_1.pca.rna.pdf $rna_rep1_mat_file $rna_rep2_mat_file
 
 # gene set enrichment results
-$SCRIPT_DIR/plot.gsea.R $GGR_DIR/results/rna/timeseries/gsea/ggr.rna.gsea_results.txt.gz
+#$SCRIPT_DIR/plot.gsea.R $GGR_DIR/results/rna/timeseries/gsea/ggr.rna.gsea_results.txt.gz
 
 # vignettes - pulled from vis files
-#$SCRIPT_DIR/plot.rna_bar.R $GGR_DIR/results/rna/timeseries/matrices/ggr.rna.counts.pc.expressed.timeseries_adj.pooled.rlog.mat.txt.gz ENSG00000091409 gene_vals.ITGA6.pdf
 #$SCRIPT_DIR/plot.rna_bar.R $GGR_DIR/results/rna/timeseries/matrices/ggr.rna.counts.pc.expressed.timeseries_adj.pooled.rlog.mat.txt.gz ENSG00000170423 gene_vals.KRT78.pdf
 #$SCRIPT_DIR/plot.rna_bar.R $GGR_DIR/results/rna/timeseries/matrices/ggr.rna.counts.pc.expressed.timeseries_adj.pooled.rlog.mat.txt.gz ENSG00000245848 gene_vals.CEBPA.pdf
-#$SCRIPT_DIR/plot.rna_bar.R $GGR_DIR/results/rna/timeseries/matrices/ggr.rna.counts.pc.expressed.timeseries_adj.pooled.rlog.mat.txt.gz ENSG00000065618 gene_vals.COL17A1.pdf
 #$SCRIPT_DIR/plot.rna_bar.R $GGR_DIR/results/rna/timeseries/matrices/ggr.rna.counts.pc.expressed.timeseries_adj.pooled.rlog.mat.txt.gz ENSG00000132470 gene_vals.ITGB4.pdf
 
 # heatmaps
 #$SCRIPT_DIR/plot_trajs.py $GGR_DIR
 
 # linking plots
-#$SCRIPT_DIR/plot_linking.py $GGR_DIR
+$SCRIPT_DIR/plot_linking.py $GGR_DIR
 
 
 # --------------------
 # SUPPLEMENTS
 # --------------------
 
-
 # PCA for other datasets
+h3k27ac_rep1_mat_file=$GGR_DIR/results/histones/H3K27ac/plots/ggr.histone.H3K27ac.midpoints.counts.rep1.rlog.filt.mat.txt.gz
+h3k27ac_rep2_mat_file=$GGR_DIR/results/histones/H3K27ac/plots/ggr.histone.H3K27ac.midpoints.counts.rep2.rlog.filt.mat.txt.gz
+#$R_DIR/plot.pca.R fig_1.pca.histone.H3K27ac.pdf $h3k27ac_rep1_mat_file $h3k27ac_rep2_mat_file
+
+h3k4me1_rep1_mat_file=$GGR_DIR/results/histones/H3K4me1/plots/ggr.histone.H3K4me1.midpoints.counts.rep1.rlog.filt.mat.txt.gz
+h3k4me1_rep2_mat_file=$GGR_DIR/results/histones/H3K4me1/plots/ggr.histone.H3K4me1.midpoints.counts.rep2.rlog.filt.mat.txt.gz
+#$R_DIR/plot.pca.R fig_1.pca.histone.H3K4me1.pdf $h3k4me1_rep1_mat_file $h3k4me1_rep2_mat_file
+
+h3k27me3_rep1_mat_file=$GGR_DIR/results/histones/H3K27me3/plots/ggr.histone.H3K27me3.midpoints.counts.rep1.rlog.filt.mat.txt.gz
+h3k27me3_rep2_mat_file=$GGR_DIR/results/histones/H3K27me3/plots/ggr.histone.H3K27me3.midpoints.counts.rep2.rlog.filt.mat.txt.gz
+#$R_DIR/plot.pca.R fig_1.pca.histone.H3K27me3.pdf $h3k27me3_rep1_mat_file $h3k27me3_rep2_mat_file
+
+
+
+# other vignettes?
+#$SCRIPT_DIR/plot.rna_bar.R $GGR_DIR/results/rna/timeseries/matrices/ggr.rna.counts.pc.expressed.timeseries_adj.pooled.rlog.mat.txt.gz ENSG00000091409 gene_vals.ITGA6.pdf
+#$SCRIPT_DIR/plot.rna_bar.R $GGR_DIR/results/rna/timeseries/matrices/ggr.rna.counts.pc.expressed.timeseries_adj.pooled.rlog.mat.txt.gz ENSG00000065618 gene_vals.COL17A1.pdf

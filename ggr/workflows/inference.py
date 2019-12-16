@@ -23,19 +23,10 @@ from tronn.interpretation.syntax import analyze_syntax
 from tronn.interpretation.syntax import recombine_syntax_results
 
 
-def run_multiplicity_workflow(
-        args, prefix, sig_pwms_file, out_dir,
-        solo_filter=False, enrichments=True, plot=True):
-    """for sig pwms, look at multiplicity
+def _setup_motifs_files(args):
+    """convenience fn, make sure setup is same across 
+    multiplicity/orientation/spacing workflows
     """
-    _MAX_COUNT = 5
-    _MIN_HIT_REGIONS = 50
-    OUT_DIR = "{}/{}".format(args.outputs["results"]["inference"]["dir"], out_dir)
-    os.system("mkdir -p {}".format(OUT_DIR))
-    TMP_DIR = "{}/tmp".format(OUT_DIR)
-    os.system("mkdir -p {}".format(TMP_DIR))
-            
-    # set up motifs files being used
     motifs_files = {}
     motifs_files["early"] = "{}/{}/ggr.scanmotifs.h5".format(
         args.inputs["inference"][args.cluster]["scanmotifs_dir"],
@@ -46,22 +37,61 @@ def run_multiplicity_workflow(
     motifs_files["late"] = "{}/{}/ggr.scanmotifs.h5".format(
         args.inputs["inference"][args.cluster]["scanmotifs_dir"],
         args.inputs["inference"][args.cluster]["scanmotifs_late_dir"])
+
+    return motifs_files
+
+
+def _setup_signal_mats(args):
+    """convenience fn, load signals
+    """
+    # read in rna signals
+    rna_signal_file = args.outputs["data"][
+        "rna.counts.pc.expressed.timeseries_adj.pooled.rlog.dynamic.traj.mat"]
+    rna_signal_mat = pd.read_csv(rna_signal_file, sep="\t", index_col=0)
+    rna_signal_mat[:] = np.subtract(
+        rna_signal_mat.values,
+        np.expand_dims(rna_signal_mat.values[:,0], axis=-1))
+
+    # read in region signals
+    atac_signal_file = args.outputs["data"][
+        "atac.counts.pooled.rlog.dynamic.traj.mat"]
+    region_signal_mat = pd.read_csv(atac_signal_file, sep="\t", index_col=0)
+    region_signal_mat[:] = np.subtract(
+        region_signal_mat.values,
+        np.expand_dims(region_signal_mat.values[:,0], axis=-1))
+    region_signal_mat = region_signal_mat.drop("d05", axis=1)
+
+    return rna_signal_mat, region_signal_mat
+
+
+def run_multiplicity_workflow(
+        args, prefix, sig_pwms_file, out_dir,
+        solo_filter=False, enrichments=True, plot=True):
+    """for sig pwms, look at multiplicity
+    """
+    # params/dirs
+    _MAX_COUNT = 5
+    _MIN_HIT_REGIONS = 50
+    OUT_DIR = "{}/{}".format(
+        args.outputs["results"]["inference"]["dir"], out_dir)
+    os.system("mkdir -p {}".format(OUT_DIR))
+    TMP_DIR = "{}/tmp".format(OUT_DIR)
+    os.system("mkdir -p {}".format(TMP_DIR))
+            
+    # set up motifs files being used
+    motifs_files = _setup_motifs_files(args)
     
     # read in the sig pwms
-    sig_pwms = list(pd.read_csv(
-        sig_pwms_file, sep="\t", header=0, index_col=0).index.values)
-    logging.info("{} sig pwms found".format(len(sig_pwms)))
     sig_pwms_trajs = pd.read_csv(sig_pwms_file, sep="\t", header=0, index_col=0)
+    sig_pwms = list(sig_pwms_trajs.index.values)
+    logging.info("{} sig pwms found".format(len(sig_pwms)))
     
     # read in the list of all pwm names
     max_val_key = DataKeys.WEIGHTED_PWM_SCORES_POSITION_MAX_VAL
     with h5py.File(motifs_files["early"], "r") as hf:
         all_pwms = hf[max_val_key].attrs["pwm_names"]
     num_pwms = len(all_pwms)
-    print num_pwms
-
-    # traj to group
-    traj_to_group = args.inputs["inference"]["traj_to_group"]
+    logging.info("{} total pwms".format(num_pwms))
 
     # read in dynamic genes
     filter_genes = pd.read_table(
@@ -69,32 +99,20 @@ def run_multiplicity_workflow(
             "rna.counts.pc.expressed.timeseries_adj.pooled.rlog.dynamic.traj.mat"],
         index_col=0).index.values.tolist()
 
-    # read in rna signals
-    rna_signal_file = args.outputs["data"]["rna.counts.pc.expressed.timeseries_adj.pooled.rlog.dynamic.traj.mat"]
-    rna_signal_mat = pd.read_csv(rna_signal_file, sep="\t", index_col=0)
-    rna_signal_mat[:] = np.subtract(
-        rna_signal_mat.values,
-        np.expand_dims(rna_signal_mat.values[:,0], axis=-1))
-
-    # read in region signals
-    atac_signal_file = args.outputs["data"]["atac.counts.pooled.rlog.dynamic.traj.mat"]
-    region_signal_mat = pd.read_csv(atac_signal_file, sep="\t", index_col=0)
-    region_signal_mat[:] = np.subtract(
-        region_signal_mat.values,
-        np.expand_dims(region_signal_mat.values[:,0], axis=-1))
-    region_signal_mat = region_signal_mat.drop("d05", axis=1)
-
-    # other files
+    # read in signals, other files/params
+    rna_signal_mat, region_signal_mat = _setup_signal_mats(args)
     background_rna_file = args.outputs["data"]["rna.counts.pc.expressed.mat"]
     links_file = args.outputs["results"]["linking"]["links.proximity"]
     tss_file = args.outputs["annotations"]["tss.pc.bed"]
+    traj_to_group = args.inputs["inference"]["traj_to_group"]
+    signal_keys = args.inputs["inference"][args.cluster]["signal_keys"]
     
     # results arrays
     all_results = {}
-    signal_keys = args.inputs["inference"][args.cluster]["signal_keys"]
     for key in signal_keys:
         all_results[key] = []
     all_results["filt"] = []
+    all_results["num_regions"] = []
         
     # analyze each pwm
     keep_pwm_names = [] # attach to results h5 for plotting
@@ -137,7 +155,8 @@ def run_multiplicity_workflow(
             # save to summary array
             for key in signal_keys:
                 all_results[key].append(results[key]["count"])
-
+            all_results["num_regions"] = results["num_regions_per_count"]
+                
             # continue if not doing enrichments
             if not enrichments:
                 filt = 1
@@ -179,6 +198,8 @@ def run_multiplicity_workflow(
                             pval_thresh=1)
 
                     # do not continue if no linked genes
+                    if not os.path.isfile(tmp_genes_file):
+                        continue
                     linked_genes = pd.read_csv(tmp_genes_file, sep="\t", header=0)
                     if linked_genes.shape[0] == 0:
                         continue
@@ -229,6 +250,11 @@ def run_multiplicity_workflow(
                 out_key = "{}/filt".format(key)
                 out.create_dataset(out_key, data=filt)
                 out[out_key].attrs["pwm_names"] = keep_pwm_names
+        num_regions_per_count = np.stack(all_results["num_regions_per_count"], axis=0)
+        with h5py.File(h5_results_file, "a") as out:
+            out_key = "{}/num_regions".format(key)
+            out.create_dataset(out_key, data=num_regions_per_count)
+            out[out_key].attrs["pwm_names"] = keep_pwm_names
 
     # save out new sig pwms file
     new_sig_pwms_file = "{}/{}.multiplicity_filt.txt.gz".format(
@@ -239,6 +265,7 @@ def run_multiplicity_workflow(
     new_sig_pwms.to_csv(new_sig_pwms_file, sep="\t", compression="gzip")
     
     # and plot
+    # TODO move this plot outside to make easier to adjust?
     if plot:
         plot_cmd = "{}/plot.results.multiplicity.summary.R {} {}/genome.homotypic.multiplicity TRUE {}".format(
             "~/git/ggr-project/figs/fig_4.homotypic", h5_results_file,
@@ -261,64 +288,38 @@ def run_syntax_workflow(args, prefix, sig_pwms_file, out_dir):
     os.system("mkdir -p {}".format(OUT_DIR))
     TMP_DIR = "{}/tmp".format(OUT_DIR)
     os.system("mkdir -p {}".format(TMP_DIR))
-            
+                        
     # set up motifs files being used
-    motifs_files = {}
-    motifs_files["early"] = "{}/{}/ggr.scanmotifs.h5".format(
-        args.inputs["inference"][args.cluster]["scanmotifs_dir"],
-        args.inputs["inference"][args.cluster]["scanmotifs_early_dir"])
-    motifs_files["mid"] = "{}/{}/ggr.scanmotifs.h5".format(
-        args.inputs["inference"][args.cluster]["scanmotifs_dir"],
-        args.inputs["inference"][args.cluster]["scanmotifs_mid_dir"])
-    motifs_files["late"] = "{}/{}/ggr.scanmotifs.h5".format(
-        args.inputs["inference"][args.cluster]["scanmotifs_dir"],
-        args.inputs["inference"][args.cluster]["scanmotifs_late_dir"])
+    motifs_files = _setup_motifs_files(args)
     
     # read in the sig pwms
-    sig_pwms = list(pd.read_csv(
-        sig_pwms_file, sep="\t", header=0, index_col=0).index.values)
-    logging.info("{} sig pwms found".format(len(sig_pwms)))
     sig_pwms_trajs = pd.read_csv(sig_pwms_file, sep="\t", header=0, index_col=0)
+    sig_pwms = list(sig_pwms_trajs.index.values)
+    logging.info("{} sig pwms found".format(len(sig_pwms)))
     
     # read in the list of all pwm names
     max_val_key = DataKeys.WEIGHTED_PWM_SCORES_POSITION_MAX_VAL
     with h5py.File(motifs_files["early"], "r") as hf:
         all_pwms = hf[max_val_key].attrs["pwm_names"]
     num_pwms = len(all_pwms)
-    print num_pwms
-
-    # traj to group
-    traj_to_group = args.inputs["inference"]["traj_to_group"]
-
+    logging.info("{} total pwms".format(num_pwms))
+    
     # read in dynamic genes
     filter_genes = pd.read_table(
         args.outputs["data"][
             "rna.counts.pc.expressed.timeseries_adj.pooled.rlog.dynamic.traj.mat"],
         index_col=0).index.values.tolist()
 
-    # read in rna signals
-    rna_signal_file = args.outputs["data"]["rna.counts.pc.expressed.timeseries_adj.pooled.rlog.dynamic.traj.mat"]
-    rna_signal_mat = pd.read_csv(rna_signal_file, sep="\t", index_col=0)
-    rna_signal_mat[:] = np.subtract(
-        rna_signal_mat.values,
-        np.expand_dims(rna_signal_mat.values[:,0], axis=-1))
-
-    # read in region signals
-    atac_signal_file = args.outputs["data"]["atac.counts.pooled.rlog.dynamic.traj.mat"]
-    region_signal_mat = pd.read_csv(atac_signal_file, sep="\t", index_col=0)
-    region_signal_mat[:] = np.subtract(
-        region_signal_mat.values,
-        np.expand_dims(region_signal_mat.values[:,0], axis=-1))
-    region_signal_mat = region_signal_mat.drop("d05", axis=1)
-
-    # other files
+    # read in signals, other files/params
+    rna_signal_mat, region_signal_mat = _setup_signal_mats(args)
     background_rna_file = args.outputs["data"]["rna.counts.pc.expressed.mat"]
     links_file = args.outputs["results"]["linking"]["links.proximity"]
     tss_file = args.outputs["annotations"]["tss.pc.bed"]
+    traj_to_group = args.inputs["inference"]["traj_to_group"]
+    signal_keys = args.inputs["inference"][args.cluster]["signal_keys"]
     
     # results arrays
     all_results = {}
-    signal_keys = args.inputs["inference"][args.cluster]["signal_keys"]
     for key in signal_keys:
         all_results[key] = []
     all_results["filt"] = []
@@ -596,7 +597,9 @@ def runall(args, prefix):
     # output: differential motifs, scanned examples
     # -------------------------------------------
 
-    # DONE EXTERNAL TO CODEBASE - SEE TRONN SCRIPTS
+    # TRONN: scanmotifs
+    # TRONN: call_differential_motifs
+    # TRONN: intersect_pwm_x_rna
     
     # sig pwms file
     sig_pwms = "{}/{}".format(
@@ -615,8 +618,10 @@ def runall(args, prefix):
     # do not use solo filter, just care about if we see them dispersed in dynamic
     # regulatory regions. NOTE that this will give you GO enrichments
     # ANSWER: yes.
-    analysis_dir = "homotypic.dynamic.all.multiplicity"
+    # output: heatmap of counts of each instance
+    analysis_dir = "homotypic.dynamic.all.multiplicity.TMP"
     if not os.path.isdir(analysis_dir):
+        # TODO focus on results file (to split out plotting)?
         run_multiplicity_workflow(
             args, prefix, sig_pwms, analysis_dir,
             solo_filter=False, enrichments=True, plot=False)
@@ -676,6 +681,23 @@ def runall(args, prefix):
     
     # build a manual summary file that will grab the appropriate gene function chart
 
+    
+    # -------------------------------------------
+    # ANALYSIS - heterotypic - buildgrammars
+    # input: mutatemotifs outputs
+    # output: grammars
+    # -------------------------------------------
+
+    # tronn: run mutatemotifs using sig pwms above
+    # tronn: build grammars
+    # build 3s, but only consider 2s for main figure?
+
+    # still need a way to filter 3s to fit in supplements
+    # maybe higher threshold for 3s?
+    # or need a different test for 3s to get enrichment
+    
+    
+    # filter grammars
     
 
     
