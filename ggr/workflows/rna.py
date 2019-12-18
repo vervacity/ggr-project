@@ -151,13 +151,15 @@ def runall(args, prefix):
 
     # annotation - pull in Andrew preprocessed scRNA-seq
     # basal vs differentiated state and create gene sigs (.gmt) for gsea downstream
+    # only run if scRNA dataset available
     gsea_annot_dir = "{}/gsea".format(args.outputs["annotations"]["dir"])
     gene_sets_scRNA_file = "{}/genesets_scRNA.gmt".format(gsea_annot_dir)
-    if not os.path.isdir(gsea_annot_dir):
-        run_shell_cmd("mkdir -p {}".format(gsea_annot_dir))
-        get_gene_sets_from_scRNA_dataset(
-            args.inputs["annot"][args.cluster]["scRNA_diff"],
-            gene_sets_scRNA_file)
+    if args.inputs["annot"][args.cluster]["scRNA_diff"] != "":
+        if not os.path.isdir(gsea_annot_dir):
+            run_shell_cmd("mkdir -p {}".format(gsea_annot_dir))
+            get_gene_sets_from_scRNA_dataset(
+                args.inputs["annot"][args.cluster]["scRNA_diff"],
+                gene_sets_scRNA_file)
 
     # if using the sc data, merge in with other gene sets - if not, then don't
     if os.path.isdir(gsea_annot_dir):
@@ -309,19 +311,20 @@ def runall(args, prefix):
         # plot PCA/correlation additionally considering scRNA-seq samples
         # for this, pre-adjust scRNA-seq data to a mat file that matches the gene_mat order
         # NOTE: the normalizations too different, doesn't work (but keep for history)
-        match_sc_mat_file = "{}/{}.scRNA.mat.txt.gz".format(
-            plot_dir, prefix)
-        build_id_matching_mat(
-            gene_mat_files[0],
-            args.inputs["annot"][args.cluster]["scRNA_mat"],
-            match_sc_mat_file,
-            id_conversion_file=args.outputs["annotations"]["geneids.mappings.mat"])
-        gene_mat_files.append(match_sc_mat_file)
-        pca_file = "{}/{}.incl_scRNA.pca.pdf".format(
-            plot_dir,
-            os.path.basename(gene_mat_files[0]).split(".rep")[0])
-        plot_PCA(gene_mat_files, pca_file)
-
+        # only do this if sc data available
+        if args.inputs["annot"][args.cluster]["scRNA_mat"] != "":
+            match_sc_mat_file = "{}/{}.scRNA.mat.txt.gz".format(
+                plot_dir, prefix)
+            build_id_matching_mat(
+                gene_mat_files[0],
+                args.inputs["annot"][args.cluster]["scRNA_mat"],
+                match_sc_mat_file,
+                id_conversion_file=args.outputs["annotations"]["geneids.mappings.mat"])
+            gene_mat_files.append(match_sc_mat_file)
+            pca_file = "{}/{}.incl_scRNA.pca.pdf".format(
+                plot_dir,
+                os.path.basename(gene_mat_files[0]).split(".rep")[0])
+            plot_PCA(gene_mat_files, pca_file)
 
     # also output timepoint specific TSS files for expressed genes
     days = ["d00", "d30", "d60"]
