@@ -57,11 +57,11 @@ source activate ggr_env
 TMP_DIR=$L_SCRATCH
 
 # work dir
-WORK_DIR=/scratch/PI/khavari/users/dskim89/ggr/v1.1.0
+WORK_DIR=$PI_SCRATCH/users/dskim89/ggr/v1.1.0
 
 # figure out a way to control total threads at top level
 echo $SLURM_JOB_CPUS_PER_NODE
 
 # actual command
 ggr --cluster sherlock --threads $SLURM_JOB_CPUS_PER_NODE --out_dir $TMP_DIR
-rsync -avz --progress $TMP_DIR $WORK_DIR
+rsync -avz --progress $TMP_DIR/ $WORK_DIR/
