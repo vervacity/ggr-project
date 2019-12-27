@@ -99,7 +99,7 @@ def get_cluster_sufficient_stats(cluster_file, timeseries_file):
     
     # open up timeseries file and zscore
     timeseries_df = pd.read_table(timeseries_file, sep='\t', index_col=0)
-    timeseries_df = timeseries_df.apply(zscore, axis=1)
+    timeseries_df = timeseries_df.apply(zscore, axis=1).to_frame()
     timeseries_df["regions"] = timeseries_df.index
     
     # merge the two
