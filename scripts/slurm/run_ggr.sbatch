@@ -49,6 +49,7 @@
 ##SBATCH --gres gpu:1
 #module load py-tensorflow/1.7.0_py27
 module load R/3.4.0 
+module load java/1.8.0_131
 
 source ~/.bashrc
 source activate ggr_env
