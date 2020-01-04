@@ -12,16 +12,15 @@
 	"tronn_preprocess_annot":"/mnt/lab_data/kundaje/users/dskim89/annotations/tronnn_preprocess_annotations.json"
     },
     "sherlock":{
-	"chromsizes":"/oak/stanford/groups/khavari/users/dskim89/annotations/hg19.GRCh37/ucsc/hg19.chrom.sizes",
-	"gencode_all_gtf":"/oak/stanford/groups/khavari/users/dskim89/annotations/hg19.GRCh37/gencode/gencode.v19.annotation.gtf",
-	"gencode_proteincoding_gtf":"/oak/stanford/groups/khavari/users/dskim89/annotations/hg19.GRCh37/gencode/gencode.v19.annotation.protein_coding.gtf",
-	"fantom5_transcriptionfactor_csv":"/oak/stanford/groups/khavari/users/dskim89/annotations/hg19.GRCh37/fantom/fantom5_transcriptionfactors_hg19.csv",
-	"hocomoco_pwms":"/oak/stanford/groups/khavari/users/dskim89/annotations/hocomoco/v11/HOCOMOCOv11_core_pwms_HUMAN_mono.txt",
-	"hocomoco_metadata":"/oak/stanford/groups/khavari/users/dskim89/annotations/hocomoco/v11/HOCOMOCOv11_core_annotation_HUMAN_mono.tsv",
-	"custom_pwms":"/oak/stanford/groups/khavari/users/dskim89/annotations/khavari/pwms.custom.homer_format.txt",
+	"chromsizes":"/oak/stanford/groups/khavari/users/dskim89/ggr/annotations/hg19.chrom.sizes",
+	"gencode_all_gtf":"/oak/stanford/groups/khavari/users/dskim89/ggr/annotations/gencode.v19.annotation.gtf",
+	"fantom5_transcriptionfactor_csv":"/oak/stanford/groups/khavari/users/dskim89/ggr/annotations/fantom5_transcriptionfactors_hg19.csv",
+	"hocomoco_pwms":"/oak/stanford/groups/khavari/users/dskim89/ggr/annotations/HOCOMOCOv11_core_pwms_HUMAN_mono.txt",
+	"hocomoco_metadata":"/oak/stanford/groups/khavari/users/dskim89/ggr/annotations/HOCOMOCOv11_core_annotation_HUMAN_mono.tsv",
+	"custom_pwms":"/oak/stanford/groups/khavari/users/dskim89/ggr/annotations/pwms.custom.homer_format.txt",
 	"scRNA_mat": "",
 	"scRNA_diff": "",
-	"gsea_gene_sets": "",
+	"gsea_gene_sets": "/oak/stanford/groups/khavari/users/dskim89/ggr/annotations/genesets_ALL.gmt",
 	"tronn_preprocess_annot":"/oak/stanford/groups/khavari/users/dskim89/annotations/tronn_preprocess_annotations.json"
     }
 }
