@@ -104,6 +104,7 @@ def run_gsea_on_series(
         genesets_file,
         out_file,
         id_conversion_file=None,
+        gsea_jar_file="/users/dskim89/software/gsea/3.0/gsea-3.0.jar",
         tmp_dir="."):
     """gsea on sequence, aggregated to one output file
     """
@@ -126,7 +127,8 @@ def run_gsea_on_series(
             tmp_dir,
             os.path.basename(deseq_file).split(".txt")[0])
         gsea_results_files = run_gsea_on_mat(
-            tmp_rank_file, genesets_file, deseq_out_dir)
+            tmp_rank_file, genesets_file, deseq_out_dir,
+            gsea_jar_file=gsea_jar_file)
 
         # read in data and save to aggregate matrix
         # want to save p-vals and normalized enrichment scores
@@ -176,12 +178,14 @@ def build_gsea_rank_file(deseq_results_file, out_file, id_conversion_file=None):
 
 def run_gsea_on_mat(
         rank_file, genesets_file, out_dir,
-        min_geneset_size=15, max_geneset_size=1000):
+        min_geneset_size=15,
+        max_geneset_size=1000,
+        gsea_jar_file="/users/dskim89/software/gsea/3.0/gsea-3.0.jar"):
     """given a data mat, split to each column to run through prerank
     """
     #chip_file = "gseaftp.broadinstitute.org://pub/gsea/annotations/ENSEMBL_human_gene.chip"
     example_cmd = (
-        "java -cp ~/software/gsea/3.0/gsea-3.0.jar -Xmx1014m xtools.gsea.GseaPreranked "
+        "java -cp {} -Xmx1014m xtools.gsea.GseaPreranked "
         "-scoring_scheme classic "
         "-rnk {} "
         "-gmx {} "
@@ -189,6 +193,7 @@ def run_gsea_on_mat(
         "-set_min {} "
         "-out {} "
         "-gui false").format(
+            gsea_jar_file,
             rank_file,
             genesets_file,
             max_geneset_size,

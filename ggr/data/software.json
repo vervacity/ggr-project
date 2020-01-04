@@ -1,0 +1,8 @@
+{
+    "kundaje": {
+	"gsea_jar": "/users/dskim89/software/gsea/3.0/gsea-3.0.jar"
+    },
+    "sherlock": {
+	"gsea_jar": "/home/groups/khavari/users/dskim89/software/gsea-3.0.jar"
+    }
+}

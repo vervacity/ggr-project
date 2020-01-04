@@ -379,6 +379,7 @@ def runall(args, prefix):
             geneset_file,
             gsea_results_file,
             id_conversion_file=args.outputs["annotations"]["geneids.mappings.mat"],
+            gsea_jar_file=args.inputs["software"][args.cluster]["gsea_jar"],
             tmp_dir=gsea_dir)
 
     # TODO: maybe need to have a link to the cluster path and dir?
