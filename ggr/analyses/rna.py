@@ -19,7 +19,7 @@ def filter_for_hgnc_ids(mat_file, keep_ids_file, mapping_file, out_file):
     hgnc_ids = pd.read_csv(keep_ids_file, header=None).iloc[:,0].values.tolist()
     mappings = pd.read_csv(mapping_file, sep="\t", header=0, index_col=False)
     matches = mappings[mappings["hgnc_symbol"].isin(hgnc_ids)]
-    matches = matches.drop("entrezgene", axis=1)
+    matches = matches.drop("entrezgene_id", axis=1)
     matches = matches.set_index("ensembl_gene_id")
 
     # then filter mat file
