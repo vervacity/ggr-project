@@ -579,8 +579,8 @@ def run_dpgp(mat_file, prefix, out_dir, tmp_dir, subsample=False, subsample_num=
             "{0}/{1}".format(out_dir, prefix))
     run_shell_cmd(cluster)
 
-    # delete the unzipped tmp files
-    run_shell_cmd("rm {}/*.dpgp.tmp".format(tmp_dir))
+    # delete the unzipped tmp files <- don't need to since subsampled and small
+    #run_shell_cmd("rm {}/*.dpgp.subsampled.tmp".format(tmp_dir))
 
     # outfile name
     optimal_clusters = "{}/{}_optimal_clustering.txt".format(out_dir, prefix)
@@ -753,7 +753,7 @@ def plot_clusters(
         "{0} {1} {2} {3} {4}").format(
             cluster_subsample_file, cluster_mat, out_dir, prefix, title)
     print r_plot_heatmap
-    #run_shell_cmd(r_plot_heatmap)
+    run_shell_cmd(r_plot_heatmap)
 
     # individual clusters
     if plot_individual:

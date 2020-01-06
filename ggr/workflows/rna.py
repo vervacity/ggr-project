@@ -530,10 +530,14 @@ def runall(args, prefix):
     if not os.path.isdir(go_dir):
         run_shell_cmd("mkdir -p {}".format(go_dir))
         for single_cluster_file in single_cluster_files:
-            run_rdavid(
-                single_cluster_file,
-                args.outputs["annotations"]["geneids.pc.list"],
-                go_dir)
+            # turn off for now
+            if False:
+                run_rdavid(
+                    single_cluster_file,
+                    args.outputs["annotations"]["geneids.pc.list"],
+                    go_dir)
+            else:
+                pass
 
     # ------------------------------------------------
     # ANALYSIS - Biomarker QC
