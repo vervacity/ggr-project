@@ -537,6 +537,8 @@ def _convert_to_interaction_format(mat_file, out_file, score_val="pooled"):
     elif score_val == "max":
         data = data.fillna(0)
         data["pooled"] = data.values.max(axis=1)
+    elif score_val == "reps":
+        data["pooled"] = data["rep1"].map(str) + ";" + data["rep2"].map(str)
     else:
         raise ValueError, "not implemented!"
 
@@ -737,6 +739,82 @@ def get_timepoint_consistent_links(
     _convert_to_interaction_format(out_mat_file, interaction_file, score_val="max")
     
     return
+
+
+def get_union_links_signal_mat(
+        union_links, mat_files, out_file, out_dir,
+        colnames=["d0", "d3", "d6"],
+        reps=["b1", "b2"]):
+    """given mat files, build a union link set and then merge on the set
+    """
+    # tmp_dir
+    tmp_dir = "{}/tmp".format(out_dir)
+    os.system("mkdir -p {}".format(tmp_dir))
+
+    # first, make the mat files as if they were links files (signals comma sep)
+    adjusted_files = [union_links]
+    for mat_file in mat_files:
+        adjusted_file = "{}/{}.link_format.tmp.txt.gz".format(
+            tmp_dir, os.path.basename(mat_file).split(".txt")[0])
+        print adjusted_file
+        _convert_to_interaction_format(mat_file, adjusted_file, score_val="reps")
+        adjusted_files.append(adjusted_file)
+    
+    # map to first file
+    # map to union
+    matched_links_files = reconcile_interactions(
+        adjusted_files, tmp_dir, method="pooled")[1:]
+    print matched_links_files
+    
+    # format link files
+    interaction_files = []
+    for links_file in matched_links_files:
+        tmp_file = "{}/{}.coord_formatted.tmp.txt.gz".format(
+            tmp_dir,
+            os.path.basename(links_file).split(".bed")[0].split(".txt")[0])
+        _convert_to_coord_format(links_file, tmp_file)
+        interaction_files.append(tmp_file)
+
+    # merge to make a table
+    summary = None
+    for interaction_file_idx in range(len(interaction_files)):
+        # adjust data
+        interaction_file = interaction_files[interaction_file_idx]
+        data = pd.read_csv(interaction_file, sep="\t", header=None, index_col=None)
+        data.index = data[0].map(str) + "_x_" + data[1].map(str)
+
+        # get reps separated back out
+        rep_data = data[2].str.split(";", n=len(reps), expand=True)
+        for rep_idx in range(len(reps)):
+            header = "{}_{}".format(colnames[interaction_file_idx], reps[rep_idx])
+            data[header] = rep_data[rep_idx]
+        #data[colnames[interaction_file_idx]] = data[2]
+        data = data.drop([0,1,2], axis=1)
+
+        # merge. use UNION across timepoints
+        if summary is None:
+            summary = data.copy()
+        else:
+            summary = summary.merge(
+                data, how="outer", left_index=True, right_index=True)
+            
+    # fill na
+    summary = summary.fillna("0").astype(float)
+    
+    # quantile norm
+    summary[:] = quantile_norm(summary.values)
+
+    # remove constant rows
+    constant_row = np.all(
+        np.equal(
+            np.median(summary.values, axis=1, keepdims=True),
+            summary.values), axis=1)
+    summary = summary[~constant_row]
+
+    # save out
+    summary.to_csv(out_file, sep="\t", compression="gzip", header=True)
+    
+    return None
 
 
 def _get_aggregate_score(region_ids_string):

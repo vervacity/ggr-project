@@ -46,7 +46,9 @@ pca_data <- data.frame(x=pc1, y=pc2)
 pca_data$group <- row.names(pca_data)
 group_levels <- colnames(all_data)
 
-if (!grepl("histone", plot_file, fixed=TRUE)) {
+print(pca_data)
+
+if (!grepl("histone", plot_file, fixed=TRUE) & !grepl("hichip", plot_file, fixed=TRUE)) {
     group_levels <- gsub("0_", ".0_", group_levels)
     group_levels <- gsub("5_", ".5_", group_levels)
 
@@ -73,12 +75,21 @@ if (grepl("histone", plot_file, fixed=TRUE)) {
     my_colors <- c(my_colors[1], my_colors[7], my_colors[10])
     title <- "ChIP-seq"
 }
+if (grepl("hichip", plot_file, fixed=TRUE)) {
+    # only 3 colors
+    my_colors <- c(my_colors[1], my_colors[7], my_colors[10])
+    title <- "HiChIP"
+}
 
 # adjust shades for different reps
 my_colors_r1 <- my_colors
 my_colors_r1 <- lighten(my_colors, amount=0.2)
 my_colors_r2 <- darken(my_colors, amount=0.2)
-my_colors_joint <- c(my_colors_r1, my_colors_r2)
+if (grepl("hichip", plot_file, fixed=TRUE)) {
+    my_colors_joint <- c(rbind(my_colors_r1, my_colors_r2))
+} else {
+    my_colors_joint <- c(my_colors_r1, my_colors_r2)
+}
 
 # plot
 p <- ggplot(pca_data, aes(x=x, y=y, colour=group, fill=day)) +
@@ -131,6 +142,10 @@ if (grepl("H3K4me1", plot_file, fixed=TRUE)) {
 
 if (grepl("H3K27me3", plot_file, fixed=TRUE)) {
     scale_lim <- 60
+}
+
+if (grepl("hichip", plot_file, fixed=TRUE)) {
+    scale_lim <- 400
 }
 
 y_lim <- 0.75*scale_lim
