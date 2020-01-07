@@ -861,7 +861,8 @@ def run_stable_epigenome_workflow(
     plot_dir = "{}/plots".format(results_dir)
     
     # plot ATAC and histone marks
-    if not os.path.isdir(plot_dir):
+    #if not os.path.isdir(plot_dir):
+    if True:
         run_shell_cmd("mkdir -p {}".format(plot_dir))
 
         for subsample_bed_key in subsample_bed_keys:
@@ -903,7 +904,7 @@ def run_stable_epigenome_workflow(
                     plot_atac_ordered_subsample_file,
                     out_data[atac_stable_mat_key],
                     plot_dir,
-                    prefix,
+                    os.path.basename(plot_atac_ordered_subsample_file), # prefix
                     plot_individual=False)
 
             # plot the histone signal profiles with deeptools
@@ -935,7 +936,7 @@ def run_stable_epigenome_workflow(
                         color=histone_color)
                 
                 # and then make own heatmap file in R with matrix output
-                row_sep_file = "{}/{}.row_seps.txt".format(plot_dir, prefix)
+                row_sep_file = "{}/{}.row_seps.txt".format(plot_dir, os.path.basename(plot_atac_ordered_subsample_file))
                 out_mat_file = "{}.point.mat.gz".format(out_prefix)
                 out_r_file = "{}.replot.pdf".format(out_file.split(".pdf")[0])
                 if not os.path.isfile(out_r_file):
