@@ -46,8 +46,6 @@ pca_data <- data.frame(x=pc1, y=pc2)
 pca_data$group <- row.names(pca_data)
 group_levels <- colnames(all_data)
 
-print(pca_data)
-
 if (!grepl("histone", plot_file, fixed=TRUE) & !grepl("hichip", plot_file, fixed=TRUE)) {
     group_levels <- gsub("0_", ".0_", group_levels)
     group_levels <- gsub("5_", ".5_", group_levels)
@@ -73,7 +71,16 @@ if (grepl("atac", plot_file, fixed=TRUE)) {
 if (grepl("histone", plot_file, fixed=TRUE)) {
     # only 3 colors
     my_colors <- c(my_colors[1], my_colors[7], my_colors[10])
-    title <- "ChIP-seq"
+
+    if (grepl("H3K27ac", plot_file, fixed=TRUE)) {
+        title <- "H3K27ac ChIP-seq"
+    } else if (grepl("H3K4me1", plot_file, fixed=TRUE)) {
+        title <- "H3K4me1 ChIP-seq"
+    } else if (grepl("H3K27me3", plot_file, fixed=TRUE)) {
+        title <- "H3K27me3 ChIP-seq"
+    } else {
+        title <- "ChIP-seq"
+    }
 }
 if (grepl("hichip", plot_file, fixed=TRUE)) {
     # only 3 colors
