@@ -12,11 +12,25 @@
 	"hic.celltype_avg.tss": {
 	    "data_dir": "/mnt/lab_data/kundaje/projects/skin/data/linking/hic.celltype_avg.tss"
 	},
-	"hic.keratinocyte": {
-	    "data_dir": "/mnt/lab_data/kundaje/projects/skin/data/linking/hic.keratinocyte"
-	},
 	"hichip": {
 	    "data_dir": "/mnt/lab_data/kundaje/projects/skin/data/linking/hichip"
+	}
+    },
+    "sherlock": {
+	"distance": {
+	    "data_dir": "/oak/stanford/groups/khavari/users/dskim89/ggr/data/freeze.2019-09-06/linking/distance"
+	},
+	"distance.tss": {
+	    "data_dir": "/oak/stanford/groups/khavari/users/dskim89/ggr/data/freeze.2019-09-06/linking/distance.tss"
+	},
+	"hic.celltype_avg": {
+	    "data_dir": "/oak/stanford/groups/khavari/users/dskim89/ggr/data/freeze.2019-09-06/linking/hic.celltype_avg"
+	},
+	"hic.celltype_avg.tss": {
+	    "data_dir": "/oak/stanford/groups/khavari/users/dskim89/ggr/data/freeze.2019-09-06/linking/hic.celltype_avg.tss"
+	},
+	"hichip": {
+	    "data_dir": "/oak/stanford/groups/khavari/users/dskim89/ggr/data/freeze.2019-09-06/linking/hichip"
 	}
     }
 }
