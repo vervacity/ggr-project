@@ -10,9 +10,10 @@ library(scales)
 # args
 args <- commandArgs(trailingOnly=TRUE)
 mat_file <- args[1]
-plot_file <- paste(
-    unlist(strsplit(mat_file, ".mat.txt", fixed=TRUE))[1],
-    ".pdf", sep="")
+plot_file <- args[2]
+#plot_file <- paste(
+#    unlist(strsplit(mat_file, ".mat.txt", fixed=TRUE))[1],
+#    ".pdf", sep="")
 
 # read data, normalize to d0
 data <- read.table(mat_file, sep="\t", header=TRUE)
