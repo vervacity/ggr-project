@@ -47,9 +47,21 @@
 
 # cudnn and tensorflow not actually used, but potentially needed for environment
 ##SBATCH --gres gpu:1
+
+# if doing anything with tronn
 #module load py-tensorflow/1.7.0_py27
+
+# plotting
 module load R/3.4.0 
+
+# for GSEA
 module load java/1.8.0_131
+
+# for IDR
+module load python/3.6.1
+module load py-numpy/1.14.3_py36
+module load viz
+module load py-matplotlib/2.2.2_py36
 
 source ~/.bashrc
 source activate ggr_env
