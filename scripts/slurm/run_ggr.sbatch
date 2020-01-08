@@ -59,9 +59,9 @@ module load java/1.8.0_131
 
 # for IDR
 module load python/3.6.1
-module load py-numpy/1.14.3_py36
-module load viz
-module load py-matplotlib/2.2.2_py36
+#module load py-numpy/1.14.3_py36
+#module load viz
+#module load py-matplotlib/2.2.2_py36
 
 source ~/.bashrc
 source activate ggr_env
