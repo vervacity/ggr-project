@@ -338,13 +338,11 @@ def runall(args, prefix):
             link_key="hichip",
             out_dir=hichip_dir)
 
-    if True:
-        # TODO here, run get_timepoint_consistent_links but with reps?
+        # get replicates into union links to be able to get PCA for QC 
         mat_files = sorted(
             glob.glob("{}/{}/*idr_filt*mat.txt.gz".format(results_dir, hichip_dir)))
         union_file = "{}/{}/ggr.linking.ALL.overlap.interactions.txt.gz".format(
             results_dir, hichip_dir)
-        print mat_files
         union_reps_file = "{}/{}/{}.ALL.reps.mat.txt.gz".format(results_dir, hichip_dir, prefix)
         get_union_links_signal_mat(
             all_interactions_file, mat_files, union_reps_file, "{}/{}".format(results_dir, hichip_dir))
@@ -353,9 +351,6 @@ def runall(args, prefix):
             results_dir, hichip_dir, prefix, union_reps_file)
         print plot_cmd
         os.system(plot_cmd)
-        
-
-    quit()
         
     # analyze trajectories (ATAC to RNA)
     links_dirs = [

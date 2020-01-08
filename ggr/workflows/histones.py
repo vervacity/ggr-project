@@ -11,6 +11,7 @@ import pandas as pd
 
 from ggr.analyses.counting import make_count_matrix
 from ggr.analyses.counting import pull_single_replicate
+from ggr.analyses.counting import count_present_regions_per_sample
 from ggr.analyses.utils import build_id_matching_mat
 from ggr.analyses.utils import plot_PCA
 
@@ -105,6 +106,24 @@ def runall(args, prefix):
         # choose master regions
         master_regions_key = histone_atac_regions_key
 
+        # how many regions are active per timepoint (against the master regions list)
+        plot_dir = "{}/plots".format(histone_dir)
+        static_region_summary_file = "{}/{}.timepoint_count_summary.static.txt".format(
+            plot_dir, histone_prefix)
+        if not os.path.isfile(static_region_summary_file):
+            os.system("mkdir -p {}".format(plot_dir))
+            count_present_regions_per_sample(
+                out_data[histone_atac_regions_key],
+                histone_overlap_files,
+                static_region_summary_file,
+                assay=histone)
+        plot_file = "{}.pdf".format(static_region_summary_file.split(".txt")[0])
+        if not os.path.isfile(plot_file):
+            plot_cmd = "Rscript ~/git/ggr-project/R/plot.counts.global.R {} {} static".format(
+                static_region_summary_file, plot_file)
+            print plot_cmd
+            os.system(plot_cmd)
+        
         # -------------------------------------------
         # ANALYSIS 1 - get read counts per master region
         # input: peak files
@@ -145,6 +164,17 @@ def runall(args, prefix):
             master_regions_key=master_regions_key,
             mat_key=counts_key)
 
+        # plot dynamic summary - sequential
+        differential_summary = "{}/timeseries/deseq2/differential_summary.txt.gz".format(
+            histone_dir)
+        plot_file = "{}/{}.timepoint_count_summary.dynamic.sequential.pdf".format(
+            plot_dir, histone_prefix)
+        if not os.path.isfile(plot_file):
+            plot_cmd = "Rscript ~/git/ggr-project/R/plot.counts.global.R {} {} dynamic".format(
+                differential_summary, plot_file)
+            print plot_cmd
+            os.system(plot_cmd)
+        
         # -------------------------------------------
         # ANALYSIS - make PCA plots
         # input: count matrix

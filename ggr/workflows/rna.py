@@ -326,6 +326,47 @@ def runall(args, prefix):
                 os.path.basename(gene_mat_files[0]).split(".rep")[0])
             plot_PCA(gene_mat_files, pca_file)
 
+    # plot static summary (genes expressed per timepoint)
+    plot_dir = "{}/plots".format(results_dir)
+    os.system("mkdir -p {}".format(plot_dir))
+    static_gene_count_summary_file = "{}/{}.gene_count_summary.static.txt".format(plot_dir, prefix)
+    if not os.path.isfile(static_gene_count_summary_file):
+        rna_rlog_thresh = args.inputs["params"]["rna_empirical_rlog_thresh"]
+        data = pd.read_csv(
+            out_data["rna.counts.pc.expressed.timeseries_adj.pooled.rlog.mat"],
+            sep="\t")
+        data_summary = pd.DataFrame((data > rna_rlog_thresh).sum(axis=0))
+        data_summary["count"] = data_summary[0]
+        data_summary["type"] = "RNA"
+        data_summary["timepoint"] = data_summary.index.str.replace("0$", ".0")
+        data_summary["timepoint"] = data_summary["timepoint"].str.replace("5$", ".5")
+        data_summary["timepoint"] = data_summary["timepoint"].str.replace("^d", "")
+        data_summary = data_summary[["timepoint", "type", "count"]]
+        data_summary.to_csv(static_gene_count_summary_file, sep="\t", header=True, index=False)
+    plot_file = "{}.pdf".format(static_gene_count_summary_file.split(".txt")[0])
+    if not os.path.isfile(plot_file):
+        plot_cmd = "Rscript ~/git/ggr-project/R/plot.counts.global.R {} {} static".format(
+            static_gene_count_summary_file, plot_file)
+        print plot_cmd
+        os.system(plot_cmd)
+
+    # plot dynamic summary (genes changing from timepoint to timepoint)
+    differential_summary = "{}/timeseries/deseq2/differential_summary.txt.gz".format(results_dir)
+    d0_baseline_file = "{}.d0_baseline_only.txt.gz".format(differential_summary.split(".txt")[0])
+    if not os.path.isfile(d0_baseline_file):
+        header_cmd = 'echo "timepoint\tup\tdown" | gzip -c > {}'.format(d0_baseline_file)
+        os.system(header_cmd)
+        filter_cmd = 'zcat {} | grep -e "^d00" | gzip -c >> {}'.format(
+            differential_summary, d0_baseline_file)
+        print filter_cmd
+        os.system(filter_cmd)
+    plot_file = "{}/{}.gene_count_summary.dynamic.pdf".format(plot_dir, prefix)
+    if not os.path.isfile(plot_file):
+        plot_cmd = "Rscript ~/git/ggr-project/R/plot.counts.global.R {} {} dynamic".format(
+            d0_baseline_file, plot_file)
+        print plot_cmd
+        os.system(plot_cmd)
+
     # also output timepoint specific TSS files for expressed genes
     days = ["d00", "d30", "d60"]
     mat_file = out_data["rna.counts.pc.expressed.timeseries_adj.pooled.rlog.mat"]

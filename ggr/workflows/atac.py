@@ -16,6 +16,7 @@ from ggr.util.bed_utils import id_to_bed
 
 from ggr.analyses.filtering import filter_for_ids
 from ggr.analyses.counting import make_count_matrix
+from ggr.analyses.counting import count_present_regions_per_sample
 from ggr.analyses.utils import build_id_matching_mat
 from ggr.analyses.utils import plot_PCA
 
@@ -98,6 +99,24 @@ def runall(args, prefix):
                 negatives_bed)
         run_shell_cmd(complement)
         os.system("rm hg19.chromsizes")
+
+    # figure out how many regions are active per timepoint
+    plot_dir = "{}/plots".format(results_dir)
+    static_region_summary_file = "{}/plots/{}.idr.timepoint_count_summary.static.txt".format(
+        results_dir, prefix)
+    if not os.path.isfile(static_region_summary_file):
+        os.system("mkdir -p {}".format(plot_dir))
+        count_present_regions_per_sample(
+            out_data[master_regions_key],
+            timepoints_files,
+            static_region_summary_file,
+            assay="ATAC")
+    plot_file = "{}.pdf".format(static_region_summary_file.split(".txt")[0])
+    if not os.path.isfile(plot_file):
+        plot_cmd = "Rscript ~/git/ggr-project/R/plot.counts.global.R {} {} static".format(
+            static_region_summary_file, plot_file)
+        print plot_cmd
+        os.system(plot_cmd)
         
     # -------------------------------------------
     # ANALYSIS 2 - get read counts in these regions
@@ -141,6 +160,34 @@ def runall(args, prefix):
         datatype_key="atac",
         mat_key=counts_key)
 
+    # plot dynamic summary: filter for just d0
+    differential_summary = "{}/timeseries/deseq2/differential_summary.txt.gz".format(results_dir)
+    d0_baseline_file = "{}.d0_baseline_only.txt.gz".format(differential_summary.split(".txt")[0])
+    if not os.path.isfile(d0_baseline_file):
+        header_cmd = 'echo "timepoint\tup\tdown" | gzip -c > {}'.format(d0_baseline_file)
+        os.system(header_cmd)
+        filter_cmd = 'zcat {} | grep -e "^d00" | gzip -c >> {}'.format(
+            differential_summary, d0_baseline_file)
+        print filter_cmd
+        os.system(filter_cmd)
+    plot_file = "{}/plots/{}.idr.timepoint_count_summary.dynamic.pdf".format(
+        results_dir, prefix)
+    if not os.path.isfile(plot_file):
+        plot_cmd = "Rscript ~/git/ggr-project/R/plot.counts.global.R {} {} dynamic".format(
+            d0_baseline_file, plot_file)
+        print plot_cmd
+        os.system(plot_cmd)
+
+    # sequential
+    differential_summary = "{}/timeseries/deseq2.sequential/differential_summary.txt.gz".format(results_dir)
+    plot_file = "{}/plots/{}.idr.timepoint_count_summary.dynamic.sequential.pdf".format(
+        results_dir, prefix)
+    if not os.path.isfile(plot_file):
+        plot_cmd = "Rscript ~/git/ggr-project/R/plot.counts.global.R {} {} dynamic".format(
+            differential_summary, plot_file)
+        print plot_cmd
+        os.system(plot_cmd)
+    
     # filter for reproducible dynamic IDs and save to data dir
     dynamic_mat_key = "atac.counts.pooled.rlog.dynamic.mat"
     dynamic_traj_mat_key = "{}.traj.mat".format(dynamic_mat_key.split(".mat")[0])
