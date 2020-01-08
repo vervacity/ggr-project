@@ -6,6 +6,9 @@ import glob
 import signal
 import logging
 
+import numpy as np
+import pandas as pd
+
 from ggr.util.utils import run_shell_cmd
 from ggr.util.utils import parallel_copy
 from ggr.util.bed_utils import merge_regions
@@ -391,5 +394,31 @@ def runall(args, prefix):
         tabix_cmd = "tabix -p bed {}".format(out_file)
         print tabix_cmd
         os.system(tabix_cmd)
+
+    # get hichip links per timepoint - summary plot
+    hichip_plot_dir = "{}/hichip/plots".format(results_dir)
+    os.system("mkdir -p {}".format(hichip_plot_dir))
+    summary_file = "{}/{}.hichip.link_counts_summary.txt".format(hichip_plot_dir, prefix)
+    if not os.path.isdir(summary_file):
+        hichip_timepoint_files = sorted(
+            glob.glob("{}/hichip/*idr_filt.interactions.txt.gz".format(results_dir)))
+        all_num_links = []
+        for hichip_file in hichip_timepoint_files:
+            num_links = pd.read_csv(hichip_file, sep="\t", header=None).shape[0]
+            num_links /= 2
+            all_num_links.append(num_links)
+        summary = pd.DataFrame({"timepoint": ["0", "3", "6"], "count": all_num_links})
+        summary["type"] = "HiChIP"
+        summary.to_csv(summary_file, sep="\t", header=True, index=False)
+
+        plot_file = "{}.pdf".format(summary_file.split(".txt")[0])
+        if not os.path.isfile(plot_file):
+            plot_cmd = "Rscript ~/git/ggr-project/R/plot.counts.global.R {} {} static".format(
+                summary_file, plot_file)
+            print plot_cmd
+            os.system(plot_cmd)
+
+    
+    
     
     return args

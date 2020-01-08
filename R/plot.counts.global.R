@@ -37,6 +37,9 @@ if (grepl("atac", plot_file, fixed=TRUE)) {
 } else if (grepl("H3K27me3", plot_file, fixed=TRUE)) {
     color <- get_ggr_assay_palette("Greens", 50)
     title <- "H3K27me3 ChIP-seq"
+} else if (grepl("hichip", plot_file, fixed=TRUE)) {
+    color <- get_ggr_assay_palette("Purples", 50)
+    title <- "HiChIP"
 } else if (grepl("rna", plot_file, fixed=TRUE)) {
     color <- get_ggr_assay_palette("Purples", 50)
     title <- "PAS-seq"
