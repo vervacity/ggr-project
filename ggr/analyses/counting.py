@@ -345,3 +345,34 @@ def split_count_matrix_by_replicate(
 
     return None
 
+
+def count_present_regions_per_sample(master_regions, region_files, out_file, assay="ATAC"):
+    """intersect with master_regions to get counts
+    """
+    print_header = "echo \"timepoint\ttype\tcount\" > {0}".format(
+        out_file)
+    run_shell_cmd(print_header)
+    
+    for region_file in region_files:
+        
+        if "ATAC" in assay:
+            awk_cmd = ("awk '{{ print \"{0}\t{1}\t\"$1 }}'").format(
+                float(os.path.basename(region_file).split(".")[0].split("-")[1].split("d")[1]) / 10,
+                assay)
+        else:
+            awk_cmd = "awk '{{ print \"{0}\t{1}\t\"$1 }}'".format(
+                float(os.path.basename(region_file).split(".")[0].split("-")[1].split("d")[1]),
+                assay)
+
+        get_nums = (
+            "bedtools intersect -u -a {} -b {} | "
+            "wc -l | "
+            "{} >> {}").format(
+                master_regions,
+                region_file,
+                awk_cmd,
+                out_file)
+        print get_nums
+        os.system(get_nums)
+    
+    return

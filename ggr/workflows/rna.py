@@ -555,8 +555,9 @@ def runall(args, prefix):
             hgnc_ids_file,
             args.outputs["annotations"]["geneids.mappings.mat"],
             biomarker_mat_file)
-        # plot fn
-        plot_cmd = "Rscript ~/git/ggr-project/R/plot.gene_mat_subset.R {}".format(biomarker_mat_file)
+        # plot
+        plot_file = "{}.pdf".format(biomarker_mat_file.split(".mat")[0])
+        plot_cmd = "plot.gene_mat_subset.R {}".format(biomarker_mat_file)
         run_shell_cmd(plot_cmd)
             
     logger.info("MASTER_WORKFLOW: DONE")

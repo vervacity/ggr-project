@@ -861,8 +861,7 @@ def run_stable_epigenome_workflow(
     plot_dir = "{}/plots".format(results_dir)
     
     # plot ATAC and histone marks
-    #if not os.path.isdir(plot_dir):
-    if True:
+    if not os.path.isdir(plot_dir):
         run_shell_cmd("mkdir -p {}".format(plot_dir))
 
         for subsample_bed_key in subsample_bed_keys:

@@ -36,12 +36,19 @@ rna_rep2_mat_file=$GGR_DIR/results/rna/timeseries/matrices/ggr.rna.counts.pc.exp
 #$SCRIPT_DIR/plot_trajs.py $GGR_DIR
 
 # linking plots
-$SCRIPT_DIR/plot_linking.py $GGR_DIR
+#$SCRIPT_DIR/plot_linking.py $GGR_DIR
 
 
 # --------------------
 # SUPPLEMENTS
 # --------------------
+
+# biomarker panel code
+biomarker_mat_file=$GGR_DIR/results/rna/plots/biomarkers.mat.txt.gz
+#$R_DIR/plot.gene_mat_subset.R $biomarker_mat_file fig_1.biomarker_panel.pdf
+
+# global summary stats
+
 
 # PCA for other datasets
 h3k27ac_rep1_mat_file=$GGR_DIR/results/histones/H3K27ac/plots/ggr.histone.H3K27ac.midpoints.counts.rep1.rlog.filt.mat.txt.gz
@@ -56,7 +63,13 @@ h3k27me3_rep1_mat_file=$GGR_DIR/results/histones/H3K27me3/plots/ggr.histone.H3K2
 h3k27me3_rep2_mat_file=$GGR_DIR/results/histones/H3K27me3/plots/ggr.histone.H3K27me3.midpoints.counts.rep2.rlog.filt.mat.txt.gz
 #$R_DIR/plot.pca.R fig_1.pca.histone.H3K27me3.pdf $h3k27me3_rep1_mat_file $h3k27me3_rep2_mat_file
 
+hichip_mat_file=$GGR_DIR/results/linking/hichip/ggr.linking.ALL.reps.mat.txt.gz
+#$R_DIR/plot.pca.R fig_1.pca.hichip.pdf $hichip_mat_file
 
+
+# --------------------
+# MISC
+# --------------------
 
 # other vignettes?
 #$SCRIPT_DIR/plot.rna_bar.R $GGR_DIR/results/rna/timeseries/matrices/ggr.rna.counts.pc.expressed.timeseries_adj.pooled.rlog.mat.txt.gz ENSG00000091409 gene_vals.ITGA6.pdf

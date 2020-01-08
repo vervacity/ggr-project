@@ -19,6 +19,7 @@ from ggr.analyses.linking import get_replicate_consistent_links
 from ggr.analyses.linking import get_timepoint_consistent_links
 from ggr.analyses.linking import region_clusters_to_genes
 from ggr.analyses.linking import build_confusion_matrix
+from ggr.analyses.linking import get_union_links_signal_mat
 
 
 def run_replicate_consistent_links_workflow(
@@ -69,6 +70,12 @@ def run_replicate_consistent_links_workflow(
                 replicated_link_dir)))
         get_timepoint_consistent_links(
             links_files, all_prefix)
+
+    # now, for PCA/QC purposes, build a matrix of signals (by rep) across unified links
+    if False:
+        mat_files = glob.glob("{}/*idr_filt*mat.txt.gz".format(replicated_link_dir))
+        get_union_links_signal_mat(all_interactions_file, mat_files)
+    
         
     return args
 
@@ -320,7 +327,7 @@ def runall(args, prefix):
             link_key="hic.celltype_avg.tss",
             out_dir=abc_avg_hic_dir)
 
-    # average hiC based ABC w TSS focus
+    # hichip
     logger.info("ANALYSIS: build replicate consistent ABC links - hichip")
     hichip_dir = "hichip"
     if not os.path.isdir("{}/{}".format(results_dir, hichip_dir)):
@@ -330,6 +337,25 @@ def runall(args, prefix):
             results_dir,
             link_key="hichip",
             out_dir=hichip_dir)
+
+    if True:
+        # TODO here, run get_timepoint_consistent_links but with reps?
+        mat_files = sorted(
+            glob.glob("{}/{}/*idr_filt*mat.txt.gz".format(results_dir, hichip_dir)))
+        union_file = "{}/{}/ggr.linking.ALL.overlap.interactions.txt.gz".format(
+            results_dir, hichip_dir)
+        print mat_files
+        union_reps_file = "{}/{}/{}.ALL.reps.mat.txt.gz".format(results_dir, hichip_dir, prefix)
+        get_union_links_signal_mat(
+            all_interactions_file, mat_files, union_reps_file, "{}/{}".format(results_dir, hichip_dir))
+        # PCA
+        plot_cmd = "Rscript ~/git/ggr-project/R/plot.pca.R {}/{}/{}.hichip.reps.pca.pdf {}".format(
+            results_dir, hichip_dir, prefix, union_reps_file)
+        print plot_cmd
+        os.system(plot_cmd)
+        
+
+    quit()
         
     # analyze trajectories (ATAC to RNA)
     links_dirs = [
