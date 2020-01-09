@@ -87,6 +87,9 @@
 	"abc.hic.celltype_avg": {
 	    "idr_thresh": 0.01
 	},
+	"abc.hic.celltype_avg.tss": {
+	    "idr_thresh": 0.01
+	},
 	"hichip": {
 	    "idr_thresh": 0.05
 	}
