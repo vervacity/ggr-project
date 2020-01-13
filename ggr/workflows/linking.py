@@ -148,6 +148,60 @@ def run_traj_linking_workflow(args, prefix, links_dir):
     return
 
 
+def run_stable_region_gene_linking_workflow(args, prefix, links_dir):
+    """take stable clusters and try link to get enrichments
+    might suggest which (if any) of these clusters are of interest
+    """
+    logging.info("ANALYSIS: link stable groups to downstream genes/gene trajs")
+
+    # setup
+    traj_dir = "{}/stable.linking".format(links_dir)
+    os.system("mkdir -p {}".format(traj_dir))
+
+    # stable groups
+    stable_atac_h3k27ac_dir = "{}/clusters/by_mark/bed".format(
+        args.outputs["results"]["epigenome"]["stable"]["dir"])
+    stable_atac_by_state_dir = "{}/clusters/by_state/bed".format(
+        args.outputs["results"]["epigenome"]["stable"]["dir"])
+    
+    # RNA all expressed?
+    
+    # RNA traj files
+    rna_clusters_file = args.outputs["results"]["rna"]["timeseries"]["dp_gp"][
+        "clusters.reproducible.hard.reordered.list"]
+    rna_mat_file = args.outputs["data"][
+        "rna.counts.pc.expressed.timeseries_adj.pooled.rlog.dynamic.traj.mat"]
+    
+    # get linking file
+    interactions_file = "{}/{}.ALL.overlap.interactions.txt.gz".format(links_dir, prefix)
+
+    # tss file and all expressed genes file
+    tss_file = args.outputs["annotations"]["tss.pc.bed"]
+    rna_expressed_file = args.outputs["data"]["rna.counts.pc.expressed.mat"]
+
+    # do each stable group
+    # for each group, need to link both rna trajectories and overall?
+
+    
+    # first, per cluster, get gene sets and enrichments
+    # DONT run a correlation filter since we're checking region to gene mapping without
+    # assuming anything about genes (outside of dynamic status)
+    if "proximity" in links_dir:
+        score_filter = 0.5
+    elif "hichip" in links_dir:
+        score_filter = None
+    else:
+        score_filter = 2
+
+    if "hichip" in links_dir:
+        extend_len = 2500
+    else:
+        extend_len = 0
+
+    
+    return
+
+
 def runall(args, prefix):
     """all workflows for atac-seq data
     """
@@ -348,7 +402,7 @@ def runall(args, prefix):
             results_dir, hichip_dir)
         union_reps_file = "{}/{}/{}.ALL.reps.mat.txt.gz".format(results_dir, hichip_dir, prefix)
         get_union_links_signal_mat(
-            all_interactions_file, mat_files, union_reps_file, "{}/{}".format(results_dir, hichip_dir))
+            union_file, mat_files, union_reps_file, "{}/{}".format(results_dir, hichip_dir))
         # PCA
         plot_cmd = "Rscript ~/git/ggr-project/R/plot.pca.R {}/{}/{}.hichip.reps.pca.pdf {}".format(
             results_dir, hichip_dir, prefix, union_reps_file)
@@ -370,7 +424,12 @@ def runall(args, prefix):
         traj_dir = "{}/{}/traj.linking".format(results_dir, links_dir)
         if not os.path.isdir(traj_dir):
             run_traj_linking_workflow(args, prefix, "{}/{}".format(results_dir, links_dir))
-
+        stable_dir = "{}/{}/stable.linking".format(results_dir, links_dir)
+        #if not os.path.isdir(stable_dir):
+        if False:
+            run_stable_region_gene_linking_workflow(
+                args, prefix, "{}/{}".format(results_dir, links_dir))
+            
     # viz: filter hichip (loose threshold) links with proximity links
     viz_dir = "{}/viz".format(results_dir)
     if not os.path.isdir(viz_dir):
