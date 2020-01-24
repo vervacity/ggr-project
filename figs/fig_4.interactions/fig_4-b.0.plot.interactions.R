@@ -170,13 +170,14 @@ data$pwm1 <- factor(data$pwm1, levels=pwm_order)
 data$pwm2 <- factor(data$pwm2, levels=rev(pwm_order))
 
 plot_file <- "fig_4-c.adjacency.pdf"
-ggplot(data, aes(x=pwm1, y=pwm2, fill=best_task_index, colour=category)) +
-#ggplot(data, aes(x=pwm1, y=pwm2, fill=category, colour=best_task_index)) +
+#ggplot(data, aes(x=pwm1, y=pwm2, fill=best_task_index, colour=category)) +
+ggplot(data, aes(x=pwm1, y=pwm2, fill=category, colour=best_task_index)) +
+#ggplot(data, aes(x=pwm1, y=pwm2, fill=category)) +
     geom_point(shape=21, stroke=0.75, aes(size=pval)) +
     theme_bw() +
     theme(
         axis.text.x=element_text(angle=90),
         aspect.ratio=1) +
-    #scale_colour_manual(values=ggr_colors)
-    scale_fill_manual(values=ggr_colors)
+    scale_colour_manual(values=ggr_colors)
+    #scale_fill_manual(values=ggr_colors)
 ggsave(plot_file)

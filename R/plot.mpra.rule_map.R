@@ -2,6 +2,7 @@
 
 
 library(ggplot2)
+library(RColorBrewer)
 library(reshape2)
 
 library(scales)
@@ -57,6 +58,9 @@ data <- data[with(data, order(day_empirical, interaction, pwm1)),]
 data$grammar <- factor(as.character(data$grammar), levels=data$grammar)
 
 # interaction results bar
+interaction_colors <- brewer.pal(8, "Dark2")
+interaction_colors <- c(interaction_colors[5], interaction_colors[6], interaction_colors[4]) #rev(interaction_colors[4:6])
+
 p1 <- ggplot(data, aes(x=0, y=grammar, fill=interaction)) +
     geom_tile(colour="black", show.legend=FALSE) +
     theme_bw() +
@@ -74,7 +78,7 @@ p1 <- ggplot(data, aes(x=0, y=grammar, fill=interaction)) +
         axis.line=element_blank(),
         axis.text=element_blank(),
         axis.ticks=element_blank()) +
-    scale_fill_brewer(palette="Set2") 
+    scale_fill_manual(values=interaction_colors) 
 
 
 # expected vs actual
@@ -139,7 +143,7 @@ p3 <- ggplot(pwm_data, aes(x=pwm, y=grammar, fill=log2FC)) +
         plot.title=element_text(size=8, margin=margin(b=1)),
             
         panel.background=element_blank(),
-        panel.border=element_blank(),
+        panel.border=element_rect(size=0.115),
         panel.grid.major.y=element_blank(),
         #panel.grid.major=element_blank(),
         panel.grid.minor=element_blank(),
@@ -150,7 +154,8 @@ p3 <- ggplot(pwm_data, aes(x=pwm, y=grammar, fill=log2FC)) +
         axis.line=element_line(color="black", size=0.115, lineend="square"),
         axis.text.x=element_text(size=6, angle=60, hjust=1),
         axis.text.y=element_blank(),
-        axis.ticks=element_line(size=0.115),
+        axis.ticks.x=element_line(size=0.115),
+        axis.ticks.y=element_blank(),
         axis.ticks.length=unit(0.01, "in")) +
     my.scale_fill_distiller(palette="RdBu", direction=-1, limits=c(-limit, limit))
 
@@ -182,7 +187,7 @@ p4 <- ggplot(data_traj, aes(x=variable, y=grammar, fill=value)) +
 
 
 # plot all together
-pdf("test.pdf", height=4, width=7, family="ArialMT", useDingbats=FALSE)
+pdf(plot_file, height=4, width=7, family="ArialMT", useDingbats=FALSE)
 grid.arrange(p1, p2, p3, p4, ncol=4, widths=c(0.4,0.4,5,0.75))
 dev.off()
 

@@ -47,6 +47,7 @@ plot_fn <- function(data, plot_file) {
             legend.title=element_blank(),
             legend.text=element_text(size=5),
             legend.position="bottom") +
+        scale_colour_brewer(palette="Dark2") +
         coord_flip()
             
     ggsave(plot_file, height=1.5, width=2, useDingbats=FALSE)

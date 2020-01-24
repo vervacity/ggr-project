@@ -282,7 +282,7 @@ def _normalize_for_trajectory_tests(
     grammar_data_traj = grammar_data_traj.dropna(axis=0)
     grammar_data_traj["day"] = grammar_data_traj["variable"].apply(
         lambda x: re.sub("_.+", "", x))
-
+    
     if method == "d0_norm":
         # then adjust to 0 median for each combo
         combos = ["-1", "0,0", "1,0", "0,1", "1,1"]
@@ -326,6 +326,13 @@ def _normalize_for_mutational_test(
         if example_data[example_data["combos"] == "1,1"].shape[0] != 1:
             continue
 
+        if False:
+            example_data_mean = example_data.set_index(metadata_headers)
+            example_data_mean[:] = np.subtract(
+                example_data_mean.values,
+                np.expand_dims(np.nanmean(example_data_mean.values, axis=0), axis=0))
+            example_data = example_data.reset_index()
+
         # normalize relative to baseline (1,1)
         if example_background_norm:
             tmp_data = example_data.drop("example_id", axis=1)
@@ -344,6 +351,14 @@ def _normalize_for_mutational_test(
 
     # concat
     grammar_data_norm = pd.concat(grammar_data_norm, axis=0)
+
+    # and then adjust according to "1,1" mean
+    if False:
+        grammar_data_norm = grammar_data_norm.drop("index", axis=1)
+        background_vals = grammar_data_norm[grammar_data_norm["combos"] == "1,1"].set_index(metadata_headers).mean(axis=0)
+        grammar_data_norm = grammar_data_norm.set_index(metadata_headers)
+        grammar_data_norm[:] = grammar_data_norm.values - np.expand_dims(background_vals.values, axis=0)
+        grammar_data_norm = grammar_data_norm.reset_index()
     
     return grammar_data_norm
 
@@ -496,6 +511,9 @@ def analyze_combinations(
         print grammar
         grammar_prefix = "{}/{}".format(out_dir, grammar)
 
+        #if not "42_x_21_x_58" in grammar:
+        #    continue
+        
         # pull gml, get nodes, sort
         grammar_gml = "{}/{}.gml".format(grammar_dir, grammar)
         grammar_graph = nx.read_gml(grammar_gml)
@@ -558,6 +576,7 @@ def analyze_combinations(
         # and NOT normalize all to endog's day 0
         grammar_data_traj = _normalize_for_trajectory_tests(
             grammar_data_avg, metadata_headers, method="d0_norm")
+        
         if plot:
             # drop 1 max and 1 min value (for extreme outliers)
             plot_data_file = "{}.traj.data.txt.gz".format(grammar_prefix)
@@ -589,6 +608,10 @@ def analyze_combinations(
 
         # testing (don't quit here, save out as much as possible)
         passed_traj_pattern, day_key = _check_traj_pattern(traj_medians, day_key)
+        #if "42_x_21_x_58" in grammar:
+        #    day_key = "d6_AVG"
+
+        
         results["day_empirical"].append(day_key)
         if not passed_traj_pattern:
             results = _attach_null_result(results, "FAILED.TRAJ_PATTERN")
@@ -714,7 +737,7 @@ def main():
     OUT_DIR = "./results"
     ref_fasta_file = "./raw/annotations/sequences.fa"
     metadata_file = "./raw/annotations/mpra.seqs.run-0.txt"
-    grammar_dir = "/mnt/lab_data/kundaje/users/dskim89/ggr/nn/inference.2019-03-12/dmim.shuffle/grammars.annotated.manual_filt.merged.final"
+    grammar_dir = "/mnt/lab_data/kundaje/users/dskim89/ggr/nn/inference.2019-03-12/dmim.shuffle.OLD/grammars.annotated.manual_filt.merged.final"
     
     os.system("mkdir -p {}".format(OUT_DIR))
     
@@ -845,7 +868,6 @@ def main():
         counts_files[key] = "{}.dedup.counts.txt.gz".format(out_prefix)
 
     # and then merge all counts into a matrix file
-    # TODO try rlog norm?
     out_prefix = "{}/ggr".format(OUT_DIR)
     count_mat_file = "{}.counts.raw.mat.txt.gz".format(out_prefix)
     signal_mat_file = "{}.signal.mat.txt.gz".format(out_prefix)
@@ -868,15 +890,16 @@ def main():
             signal_mat_file,
             grammar_dir,
             results_dir,
-            signal_thresh=0,
+            signal_thresh=0, # maybe here
             drop_reps=[],
-            filter_synergy=True)
+            filter_synergy=True, # maybe here?
+            plot=True)
     
     # plot expected vs actual
     summary_file = "{}/summary.txt.gz".format(results_dir)
     summary_plot_file = "{}/summary.expected_v_actual.pdf".format(results_dir)
-    #os.system("Rscript ~/git/ggr-project/R/plot.mpra.summary.R {} {}".format(
-    #    summary_file, summary_plot_file))
+    os.system("Rscript ~/git/ggr-project/R/plot.mpra.summary.R {} {}".format(
+        summary_file, summary_plot_file))
 
     # plot rule map
     map_plot_file = "{}/summary.rule_map.pdf".format(results_dir)

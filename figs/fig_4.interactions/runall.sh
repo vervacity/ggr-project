@@ -1,4 +1,4 @@
-WORK_DIR=/srv/scratch/dskim89/ggr/ggr.tronn.2019-06-19.interactions
+WORK_DIR=/mnt/lab_data/kundaje/users/dskim89/ggr/nn/inference.2019-03-12/ggr.tronn.2019-06-19.interactions
 endogenous_file=$WORK_DIR/interactions.summary.endogenous.2.txt
 simulations_file=$WORK_DIR/interactions.summary.sims.txt
 

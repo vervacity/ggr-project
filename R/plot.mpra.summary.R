@@ -2,6 +2,8 @@
 
 library(ggplot2)
 library(ggsci)
+library(RColorBrewer)
+
 
 # args
 args <- commandArgs(trailingOnly=TRUE)
@@ -16,12 +18,17 @@ data$labels <- paste(data$pwm1_clean, data$pwm2_clean, sep=",")
 data <- data[data$interaction != "FAILED.NEGATIVE_ENDOG",]
 data <- data[data$interaction != "FAILED.TRAJ_PATTERN",]
 
+# get palette
+colors <- brewer.pal(8, "Set2")
+colors <- brewer.pal(8, "Dark2")
+colors <- rev(colors[4:6])
+
 # plot
 ggplot(data, aes(x=expected, y=actual, colour=interaction)) +
     geom_abline(intercept=0, slope=1, size=0.115, linetype="dashed") +
     geom_point() +
     #geom_text(aes(label=labels, vjust=1, hjust=1), size=1) +
-    labs(x="Expected", y="Actual") +
+    labs(x="Expected", y="Actual", title="Additive expectation vs actual activity") +
     coord_fixed() +
     theme_bw() +
     theme(
@@ -52,7 +59,8 @@ ggplot(data, aes(x=expected, y=actual, colour=interaction)) +
         legend.title=element_blank(),
         legend.text=element_text(size=5),
         legend.position="bottom") +
-     scale_colour_brewer(palette="Set2")
+    scale_colour_manual(values=colors) +
+    scale_y_continuous(limits=c(0,1), expand=c(0,0))
 
 ggsave(plot_file, height=2, width=4, useDingbats=FALSE)
 
