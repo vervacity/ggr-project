@@ -79,10 +79,27 @@ def get_ensembl_to_geneid_mapping(ensembl_id_file, out_mapping_file):
     return None
 
 
-# TODO write a conversion function (ensembl to other ID)
+def hgnc_list_to_ensembl_ids(hgnc_file, mapping_file, out_file):
+    """get ensembl IDs attached to HGNC ID list
+    """
+    print hgnc_file
+    print mapping_file
+    print out_file
 
+    # read in files
+    hgnc_ids = pd.read_csv(hgnc_file, sep="\t", header=None)
+    hgnc_ids.columns = ["hgnc_symbol"]
+    mappings = pd.read_csv(mapping_file, sep="\t")
 
+    # overlap
+    mapped_ids = hgnc_ids.merge(mappings, on="hgnc_symbol", how="inner")
 
+    # keep only hgnc and ensemb
+    mapped_ids = mapped_ids[["ensembl_gene_id", "hgnc_symbol"]]
+    mapped_ids = mapped_ids.drop_duplicates()
+    mapped_ids.to_csv(out_file, sep="\t", header=False, index=False, compression="gzip")
+    
+    return
 
 
 def build_ordered_tss_file(ordered_gene_list, gtf_file, out_bed):

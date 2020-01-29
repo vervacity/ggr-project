@@ -8,6 +8,7 @@ from ggr.util.utils import run_shell_cmd
 from ggr.analyses.annotations import get_proteincoding_gene_list_from_gtf
 from ggr.analyses.annotations import get_proteincoding_tss_bed_from_gtf
 from ggr.analyses.annotations import get_ensembl_to_geneid_mapping
+from ggr.analyses.annotations import hgnc_list_to_ensembl_ids
 
 from ggr.analyses.motifs import add_hocomoco_metadata
 from ggr.analyses.motifs import reduce_pwm_redundancy
@@ -123,7 +124,7 @@ def runall(args, prefix):
             inputs["fantom5_transcriptionfactor_csv"],
             outputs[geneids_tf_key])
         run_shell_cmd(convert_entrez_to_ensembl)
-
+        
     # -------------------------------------------------
     # ANALYSIS 2 - make a TSS file
     # input: GTF file
@@ -153,6 +154,17 @@ def runall(args, prefix):
             outputs[geneids_pc_key],
             outputs[mapping_mat_key])
 
+
+    # get genodermatosis genes as ensembl IDs
+    genoderm_ensembl_ids_key = "genodermatoses_ensembl_id"
+    outputs[genoderm_ensembl_ids_key] = "{}/{}.genodermatoses.ensembl_ids.txt.gz".format(
+        out_dir, prefix)
+    if not os.path.isfile(outputs[genoderm_ensembl_ids_key]):
+        hgnc_list_to_ensembl_ids(
+            inputs["khavari_genodermatoses"],
+            outputs[mapping_mat_key],
+            outputs[genoderm_ensembl_ids_key])
+        
     # -------------------------------------------------
     # ANALYSIS 4 - set up motif file with reduction
     # input: pwm file + metadata
