@@ -88,8 +88,7 @@ TRONN_DIR=~/git/tronn
 # DON'T FORGET UCSC TOOLS
 MOTIFS=$SIG_MOTIFS_DIR/summary/ggr.pwms_present_summary.txt
 MAPCHAIN_FILE=$ANNOT_DIR/hg19ToHg38.over.chain.gz
-SCANMOTIFS="/srv/scratch/dskim89/ggr/ggr.tronn.2019-06-17.footprinting/motifs.input_x_grad.lite/ggr.scanmotifs.h5"
-#SCANMOTIFS=/mnt/lab_data3/dskim89/ggr/nn/2020-01-13/scanmotifs/motifs.background.lite/ggr.scanmotifs.h5
+SCANMOTIFS=/mnt/lab_data3/dskim89/ggr/nn/2019-03-12.freeze/motifs.input_x_grad.lite/ggr.scanmotifs.h5
 CISTROME_DIR=/mnt/lab_data3/dskim89/ggr/nn/2019-03-12.freeze/cistrome
 
 # TP63
@@ -106,6 +105,5 @@ BIGWIG_FILE=$CISTROME_DIR/cistrome.48799.ZNF750.hg38.bw
 D0_BAM="/mnt/lab_data/kundaje/projects/skin/data/bds/processed.atac.2019-06-04.bams_bp-resolution/primary_keratinocyte-d00.GGR.Stanford_Greenleaf.ATAC-seq.pooled.fixedtrim.PE2SE.nodup.bam"
 D3_BAM="/mnt/lab_data/kundaje/projects/skin/data/bds/processed.atac.2019-06-04.bams_bp-resolution/primary_keratinocyte-d30.GGR.Stanford_Greenleaf.ATAC-seq.pooled.fixedtrim.PE2SE.nodup.bam"
 D6_BAM="/mnt/lab_data/kundaje/projects/skin/data/bds/processed.atac.2019-06-04.bams_bp-resolution/primary_keratinocyte-d60.GGR.Stanford_Greenleaf.ATAC-seq.pooled.fixedtrim.PE2SE.nodup.bam"
-# tODO make sure to account for rc pwms
-#python /users/dskim89/git/tronn/scripts/ggr/ggr_footprint_motifs.py --motif_list $MOTIFS --data_file $SCANMOTIFS --bam_files $D0_BAM $D3_BAM $D6_BAM -o footprints --prefix ggr --filter_motifs NFKB NFAT GRHL
+python /users/dskim89/git/tronn/scripts/ggr/ggr_footprint_motifs.py --motif_list $MOTIFS --data_file $SCANMOTIFS --bam_files $D0_BAM $D3_BAM $D6_BAM -o footprints --prefix ggr --filter_motifs NFKB NFAT GRHL
 

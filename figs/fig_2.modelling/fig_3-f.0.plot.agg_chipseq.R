@@ -53,6 +53,7 @@ title_name <- strsplit(basename(plot_file), ".", fixed=TRUE)[[1]]
 title_name <- title_name[8]
 #title_name <- gsub("HCLUST-\\d+.", "", title_name)
 #title_name <- gsub(".UNK.0.A", "", title_name)
+title_name <- paste(title_name, " ChIP-seq", sep="")
 
 # plot
 ggplot(data_melted, aes(x=index, y=value, colour=variable)) +
