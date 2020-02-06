@@ -102,8 +102,10 @@ BIGWIG_FILE=$CISTROME_DIR/cistrome.48799.ZNF750.hg38.bw
 #python $TRONN_DIR/scripts/ggr/ggr_agg_chipseq_signal.py --motif_list $MOTIFS --data_file $SCANMOTIFS --motif_string TFAP2A --bigwig_files $BIGWIG_FILE --mapchain $MAPCHAIN_FILE -o chipseq --prefix chipseq
 
 # SUPPL: footprinting plots
+# run two ways: 1) GC content matched, this gives the flanking accessibility diff between sites. 2) accessibility matched, this gives diff in footprint depth
 D0_BAM="/mnt/lab_data/kundaje/projects/skin/data/bds/processed.atac.2019-06-04.bams_bp-resolution/primary_keratinocyte-d00.GGR.Stanford_Greenleaf.ATAC-seq.pooled.fixedtrim.PE2SE.nodup.bam"
 D3_BAM="/mnt/lab_data/kundaje/projects/skin/data/bds/processed.atac.2019-06-04.bams_bp-resolution/primary_keratinocyte-d30.GGR.Stanford_Greenleaf.ATAC-seq.pooled.fixedtrim.PE2SE.nodup.bam"
 D6_BAM="/mnt/lab_data/kundaje/projects/skin/data/bds/processed.atac.2019-06-04.bams_bp-resolution/primary_keratinocyte-d60.GGR.Stanford_Greenleaf.ATAC-seq.pooled.fixedtrim.PE2SE.nodup.bam"
-python /users/dskim89/git/tronn/scripts/ggr/ggr_footprint_motifs.py --motif_list $MOTIFS --data_file $SCANMOTIFS --bam_files $D0_BAM $D3_BAM $D6_BAM -o footprints --prefix ggr --filter_motifs NFKB NFAT GRHL
+#python /users/dskim89/git/tronn/scripts/ggr/ggr_footprint_motifs.py --motif_list $MOTIFS --data_file $SCANMOTIFS --bam_files $D0_BAM $D3_BAM $D6_BAM -o footprints --prefix ggr --filter_motifs NFKB NFAT GRHL --signal_matching_key ATAC_SIGNALS.NORM
+python /users/dskim89/git/tronn/scripts/ggr/ggr_footprint_motifs.py --motif_list $MOTIFS --data_file $SCANMOTIFS --bam_files $D0_BAM $D3_BAM $D6_BAM -o footprints --prefix ggr --filter_motifs NFKB NFAT GRHL --signal_matching_key GC_CONTENT
 
