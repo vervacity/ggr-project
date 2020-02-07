@@ -14,23 +14,26 @@ args <- commandArgs(trailingOnly=TRUE)
 input_file <- args[1]
 out_prefix <- args[2]
 
-# params
+# params: null flanks, for flank normalization
 null_flank_start <- 1 # how far from edge, start
 null_flank_end <- 50 # how far from edge, end
 
-acc_flank_start <- 100 # how far from edge, start
-acc_flank_end <- 240 # how from edge, end. MAKE SURE DOES NOT OVERLAP FOOTPRINT
+# params: accessibility flanks, for calculating accessibility diff
+acc_flank_start <- 100 # how far from MIDDLE, start
+acc_flank_end <- 15 # how from MIDDLE, end. MAKE SURE DOES NOT OVERLAP FOOTPRINT
 
-footprint_start <- -10
-footprint_end <- 10
+# params: accessibility flank norm widths, for normalizing for footpring depth
+acc_flank_norm_start <- 40 # how far from MIDDLE, start (prev 75)
+acc_flank_norm_end <- 15 # how far from MIDDLE, end (prev 25)
 
-footprint_flank_length <- 25
+# params: location of footprint
+footprint_start <- -8
+footprint_end <- -1
 
 # read in data, create index
 data <- read.table(input_file, sep="\t", header=TRUE, row.names=1)
+colnames(data) <- c("NN.inactive", "NN.active")
 data$position <- as.numeric(rownames(data)) - (nrow(data) / 2)
-
-print(head(data))
 
 # normalizations: flank norm. this gives a fold change enrichment over background
 l_null_flank_start <- data$position[null_flank_start]
@@ -43,203 +46,266 @@ background_vals <- rbind(
     data[(data$position <= r_null_flank_start) & (data$position > r_null_flank_end),])
 background_avg_vals <- apply(background_vals, 2, mean)
 
-data <- data.frame(t(t(data) / background_avg_vals))
-data$position <- as.numeric(rownames(data)) - (nrow(data) / 2)
+data_flank_adj <- data.frame(t(t(data) / background_avg_vals))
+data_flank_adj$position <- as.numeric(rownames(data_flank_adj)) - (nrow(data_flank_adj) / 2)
 
 # melt
-data_melted <- melt(data, id.vars=c("position"))
+data_melted <- melt(data_flank_adj, id.vars=c("position"))
+data_melted$variable <- gsub(".", "-", data_melted$variable, fixed=TRUE)
+
+# adjust colors if actually just pos/neg
+if (dim(data)[2] == 3) {
+    ggr_colors <- brewer.pal(6, "Paired")[1:2]
+    data_melted$variable <- factor(data_melted$variable, levels=c("NN-inactive", "NN-active"))
+} else {
+    ggr_colors <- get_ggr_timepoint_colors()
+    ggr_colors <- ggr_colors[c(2, 7, 10)]
+    ggr_colors <- rev(ggr_colors)
+    data_melted$variable <- factor(data_melted$variable, levels=c("d6.0", "d3.0", "d0.0"))
+}
+
+# figure out title
+title_name <- strsplit(basename(out_prefix), ".", fixed=TRUE)[[1]]
+title_name <- gsub("HCLUST-\\d+_", "", title_name[2])
 
 # ==================================================
 # PLOT 1 - plot full pattern across all positions
 # ==================================================
 plot_file <- paste(out_prefix, ".full_length.pdf", sep="")
 
-# adjust colors if actually just pos/neg
-if (dim(data)[2] == 3) {
-    ggr_colors <- rev(brewer.pal(6, "Paired")[1:2])
-    data_melted$variable <- factor(data_melted$variable, levels=c("pos", "neg"))
-} else {
-    ggr_colors <- get_ggr_timepoint_colors()
-    ggr_colors <- ggr_colors[c(2, 7, 10)]
-    ggr_colors <- rev(ggr_colors)
-    data_melted$variable <- factor(data_melted$variable, levels=c("d6.0", "d3.0", "d0.0"))
-}
-
 # make pretty y limit
-y_max <- ceiling(2*max(abs(data_melted$value))) / 2
-y_min <- floor(2*min(abs(data_melted$value))) / 2
-
-# figure out title
-title_name <- strsplit(basename(out_prefix), ".", fixed=TRUE)[[1]]
-title_name <- gsub("HCLUST_\\d+.", "", title_name[2])
+#y_max <- ceiling(2*max(data_melted$value)) / 2
+#y_min <- floor(2*min(data_melted$value)) / 2
+y_max <- ceiling(max(data_melted$value))
+y_min <- min(floor(min(data_melted$value)), 0)
 
 # plot
 ggplot(data_melted, aes(x=position, y=value, colour=variable)) +
+    #geom_rect(alpha=0.2, size=0, color=NA, fill="grey95", aes(xmin=footprint_start, xmax=footprint_end, ymin=y_min, ymax=y_max)) +
+    geom_rect(alpha=0.2, size=0, color=NA, fill="grey95", aes(xmin=-acc_flank_start, xmax=-acc_flank_end, ymin=y_min, ymax=y_max)) +
+    geom_rect(alpha=0.2, size=0, color=NA, fill="grey95", aes(xmin=acc_flank_end, xmax=acc_flank_start, ymin=y_min, ymax=y_max)) +
     geom_line(alpha=0.7, size=0.230) + # 0.115
-    labs(title=title_name, x="Position (bp)", y="Fold Enrichment") +
+    labs(title=title_name, x="\nPosition (bp)", y="Fold enrichment\n") +
     theme_bw() +
     theme(
         text=element_text(family="ArialMT"),
-        plot.title=element_text(size=6, margin=margin(b=0)),
+        plot.title=element_text(hjust=0.5, size=8, margin=margin(b=1)),
         plot.margin=margin(5,5,1,5),
         panel.background=element_blank(),
         panel.border=element_blank(),
         panel.grid=element_blank(),
         axis.title=element_text(size=6),
         axis.title.x=element_text(vjust=1, margin=margin(0,0,0,0)),
-        axis.title.y=element_text(vjust=1, margin=margin(0,0,0,0)),
-        axis.text.y=element_text(size=5),
-        axis.text.x=element_text(size=5),
+        axis.title.y=element_text(vjust=0, hjust=0.5, margin=margin(0,0,0,0)),
+        axis.text.y=element_text(size=6),
+        axis.text.x=element_text(size=6),
         axis.line=element_line(color="black", size=0.115, lineend="square"),
         axis.ticks=element_line(size=0.115),
         axis.ticks.length=unit(0.01, "in"),
         legend.background=element_blank(),
         legend.box.background=element_blank(),
         legend.margin=margin(0,0,0,0),
-        legend.key.size=unit(0.1, "in"),
+        legend.key.size=unit(0.05, "in"),
         legend.box.margin=margin(0,0,0,0),
         legend.box.spacing=unit(0.05, "in"),
         legend.title=element_blank(),
-        legend.text=element_text(size=6),
+        legend.text=element_text(size=5, margin=margin(l=-3)),
         legend.position=c(0.9, 0.9),
         strip.background=element_blank(),
         strip.text=element_blank()) +
     scale_color_manual(values=ggr_colors) +
     scale_x_continuous(expand=c(0,0)) +
-    scale_y_continuous(limits=c(-y_min, y_max), expand=c(0,0)) #+
+    scale_y_continuous(limits=c(y_min, y_max), expand=c(0,0))
 
 ggsave(plot_file, height=1.2, width=2, useDingbats=FALSE)
 
-quit()
 
 # ==================================================
 # PLOT 2 - plot accessibility diff
 # ==================================================
-plot_file <- paste(out_prefix, ".accessibility_diff..pdf", sep="")
+plot_file <- paste(out_prefix, ".accessibility_diff.pdf", sep="")
 
-l_acc_flank_pos <- footprint_start - footprint_flank_length
-r_acc_flank_pos <- footprint_end + footprint_flank_length
+l_acc_flank_start <- -acc_flank_start #data$position[acc_flank_start]
+l_acc_flank_end <- -acc_flank_end #footprint_start #data$position[acc_flank_start] + acc_flank_end
+r_acc_flank_start <- acc_flank_end #data$position[nrow(data)] - acc_flank_start + 1
+r_acc_flank_end <- acc_flank_start #footprint_end #data$position[nrow(data)] - acc_flank_end + 1
 
-flank_vals <- rbind(
-    data[(data$position > l_null_flank_pos) & (data$position < l_acc_flank_pos),],
-    data[(data$position < r_null_flank_pos) & (data$position > r_acc_flank_pos),])
-flank_avg_vals <- apply(flank_vals, 2, mean)
+acc_flank_vals <- rbind(
+    data_flank_adj[(data_flank_adj$position >= l_acc_flank_start) & (data_flank_adj$position < l_acc_flank_end),],
+    data_flank_adj[(data_flank_adj$position <= r_acc_flank_start) & (data_flank_adj$position > r_acc_flank_end),])
+acc_flank_avg_vals <- as.data.frame(t(apply(acc_flank_vals, 2, mean)))
+acc_flank_avg_vals$position <- NULL
+acc_flank_avg_vals <- melt(acc_flank_avg_vals)
 
-quit()
+acc_flank_avg_vals$variable <- gsub(".", "-", acc_flank_avg_vals$variable, fixed=TRUE)
+if (dim(data)[2] == 3) {
+    acc_flank_avg_vals$variable <- factor(acc_flank_avg_vals$variable, levels=c("NN-inactive", "NN-active"))
+} else {
+    acc_flank_avg_vals$variable <- factor(acc_flank_avg_vals$variable, levels=c("d6.0", "d3.0", "d0.0"))
+}
+print(acc_flank_avg_vals)
+
+# pretty y scale
+y_max <- ceiling(max(acc_flank_avg_vals$value))
+y_min <- min(floor(min(acc_flank_avg_vals$value)), 0)
+
+# plot
+ggplot(acc_flank_avg_vals, aes(x=variable, y=value, colour=variable, fill=variable)) +
+    geom_col(alpha=0.5, size=0.115, width=0.6, show.legend=FALSE) +
+    labs(title=title_name, x="", y="Flank ATAC enrichment\n") +
+    theme_bw() +
+    theme(
+        text=element_text(family="ArialMT"),
+        plot.title=element_text(hjust=0.5, size=8, margin=margin(b=1)),
+        plot.margin=margin(5,0,-8,0),
+        panel.background=element_blank(),
+        panel.border=element_blank(),
+        panel.grid=element_blank(),
+        axis.title=element_text(size=6),
+        axis.title.x=element_text(vjust=1, margin=margin(0,0,0,0)),
+        axis.title.y=element_text(vjust=0, hjust=1, margin=margin(0,0,0,0)),
+        axis.text.y=element_text(size=6),
+        axis.text.x=element_text(size=6, vjust=1, hjust=1, angle=60),
+        axis.line=element_line(color="black", size=0.115, lineend="square"),
+        axis.ticks=element_line(size=0.115),
+        axis.ticks.length=unit(0.01, "in")) +
+    scale_color_manual(values=ggr_colors) +
+    scale_fill_manual(values=ggr_colors) +
+    scale_y_continuous(limits=c(y_min, y_max), expand=c(0,0))
+
+ggsave(plot_file, height=1.2, width=0.75, useDingbats=FALSE)
+
+
 
 # ==================================================
 # PLOT 3 - plot full pattern across all positions
 # ==================================================
-plot_file <- paste(out_prefix, ".footprint_w_flanks..pdf", sep="")
+plot_file <- paste(out_prefix, ".footprint_w_flanks.pdf", sep="")
+
+# TODO use the flank adjusted?
+data <- data_flank_adj
 
 # bias adjust
+l_bias_flank_start <- -acc_flank_norm_start
+l_bias_flank_end <- -acc_flank_norm_end
+r_bias_flank_start <- acc_flank_norm_end
+r_bias_flank_end <- acc_flank_norm_start
 
-data <- data.frame(t(t(data) / background_avg_vals))
-data$position <- as.numeric(rownames(data)) - (nrow(data) / 2)
+bias_vals <- rbind(
+    data[(data$position >= l_bias_flank_start) & (data$position < l_bias_flank_end),],
+    data[(data$position <= r_bias_flank_start) & (data$position > r_bias_flank_end),])
+bias_avg_vals <- apply(bias_vals, 2, mean)
 
+data_bias_adj <- data.frame(t(t(data) - bias_avg_vals))
+data_bias_adj$position <- as.numeric(rownames(data_bias_adj)) - (nrow(data_bias_adj) / 2)
 
+x_lim <- acc_flank_norm_start
 
-data_norm <- rbind(data[50:75,], data[125:150,])
-norm_factors <- apply(data_norm, 2, mean)
-data <- data.frame(t(t(data) - norm_factors))
-
-data$index <- as.numeric(rownames(data)) - (nrow(data) / 2)
-
-
-# PLOT 2 - calculate accessibility enrichment and plot out bar plot
-
-
-quit()
-
-
-
-# normalize to flank
-data_norm <- rbind(data[1:10,], data[191:200,])
-flank_norm_factors <- apply(data_norm, 2, mean)
-
-print(head(data))
-
-# calculate flank accessibility
-#print(head(data_melted))
-#pos_l_flank <- data_melted[(data_melted$variable == "pos") & (data_melted$index < footprint_start),]
-#pos_r_flank <- data_melted[(data_melted$variable == "pos") & (data_melted$index > footprint_end),]
-
-
-#data_norm <- rbind(data[50:75,], data[125:150,])
-#center_norm_factors <- apply(data_norm, 2, mean)
-
-#norm_factors <- center_norm_factors - flank_norm_factors
-data <- data.frame(t(t(data) / flank_norm_factors))
-
-# and then bias adjust
-data_norm <- rbind(data[50:75,], data[125:150,])
-norm_factors <- apply(data_norm, 2, mean)
-data <- data.frame(t(t(data) - norm_factors))
-
-data$index <- as.numeric(rownames(data)) - (nrow(data) / 2)
-
-# clipping
-data <- data[50:150,]
-
-data_melted <- melt(data, id.vars=c("index"))
-
-# adjust colors if actually just pos/neg
+# melt
+data_bias_adj_melted <- melt(data_bias_adj, id.vars=c("position"))
+data_bias_adj_melted$variable <- gsub(".", "-", data_bias_adj_melted$variable, fixed=TRUE)
 if (dim(data)[2] == 3) {
-    ggr_colors <- rev(brewer.pal(6, "Paired")[1:2])
-    data_melted$variable <- factor(data_melted$variable, levels=c("pos", "neg"))
+    data_bias_adj_melted$variable <- factor(data_bias_adj_melted$variable, levels=c("NN-inactive", "NN-active"))
 } else {
-    ggr_colors <- get_ggr_timepoint_colors()
-    ggr_colors <- ggr_colors[c(2, 7, 10)]
-    ggr_colors <- rev(ggr_colors)
-    data_melted$variable <- factor(data_melted$variable, levels=c("d6.0", "d3.0", "d0.0"))
+    data_bias_adj_melted$variable <- factor(data_bias_adj_melted$variable, levels=c("d6.0", "d3.0", "d0.0"))
 }
 
 # make pretty y limit
-y_limit <- ceiling(2*max(abs(data_melted$value))) / 2
-
-# figure out title
-title_name <- strsplit(basename(plot_file), ".", fixed=TRUE)[[1]]
-title_name <- title_name[2]
+#y_max <- ceiling(2*max(data_bias_adj_melted$value)) / 2
+#y_min <- floor(2*min(data_bias_adj_melted$value)) / 2
+y_max <- ceiling(max(data_bias_adj_melted$value))
+y_min <- min(floor(min(data_bias_adj_melted$value)), 0)
 
 # plot
-ggplot(data_melted, aes(x=index, y=value, colour=variable)) +
+ggplot(data_bias_adj_melted, aes(x=position, y=value, colour=variable)) +
+    geom_rect(alpha=0.2, size=0, color=NA, fill="grey95", aes(xmin=footprint_start, xmax=footprint_end, ymin=y_min, ymax=y_max)) +
     geom_line(alpha=0.7, size=0.230) + # 0.115
-    labs(title=title_name, x="Position (bp)", y="Normalized read coverage") +
+    labs(title=title_name, x="\nPosition (bp)", y="Flank adjusted enrichment\n") +
     theme_bw() +
     theme(
         text=element_text(family="ArialMT"),
-        plot.title=element_text(size=6, margin=margin(b=0)),
+        plot.title=element_text(hjust=0.5, size=8, margin=margin(b=1)),
         plot.margin=margin(5,5,1,5),
         panel.background=element_blank(),
         panel.border=element_blank(),
         panel.grid=element_blank(),
         axis.title=element_text(size=6),
         axis.title.x=element_text(vjust=1, margin=margin(0,0,0,0)),
-        axis.title.y=element_text(vjust=1, margin=margin(0,0,0,0)),
-        axis.text.y=element_text(size=5),
-        axis.text.x=element_text(size=5),
+        axis.title.y=element_text(vjust=0, hjust=0.5, margin=margin(0,0,0,0)),
+        axis.text.y=element_text(size=6),
+        axis.text.x=element_text(size=6),
         axis.line=element_line(color="black", size=0.115, lineend="square"),
         axis.ticks=element_line(size=0.115),
         axis.ticks.length=unit(0.01, "in"),
         legend.background=element_blank(),
         legend.box.background=element_blank(),
         legend.margin=margin(0,0,0,0),
-        legend.key.size=unit(0.1, "in"),
+        legend.key.size=unit(0.05, "in"),
         legend.box.margin=margin(0,0,0,0),
         legend.box.spacing=unit(0.05, "in"),
         legend.title=element_blank(),
-        legend.text=element_text(size=6),
+        legend.text=element_text(size=5, margin=margin(l=-3)),
         legend.position=c(0.9, 0.9),
         strip.background=element_blank(),
         strip.text=element_blank()) +
     scale_color_manual(values=ggr_colors) +
-    scale_x_continuous(limits=c(-50,50), expand=c(0,0)) +
-    scale_y_continuous(limits=c(-y_limit, y_limit), expand=c(0,0)) #+
-    #facet_grid(. ~ variable)
+    scale_x_continuous(limits=c(-x_lim, x_lim), expand=c(0,0)) +
+    scale_y_continuous(limits=c(y_min, y_max), expand=c(0,0))
 
 ggsave(plot_file, height=1.2, width=2, useDingbats=FALSE)
 
 
+# ==================================================
+# PLOT 4 - plot footprint differences
+# ==================================================
+plot_file <- paste(out_prefix, ".footprint_diff.pdf", sep="")
 
-# analyze footprint depth
+footprint_vals <- data_bias_adj[(data_bias_adj$position >= footprint_start) &
+                                    (data_bias_adj$position <= footprint_end),]
 
+# normalize to max point of footprint, then get average depth
+footprint_max_vals <- apply(footprint_vals, 2, max)
+data_footprints <- data.frame(t(t(footprint_vals) - footprint_max_vals))
+footprint_avg_vals <- as.data.frame(t(apply(data_footprints, 2, mean)))
+footprint_avg_vals$position <- NULL
+footprint_avg_vals <- melt(footprint_avg_vals)
+footprint_avg_vals$variable <- gsub(".", "-", footprint_avg_vals$variable, fixed=TRUE)
+
+
+if (dim(data)[2] == 3) {
+    footprint_avg_vals$variable <- factor(footprint_avg_vals$variable, levels=c("NN-inactive", "NN-active"))
+} else {
+    footprint_avg_vals$variable <- factor(footprint_avg_vals$variable, levels=c("d6.0", "d3.0", "d0.0"))
+}
+print(footprint_avg_vals)
+
+# pretty y scale
+y_max <- max(ceiling(max(footprint_avg_vals$value)), 0)
+y_min <- floor(min(footprint_avg_vals$value))
+
+# plot
+ggplot(footprint_avg_vals, aes(x=variable, y=value, colour=variable, fill=variable)) +
+    geom_hline(yintercept=0, size=0.115, linetype="dashed") +
+    geom_col(alpha=0.5, size=0.115, width=0.6, show.legend=FALSE) +
+    labs(title=title_name, x="", y="Footprint average depth\n") +
+    theme_bw() +
+    theme(
+        text=element_text(family="ArialMT"),
+        plot.title=element_text(hjust=0.5, size=8, margin=margin(b=1)),
+        plot.margin=margin(5,0,-8,0),
+        panel.background=element_blank(),
+        panel.border=element_blank(),
+        panel.grid=element_blank(),
+        axis.title=element_text(size=6),
+        axis.title.x=element_text(vjust=1, margin=margin(0,0,0,0)),
+        axis.title.y=element_text(vjust=0, hjust=1, margin=margin(0,0,0,0)),
+        axis.text.y=element_text(size=6),
+        axis.text.x=element_text(size=6, vjust=1, hjust=1, angle=60),
+        axis.line=element_line(color="black", size=0.115, lineend="square"),
+        axis.ticks=element_line(size=0.115),
+        axis.ticks.length=unit(0.01, "in")) +
+    scale_color_manual(values=ggr_colors) +
+    scale_fill_manual(values=ggr_colors) +
+    scale_y_continuous(limits=c(y_min, y_max))
+
+ggsave(plot_file, height=1.2, width=0.75, useDingbats=FALSE)
