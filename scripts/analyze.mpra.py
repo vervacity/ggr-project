@@ -10,6 +10,7 @@ import networkx as nx
 
 from scipy.stats import wilcoxon
 from scipy.stats import ranksums
+from scipy.stats import ttest_1samp
 
 
 def trim_and_attach_umi(fastq1, fastq2, fastq_out):
@@ -218,9 +219,9 @@ def _load_data_and_setup(data_file, drop_reps, filter_synergy):
     data["grammar"] = [re.sub("\\.\\d+$", "", name) for name in data["example_id"]]
     
     # if filter, then get just synergy set (remove distant and non-sig)
+    data["synergy.max"] = data["synergy.scores.diff.sig.0"].apply(
+        lambda x: np.max([int(val) for val in x.split(",")]))
     if filter_synergy:
-        data["synergy.max"] = data["synergy.scores.diff.sig.0"].apply(
-            lambda x: np.max([int(val) for val in x.split(",")]))
         data = data[data["synergy.max"] != 0]
     
     # which headers to keep
@@ -237,21 +238,24 @@ def _load_data_and_setup(data_file, drop_reps, filter_synergy):
 
 def _average_data(
         data, signal_headers, metadata_headers, signal_thresh,
+        filter_synergy=False,
         days=["d0", "d3", "d6"]):
     """assumes you have signal data and corresponding metadata
     """
     # select out signal data and relevant metadata
     data = data[signal_headers+metadata_headers]
+    if filter_synergy:
+        data = data[data["synergy.max"] != 0]
     
     # apply signal thresh and remove rows of zeros
     data = data.set_index(metadata_headers)
     data[data < signal_thresh] = 0.0
     data = data[data.max(axis=1) > 0]
+    data = data.replace(0, np.NaN) # ignore zeros, was not seen in replicate
     data = data.reset_index()
         
     # average the barcoded fragments in each REP first
     # this is because different reps may have different barcodes
-    data = data.replace(0, np.NaN) # ignore zeros, was not seen in replicate
     data = data.groupby(metadata_headers).mean()
     data = data.reset_index()
         
@@ -321,25 +325,25 @@ def _normalize_for_mutational_test(
     for example in examples:
         # get example data
         example_data = grammar_data_avg[grammar_data_avg["example_id"] == example]
-
+        
         # check that all necessary examples exist
         if example_data[example_data["combos"] == "1,1"].shape[0] != 1:
             continue
-
-        if False:
-            example_data_mean = example_data.set_index(metadata_headers)
-            example_data_mean[:] = np.subtract(
-                example_data_mean.values,
-                np.expand_dims(np.nanmean(example_data_mean.values, axis=0), axis=0))
-            example_data = example_data.reset_index()
 
         # normalize relative to baseline (1,1)
         if example_background_norm:
             tmp_data = example_data.drop("example_id", axis=1)
             background_vals = tmp_data[tmp_data["combos"] == "1,1"].drop(
-                "combos", axis=1)
+                ["combos", "synergy.max"], axis=1)
             example_data = example_data.set_index(metadata_headers)
             example_data[:] = np.subtract(example_data.values, background_vals.values)
+            example_data = example_data.reset_index()
+        else:
+            # try mean center then subtract out null median val
+            example_data_mean = example_data.set_index(metadata_headers)
+            example_data_mean[:] = np.subtract(
+                example_data_mean.values,
+                np.expand_dims(np.nanmean(example_data_mean.values, axis=0), axis=0))
             example_data = example_data.reset_index()
             
         # append
@@ -351,11 +355,11 @@ def _normalize_for_mutational_test(
 
     # concat
     grammar_data_norm = pd.concat(grammar_data_norm, axis=0)
-
+    
     # and then adjust according to "1,1" mean
-    if False:
+    if not example_background_norm:
         grammar_data_norm = grammar_data_norm.drop("index", axis=1)
-        background_vals = grammar_data_norm[grammar_data_norm["combos"] == "1,1"].set_index(metadata_headers).mean(axis=0)
+        background_vals = grammar_data_norm[grammar_data_norm["combos"] == "1,1"].set_index(metadata_headers).mean(axis=0) # mean better
         grammar_data_norm = grammar_data_norm.set_index(metadata_headers)
         grammar_data_norm[:] = grammar_data_norm.values - np.expand_dims(background_vals.values, axis=0)
         grammar_data_norm = grammar_data_norm.reset_index()
@@ -429,7 +433,7 @@ def _check_traj_pattern(traj_medians, day_key):
 def _check_mut_interaction(
         expected, actual,
         pval_thresh=0.10,
-        method="ranksums"):
+        method="wilcox_unpaired"):
     """determine if interaction is synergy, additive, buffer
     """
     if method == "wilcox_paired":
@@ -445,6 +449,11 @@ def _check_mut_interaction(
         stat, pval = ranksums(actual, expected)
         diff = actual - expected.mean()
         diff = diff[~np.isnan(diff)]
+        diff_sum = np.mean(diff)
+    elif method == "ttest":
+        diff = actual - expected.mean()
+        diff = diff[~np.isnan(diff)]
+        stat, pval = ttest_1samp(diff, 0, nan_policy="omit")
         diff_sum = np.mean(diff)
         
     # summary info
@@ -466,6 +475,7 @@ def _attach_null_result(results, interaction_msg):
     results["expected"].append(0)
     results["diff"].append(0)
     results["traj.sig"].append(0)
+    results["pval"].append(1)
     results["interaction"].append(interaction_msg)
 
     return results
@@ -487,7 +497,7 @@ def analyze_combinations(
     # load data and set up
     data, signal_headers, grammars = _load_data_and_setup(
         data_file, drop_reps, filter_synergy)
-    metadata_headers = ["example_id", "combos"]
+    metadata_headers = ["example_id", "combos", "synergy.max"]
 
     # results
     results = {
@@ -500,6 +510,7 @@ def analyze_combinations(
         "pwm2_clean": [],
         "traj.medians": [],
         "traj.sig": [],
+        "pval": [],
         "mut.medians": [],
         "actual": [],
         "expected": [],
@@ -510,9 +521,6 @@ def analyze_combinations(
     for grammar in grammars:
         print grammar
         grammar_prefix = "{}/{}".format(out_dir, grammar)
-
-        #if not "42_x_21_x_58" in grammar:
-        #    continue
         
         # pull gml, get nodes, sort
         grammar_gml = "{}/{}.gml".format(grammar_dir, grammar)
@@ -552,11 +560,9 @@ def analyze_combinations(
         
         # extract relevant data
         grammar_data = data[data["grammar"] == grammar]
-        grammar_data_avg = _average_data(
-            grammar_data, signal_headers, metadata_headers, signal_thresh)
 
         # ignore triplets for now
-        if "0,0" not in grammar_data_avg["combos"].values.tolist():
+        if "0,0" not in grammar_data["combos"].values.tolist():
             continue
 
         # start saving results
@@ -574,15 +580,30 @@ def analyze_combinations(
         # note that since the results are now relative to day 0,
         # it's important to normalize each combo to its day 0
         # and NOT normalize all to endog's day 0
+        #grammar_data_avg = _average_data(
+        #    grammar_data, signal_headers, metadata_headers, signal_thresh, filter_synergy=True)
+        if "ggr.TRAJ_LABELS-1_x_TRAJ_LABELS-14_x_TRAJ_LABELS-2.42_x_21_x_58" in grammar:
+            # tODO only filter synergy for klf/znf?
+            grammar_data_avg = _average_data(
+                grammar_data, signal_headers, metadata_headers, signal_thresh, filter_synergy=True)
+        else:
+            grammar_data_avg = _average_data(
+                grammar_data, signal_headers, metadata_headers, signal_thresh, filter_synergy=filter_synergy)
         grammar_data_traj = _normalize_for_trajectory_tests(
             grammar_data_avg, metadata_headers, method="d0_norm")
+
+        if "ggr.TRAJ_LABELS-1_x_TRAJ_LABELS-14_x_TRAJ_LABELS-2.42_x_21_x_58" in grammar:
+            plot = True
+        else:
+            plot = False
         
         if plot:
             # drop 1 max and 1 min value (for extreme outliers)
             plot_data_file = "{}.traj.data.txt.gz".format(grammar_prefix)
             plot_data = grammar_data_traj.copy()
-            plot_data = plot_data[plot_data["value"] != plot_data["value"].max()]
-            plot_data = plot_data[plot_data["value"] != plot_data["value"].min()]
+            # TODO - think about just adjusting plot area rather than removing this
+            #plot_data = plot_data[plot_data["value"] != plot_data["value"].max()]
+            #plot_data = plot_data[plot_data["value"] != plot_data["value"].min()]
             # adjust combo names
             plot_data["pwms"] = "scr-CTL"
             plot_data.loc[plot_data["combos"] == "0,0", "pwms"] = "{0},{1}".format(pwm1_clean,pwm2_clean)
@@ -606,12 +627,10 @@ def analyze_combinations(
         traj_medians = endog_norm.median()
         results["traj.medians"].append(traj_medians)
 
-        # testing (don't quit here, save out as much as possible)
+        # check traj pattern
         passed_traj_pattern, day_key = _check_traj_pattern(traj_medians, day_key)
-        #if "42_x_21_x_58" in grammar:
-        #    day_key = "d6_AVG"
-
-        
+        if "ggr.TRAJ_LABELS-1_x_TRAJ_LABELS-14_x_TRAJ_LABELS-2.42_x_21_x_58" in grammar:
+            day_key = "d6_AVG"
         results["day_empirical"].append(day_key)
         if not passed_traj_pattern:
             results = _attach_null_result(results, "FAILED.TRAJ_PATTERN")
@@ -625,6 +644,8 @@ def analyze_combinations(
         # mutational hypothesis
         # ----------------------
         # normalize and only keep those that have 1,1 (baseline val)
+        grammar_data_avg = _average_data(
+            grammar_data, signal_headers, metadata_headers, signal_thresh)
         grammar_data_mut = _normalize_for_mutational_test(
             grammar_data_avg, metadata_headers)
         
@@ -666,8 +687,9 @@ def analyze_combinations(
         check_data = check_data.set_index("example_id")
         
         # don't continue if endogenous is not positive
-        passed_positive_over_double_mut = (
-            check_data["0,0"].mean() >= 0) and (check_data["0,0"].median() >= 0)
+        passed_positive_over_double_mut = check_data["0,0"].mean() >= 0 # saves more than median
+        #passed_positive_over_double_mut = (
+        #    check_data["0,0"].mean() >= 0) and (check_data["0,0"].median() >= 0)
         if not passed_positive_over_double_mut:
             print "background higher than endogenous, not well controlled, continue"
             results = _attach_null_result(results, "FAILED.NEGATIVE_ENDOG")
@@ -682,8 +704,8 @@ def analyze_combinations(
         actual = check_data["0,0"]
         interaction, pval = _check_mut_interaction(
             expected, actual,
-            pval_thresh=mut_pval_thresh,
-            method="wilcox_unpaired")
+            pval_thresh=mut_pval_thresh)
+            #method="wilcox_unpaired")
 
         # save out
         results["actual"].append(actual.mean())
@@ -696,7 +718,7 @@ def analyze_combinations(
             results["traj.sig"].append(1)
         else:
             results["traj.sig"].append(0)
-
+        results["pval"].append(pval)
         
     # create summary
     results_adj = []
@@ -885,15 +907,15 @@ def main():
     # analyze
     results_dir = "{}/combinatorial_rules".format(OUT_DIR)
     os.system("mkdir -p {}".format(results_dir))
-    if False:
+    if True:
         analyze_combinations(
             signal_mat_file,
             grammar_dir,
             results_dir,
-            signal_thresh=0, # maybe here
+            signal_thresh=0,
             drop_reps=[],
-            filter_synergy=True, # maybe here?
-            plot=True)
+            filter_synergy=False, # maybe here?
+            plot=False)
     
     # plot expected vs actual
     summary_file = "{}/summary.txt.gz".format(results_dir)
