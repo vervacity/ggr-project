@@ -13,14 +13,13 @@ TRONN_R=/users/dskim89/git/tronn/R
 # -------------
 
 # MAIN: pairwise interactions
-WORK_DIR=/mnt/lab_data/kundaje/users/dskim89/ggr/nn/inference.2019-03-12/ggr.tronn.2019-06-19.interactions
-endogenous_file=$WORK_DIR/interactions.summary.endogenous.2.txt
-simulations_file=$WORK_DIR/interactions.summary.sims.txt
+#WORK_DIR=/mnt/lab_data/kundaje/users/dskim89/ggr/nn/inference.2019-03-12/ggr.tronn.2019-06-19.interactions
+#endogenous_file=$WORK_DIR/interactions.summary.endogenous.2.txt
+#simulations_file=$WORK_DIR/interactions.summary.sims.txt
 
 WORK_DIR=/mnt/lab_data3/dskim89/ggr/nn/2019-03-12.freeze/dmim.shuffle.complete
 endogenous_file=$WORK_DIR/synergy_calcs.endog/interactions.summary.txt
 simulations_file=$WORK_DIR/synergy_calcs.sims/interactions.summary.txt
-
 $SCRIPT_DIR/fig_4-b.0.plot.interactions.R $endogenous_file $simulations_file
 
 # SUPPL: pairwise combinations, using various signal sources
