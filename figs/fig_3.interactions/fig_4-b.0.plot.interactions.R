@@ -146,38 +146,104 @@ ggsave(plot_file, height=1, width=2)
 data_sims$diff_order <- NULL
 
 
-# plot them together 
+# --------------------
+# adjacency matrix
+# --------------------
+
+# build a joint dataframe
 pwm1_endo <- data_endo$pwm1
 pwm2_endo <- data_endo$pwm2
 data_endo$pwm2 <- pwm1_endo
 data_endo$pwm1 <- pwm2_endo
-
+data_endo$seq_type <- "endogenous"
+data_sims$seq_type <- "simulation"
 data <- rbind(data_endo, data_sims)
 print(dim(data))
 
-# set up adjacency matrix
+# get an ordering
 data_unmelted <- dcast(data, pwm1 ~ pwm2, value.var="actual")
 data_unmelted[is.na(data_unmelted)] <- 0
 rownames(data_unmelted) <- data_unmelted$pwm1
 data_unmelted$pwm1 <- NULL
 my_hc <- hclust(dist(data_unmelted), method="ward.D2")
 pwm_order <- rownames(data_unmelted)[my_hc$order]
-write.table(pwm_order, "ordering.txt", quote=FALSE, row.names=FALSE, col.names=FALSE)
+#write.table(pwm_order, "ordering.txt", quote=FALSE, row.names=FALSE, col.names=FALSE)
+print(pwm_order)
 
+# then, for each row, check which comes first in ordering
+for (row_i in 1:nrow(data)) {
+    pwm1 <- data$pwm1[row_i]
+    pwm1_pos <- match(pwm1, pwm_order)
+    #print(pwm1)
+    #print(pwm1_pos)
+    
+    pwm2 <- data$pwm2[row_i]
+    pwm2_pos <- match(pwm2, pwm_order)
+    #print(pwm2)
+    #print(pwm2_pos)
+
+    # check order
+    if (data$seq_type[row_i] == "endogenous") {
+        # make sure pwm1_pos > pwm2_pos
+        if (pwm2_pos < pwm1_pos) {
+            data$pwm1[row_i] <- pwm2
+            data$pwm2[row_i] <- pwm1
+        }
+    } else {
+        # make sure pwm1_pos < pwm2_pos
+        if (pwm2_pos > pwm1_pos) {
+            data$pwm1[row_i] <- pwm2
+            data$pwm2[row_i] <- pwm1
+        }
+    }
+}
 
 # set as ordered factor
 data$pwm1 <- factor(data$pwm1, levels=pwm_order)
 data$pwm2 <- factor(data$pwm2, levels=rev(pwm_order))
 
+# thresh pval
+thresh <- quantile(data$pval, 0.80)
+print(thresh)
+data$pval[data$pval > thresh] <- thresh
+
+# plot abs val of diff
+data$diff_abs <- abs(data$diff)
+
 plot_file <- "fig_4-c.adjacency.pdf"
 #ggplot(data, aes(x=pwm1, y=pwm2, fill=best_task_index, colour=category)) +
-ggplot(data, aes(x=pwm1, y=pwm2, fill=category, colour=best_task_index)) +
-#ggplot(data, aes(x=pwm1, y=pwm2, fill=category)) +
-    geom_point(shape=21, stroke=0.75, aes(size=pval)) +
+#ggplot(data, aes(x=pwm1, y=pwm2, fill=category, colour=best_task_index)) +
+ggplot(data, aes(x=pwm1, y=pwm2, fill=category)) +
+    #geom_point(shape=21, stroke=0.115, aes(size=pval), show.legend=FALSE) +
+    geom_point(shape=21, stroke=0.115, aes(size=diff_abs)) +
+    labs(x="Motif", y="Motif", title="Significant pairwise interactions") +
     theme_bw() +
     theme(
-        axis.text.x=element_text(angle=90),
-        aspect.ratio=1) +
-    scale_colour_manual(values=ggr_colors)
+        aspect.ratio=1,
+        text=element_text(family="ArialMT"),
+        plot.title=element_text(size=8, margin=margin(b=0)),
+        plot.margin=margin(5,1,1,1),
+        panel.background=element_blank(),
+        panel.border=element_rect(size=0.115),
+        panel.grid=element_line(size=0.115),
+        axis.title=element_text(size=6),
+        axis.title.x=element_text(margin=margin(0,0,0,0)),
+        axis.title.y=element_text(margin=margin(0,0,0,0)),
+        axis.text.y=element_text(size=6),
+        axis.text.x=element_text(size=6, angle=90),
+        axis.line=element_line(color="black", size=0.115, lineend="square"),
+        axis.ticks=element_line(size=0.115),
+        axis.ticks.length=unit(0.01, "in"),
+        legend.background=element_blank(),
+        legend.box.background=element_blank(),
+        legend.margin=margin(0,0,0,0),
+        legend.key.size=unit(0.05, "in"),
+        legend.box.margin=margin(0,0,0,0),
+        legend.box.spacing=unit(0.05, "in"),
+        legend.title=element_blank(),
+        legend.text=element_text(size=6)) +
+    scale_colour_manual(values=ggr_colors) +
+    scale_size_continuous(range=c(0.3,3))
     #scale_fill_manual(values=ggr_colors)
-ggsave(plot_file)
+
+ggsave(plot_file, height=3.25, width=3.25, units="in", useDingbats=FALSE)
