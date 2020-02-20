@@ -78,7 +78,7 @@ p1 <- ggplot(data, aes(x=0, y=grammar, fill=interaction)) +
         axis.line=element_blank(),
         axis.text=element_blank(),
         axis.ticks=element_blank()) +
-    scale_fill_manual(values=interaction_colors) 
+    scale_fill_manual(values=interaction_colors, drop=FALSE) 
 
 
 # expected vs actual

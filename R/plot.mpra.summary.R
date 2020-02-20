@@ -17,6 +17,8 @@ data <- read.table(gzfile(data_file), sep="\t", header=TRUE)
 data$labels <- paste(data$pwm1_clean, data$pwm2_clean, sep=",")
 data <- data[data$interaction != "FAILED.NEGATIVE_ENDOG",]
 data <- data[data$interaction != "FAILED.TRAJ_PATTERN",]
+category_levels <- c("ADDITIVE", "BUFFER", "SYNERGY")
+data$interaction <- factor(as.character(data$interaction), levels=category_levels)
 
 # get palette
 colors <- brewer.pal(8, "Set2")
@@ -59,7 +61,7 @@ ggplot(data, aes(x=expected, y=actual, colour=interaction)) +
         legend.title=element_blank(),
         legend.text=element_text(size=5),
         legend.position="bottom") +
-    scale_colour_manual(values=colors) +
+    scale_colour_manual(values=colors, drop=FALSE) +
     scale_y_continuous(limits=c(0,1), expand=c(0,0))
 
 ggsave(plot_file, height=2, width=4, useDingbats=FALSE)

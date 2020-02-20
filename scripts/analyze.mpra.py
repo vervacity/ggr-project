@@ -592,18 +592,18 @@ def analyze_combinations(
         grammar_data_traj = _normalize_for_trajectory_tests(
             grammar_data_avg, metadata_headers, method="d0_norm")
 
-        if "ggr.TRAJ_LABELS-1_x_TRAJ_LABELS-14_x_TRAJ_LABELS-2.42_x_21_x_58" in grammar:
-            plot = True
-        else:
-            plot = False
+        #if "ggr.TRAJ_LABELS-1_x_TRAJ_LABELS-14_x_TRAJ_LABELS-2.42_x_21_x_58" in grammar:
+        #    plot = True
+        #else:
+        #    plot = False
         
         if plot:
             # drop 1 max and 1 min value (for extreme outliers)
             plot_data_file = "{}.traj.data.txt.gz".format(grammar_prefix)
             plot_data = grammar_data_traj.copy()
             # TODO - think about just adjusting plot area rather than removing this
-            #plot_data = plot_data[plot_data["value"] != plot_data["value"].max()]
-            #plot_data = plot_data[plot_data["value"] != plot_data["value"].min()]
+            plot_data = plot_data[plot_data["value"] != plot_data["value"].max()]
+            plot_data = plot_data[plot_data["value"] != plot_data["value"].min()]
             # adjust combo names
             plot_data["pwms"] = "scr-CTL"
             plot_data.loc[plot_data["combos"] == "0,0", "pwms"] = "{0},{1}".format(pwm1_clean,pwm2_clean)
@@ -897,8 +897,9 @@ def main():
         counts_to_mat(counts_files, out_prefix, metadata_file=metadata_file)
         
     # run QC
-    qc_cmd = "./qc.mpra.R {} {}".format(count_mat_file, signal_mat_file)
-    #print qc_cmd
+    qc_cmd = "Rscript ~/git/ggr-project/R/qc.mpra.R {} {}".format(
+        count_mat_file, signal_mat_file)
+    print qc_cmd
     #os.system(qc_cmd)
     
     # signal file w metadata
@@ -907,7 +908,7 @@ def main():
     # analyze
     results_dir = "{}/combinatorial_rules".format(OUT_DIR)
     os.system("mkdir -p {}".format(results_dir))
-    if True:
+    if False:
         analyze_combinations(
             signal_mat_file,
             grammar_dir,
@@ -915,18 +916,22 @@ def main():
             signal_thresh=0,
             drop_reps=[],
             filter_synergy=False, # maybe here?
-            plot=False)
+            plot=True)
     
     # plot expected vs actual
     summary_file = "{}/summary.txt.gz".format(results_dir)
     summary_plot_file = "{}/summary.expected_v_actual.pdf".format(results_dir)
-    os.system("Rscript ~/git/ggr-project/R/plot.mpra.summary.R {} {}".format(
-        summary_file, summary_plot_file))
+    plot_cmd = "Rscript ~/git/ggr-project/R/plot.mpra.summary.R {} {}".format(
+        summary_file, summary_plot_file)
+    print plot_cmd
+    os.system(plot_cmd)
 
     # plot rule map
     map_plot_file = "{}/summary.rule_map.pdf".format(results_dir)
-    os.system("Rscript ~/git/ggr-project/R/plot.mpra.rule_map.R {} {}".format(
-        summary_file, map_plot_file))
+    plot_cmd = "Rscript ~/git/ggr-project/R/plot.mpra.rule_map.R {} {}".format(
+        summary_file, map_plot_file)
+    print plot_cmd
+    os.system(plot_cmd)
     
     return
 
