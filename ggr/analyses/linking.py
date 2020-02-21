@@ -844,19 +844,22 @@ def regions_to_genes(
     
     # overlap regions with links
     # keep original region info to pass through
-    tmp_file = "{}/{}.region_to_region.tmp.txt.gz".format(
+    tmp_file = "{}/{}.region_to_region.tmp.txt".format(
         tmp_dir,
         os.path.basename(out_file).split(".txt")[0])
     intersect_cmd = (
-        "bedtools intersect -wo -a {} -b {} | "
-        "gzip -c > {}").format(
+        "bedtools intersect -wo -a {} -b {} "
+        "> {}").format(
             links_file, region_file, tmp_file)
     run_shell_cmd(intersect_cmd)
     
     # reformat linked regions to bed file
     # keep original region info to pass through
-    tmp_bed_file = "{}.bed.gz".format(tmp_file.split(".txt")[0])
-    data = pd.read_csv(tmp_file, sep="\t", header=None)
+    tmp_bed_file = "{}.bed".format(tmp_file.split(".txt")[0])
+    try:
+        data = pd.read_csv(tmp_file, sep="\t", header=None)
+    except pd.errors.EmptyDataError:
+        return None
     chrom, start, stop, score = _split_interaction_name_field(data[3])
     region_id = data[6].map(str) + ":" + data[7].map(str) + "-" + data[8].map(str) + "," + score.map(str)
     bed_data = pd.DataFrame(
@@ -874,7 +877,7 @@ def regions_to_genes(
     bed_data["strand"] = "."    
     bed_data = bed_data[["chrom", "start", "stop", "region_id", "unique_id", "strand"]]
     bed_data.to_csv(
-        tmp_bed_file, sep="\t", compression="gzip",
+        tmp_bed_file, sep="\t",
         header=False, index=False)
     
     # overlap linked regions with TSS file (generally, all expressed)
