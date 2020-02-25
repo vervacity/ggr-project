@@ -2,13 +2,18 @@
 
 # setup
 GIT_DIR=/users/dskim89/git/ggr-project
-MPRA_DIR=/mnt/lab_data/kundaje/users/dskim89/ggr/validation/mpra.2019-10-22.results/results/combinatorial_rules
+MPRA_DIR=/mnt/lab_data/kundaje/users/dskim89/ggr/validation/mpra.2019-10-22.results
 SCRIPT_DIR=$GIT_DIR/figs/fig_4.mpra
 
 # analysis happens through script
 #$GIT_DIR/scripts/analyze.mpra.py
 
-# fig 5b - vignettes
+
+# ----------------------------------
+# VIGNETTES
+# ----------------------------------
+
+# Main
 
 # HOXA1,GLI3 (early)
 #rsync -avz --progress $MPRA_DIR/results/combinatorial_rules/ggr.TRAJ_LABELS-0.grammar-22.annot-15*pdf ./
@@ -24,13 +29,29 @@ SCRIPT_DIR=$GIT_DIR/figs/fig_4.mpra
 #ggr.TRAJ_LABELS-2.grammar-55
 #TRAJ_LABELS-1.grammar-99
 
+# ----------------------------------
+# SUMMARY
+# ----------------------------------
+
 # fig 5c - summary
 #rsync -avz --progress $MPRA_DIR/summary.expected_v_actual.pdf ./
 
+# ----------------------------------
+# FULL SUMMARY
+# ----------------------------------
+
 # fig 5d - summary of rules
 #rsync -avz --progress $MPRA_DIR/results/combinatorial_rules/summary.rule_map.pdf ./
-PREDICTED_RULE_DIR=/mnt/lab_data3/dskim89/ggr/nn/2019-03-12.freeze/dmim.shuffle.complete/grammars.annotated.manual_filt.merged.final
 
 # build new summary
-$SCRIPT_DIR/plot.validated_rule_map.R $MPRA_DIR/summary.txt.gz $PREDICTED_RULE_DIR/grammars_summary.txt $PREDICTED_RULE_DIR/grammars.filt.atac.mat.txt $PREDICTED_RULE_DIR/grammars.filt.rna.mat.txt $PREDICTED_RULE_DIR/grammars.filt.go_terms.mat.txt fig_4.validated_rule_map.pdf
+PREDICTED_RULE_DIR=/mnt/lab_data3/dskim89/ggr/nn/2019-03-12.freeze/dmim.shuffle.complete/grammars.annotated.manual_filt.merged.final
+#$SCRIPT_DIR/plot.validated_rule_map.R $MPRA_DIR/results/combinatorial_rules/summary.txt.gz $PREDICTED_RULE_DIR/grammars_summary.txt $PREDICTED_RULE_DIR/grammars.filt.atac.mat.txt $PREDICTED_RULE_DIR/grammars.filt.rna.mat.txt $PREDICTED_RULE_DIR/grammars.filt.go_terms.mat.txt fig_4.validated_rule_map.pdf
 
+# ----------------------------------
+# SUPPL
+# ----------------------------------
+
+SIGNAL_FILE=$MPRA_DIR/results/ggr.signal.w_metadata.mat.txt.gz
+
+# plot mpra vs epigenome signals
+$SCRIPT_DIR/plot.mpra_v_epigenome.R $SIGNAL_FILE fig_SX.mpra_compare
