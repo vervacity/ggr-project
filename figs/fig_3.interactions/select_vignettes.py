@@ -39,6 +39,25 @@ SECOND_PASS_GENE_FILT = [
     #"STAT1", # immune
 ]
 
+THIRD_PASS_GENE_FILT = [
+    "LAMB3",
+    "LAMC2",
+    #"KRT5", # 3rd pass filt
+    "TP63",
+    #"EXPH5", # 3rd pass filt
+    "CERS3",
+    #"SPINK5", # 3rd pass filt
+    "CLDN1",
+    #"ELOVL4", # 3rd pass filt
+    #"ABCA12" # 3rd pass filt
+    #"PEX1", # weak rna signal
+    #"ERCC6", # infectious
+    #"FBN1", # connective tissue (Marfans)
+    #"CAST", # rna not good traj
+    #"STAT1", # immune
+]
+
+
 def get_vignettes(
         h5_file,
         links_file,
@@ -95,7 +114,7 @@ def get_vignettes(
             results_regions = metadata_df[metadata_df["id"] == bed_region_id][3].tolist()
 
             # check second pass
-            if hgnc_id not in SECOND_PASS_GENE_FILT:
+            if hgnc_id not in THIRD_PASS_GENE_FILT:
                 continue
 
             for region_id in results_regions:
