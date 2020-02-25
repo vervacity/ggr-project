@@ -80,7 +80,7 @@ p_interaction_type <- ggplot(data, aes(x="interaction type", y=grammar, fill=int
     theme_bw() +
     theme(
         text=element_text(family="ArialMT"),
-        plot.margin=margin(t=4,r=1,b=interact_bottom_adjust,l=1),
+        plot.margin=margin(t=4,r=1,b=interact_bottom_adjust,l=2),
         plot.title=element_text(size=8, margin=margin(b=1)),
         
         panel.background=element_blank(),
@@ -276,7 +276,7 @@ p_rna <- ggplot(rna_melt, aes(x=variable, y=ids, fill=value)) +
     theme(
         text=element_text(family="ArialMT"),
         plot.title=element_text(size=8, margin=margin(b=1)),
-        plot.margin=margin(t=4,r=5,bottom_adjust,l=1),
+        plot.margin=margin(t=4,r=1,bottom_adjust,l=1),
         panel.background=element_blank(),
         panel.border=element_blank(),
         panel.grid.major=element_blank(),
@@ -342,7 +342,7 @@ p_go <- ggplot(go_data_melted, aes(x=variable, y=ids)) +
     scale_y_discrete(drop=FALSE)
 
 # plot all together
-pdf(plot_file, height=4.25, width=7.5, family="ArialMT", useDingbats=FALSE)
+pdf(plot_file, height=4.25, width=7.25, family="ArialMT", useDingbats=FALSE)
 grid.arrange(
     p_atac,
     p_motifs,
