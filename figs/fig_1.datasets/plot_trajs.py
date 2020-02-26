@@ -79,7 +79,7 @@ def main():
         stable_prefix = new_prefixes[i]
         
         # plot stable ATAC with matching profile maps of H3K27ac/H3K4me1/H3K27me3
-        if False:
+        if True:
             plot_clusters(
                 "{}/{}".format(GGR_DIR, outputs["results"]["epigenome"]["stable"][
                     fake_clusters_key].lstrip("./")),
@@ -92,7 +92,7 @@ def main():
         # row seps file produced by plotting
         rowsep_file = "{}/{}.{}.row_seps.txt".format(out_dir, prefix, stable_prefix)
 
-        if False:
+        if True:
             # histones
             for histone_idx in range(len(histones)):
                 histone = histones[histone_idx]

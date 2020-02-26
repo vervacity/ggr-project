@@ -42,6 +42,10 @@ pc1 <- pca_obj$x[,1]
 pc2 <- pca_obj$x[,2]
 pca_data <- data.frame(x=pc1, y=pc2)
 
+# var explained
+pca_eigs <- pca_obj$sdev^2
+var_explained <- pca_eigs / sum(pca_eigs)
+
 # adjust group names
 pca_data$group <- row.names(pca_data)
 group_levels <- colnames(all_data)
@@ -63,7 +67,7 @@ my_colors <- get_ggr_timepoint_colors()
 if (grepl("rna", plot_file, fixed=TRUE)) {
     # drop d0.5
     my_colors <- c(my_colors[1], my_colors[3:length(my_colors)])
-    title <- "RNA-seq"
+    title <- "PAS-seq"
 }
 if (grepl("atac", plot_file, fixed=TRUE)) {
     title <- "ATAC-seq"
@@ -104,7 +108,10 @@ p <- ggplot(pca_data, aes(x=x, y=y, colour=group, fill=day)) +
     geom_tile(size=1.1, fill="white", colour="white", show.legend=FALSE) +
     #geom_point(size=1, show.legend=FALSE) + # size=0.25
     geom_point(shape=21, fill="white", size=1.25, stroke=0.5, show.legend=FALSE) +
-    labs(x="PC1", y="PC2", title=title) + 
+    labs(
+        x=paste("PC1 (", format(round(var_explained[1], 2), nsmall=2), ")", sep=""),
+        y=paste("PC2 (", format(round(var_explained[2], 2), nsmall=2), ")", sep=""),
+        title=title) + 
     scale_color_manual(values=my_colors_joint, guide="none") +
     scale_fill_manual(values=my_colors) +
     coord_fixed() +
@@ -113,7 +120,7 @@ p <- ggplot(pca_data, aes(x=x, y=y, colour=group, fill=day)) +
         #aspect.ratio=1,
         text=element_text(family="ArialMT"),
         plot.margin=margin(5,20,1,0),
-        plot.title=element_text(size=8, margin=margin(b=1)),
+        plot.title=element_text(size=8, hjust=0.5, margin=margin(b=3)),
         panel.background=element_blank(),
         panel.border=element_blank(),
         panel.grid.major=element_blank(),
@@ -160,5 +167,12 @@ y_lim <- 0.75*scale_lim
 p <- p + scale_x_continuous(limits=c(-scale_lim, scale_lim), expand=c(0,0)) +
     scale_y_continuous(limits=c(-y_lim, y_lim), expand=c(0,0))
 
+if (grepl("atac", plot_file, fixed=TRUE)) {
+    plot_ht <- 1.75
+    plot_wid <- 2.5
+}  else {
+    plot_ht <- 1.75 * 0.8
+    plot_wid <- 2.5 * 0.8
+}
 
-ggsave(plot_file, height=1.75, width=2.5, useDingbats=FALSE)
+ggsave(plot_file, height=plot_ht, width=plot_wid, useDingbats=FALSE)

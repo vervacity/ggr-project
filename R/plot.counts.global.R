@@ -27,7 +27,10 @@ plot_width <- 1.5
 if (grepl("atac", plot_file, fixed=TRUE)) {
     color <- get_ggr_assay_palette("Blues", 50)
     title <- "ATAC-seq"
-    plot_width <- 2
+    plot_width <- 1.75
+    num_type <- "regions"
+    y_static_lim <- 160
+    y_dynamic_lim <- 15
 } else if (grepl("H3K27ac", plot_file, fixed=TRUE)) {
     color <- get_ggr_assay_palette("Reds", 50)
     title <- "H3K27ac ChIP-seq"
@@ -43,7 +46,10 @@ if (grepl("atac", plot_file, fixed=TRUE)) {
 } else if (grepl("rna", plot_file, fixed=TRUE)) {
     color <- get_ggr_assay_palette("Purples", 50)
     title <- "PAS-seq"
-    plot_width <- 2
+    plot_width <- 1.75
+    num_type <- "genes"
+    y_static_lim <- 12
+    y_dynamic_lim <- 2
 }
 
 
@@ -53,10 +59,12 @@ data$color <- color
 
 # now set up differences for static vs dynamic counts
 if (count_type == "static") {
-    y <- "Number of regions\n(1000s)"
+    y <- paste("Number of ", num_type, "\n(1000s)", sep="")
+    y_lims <- c(0, y_static_lim)
     data$count <- data$count / 1000.
 } else if (count_type == "dynamic") {
-    y <- "Number of changing regions\n(1000s)"
+    y <- paste("Number of changing\n", num_type, " (1000s)", sep="")
+    y_lims <- c(-y_dynamic_lim, y_dynamic_lim)
     colnames(data) <- c("timepoint", "up", "down", "color")
     # adjust data here
     data$down <- -data$down
@@ -85,18 +93,20 @@ data$color <- as.factor(data$color)
 print(data)
 
 # plot
-ggplot(data, aes(x=timepoint, y=count)) +
+ggplot(data, aes(x=timepoint, y=count, fill=color, colour=color)) +
     geom_bar(
+        alpha=0.7,
         stat="identity",
         position=position_stack(),
-        width=0.25,
-        aes(fill=color),
+        width=0.4,
+        size=0.115,
+        #aes(fill=color, colour=color),
         show.legend=FALSE) +
     labs(x="Timepoint (day)", y=y, title=title) +
     theme_bw() +
     theme(
         text=element_text(family="ArialMT"),
-        plot.title=element_text(size=8, margin=margin(b=1)),
+        plot.title=element_text(size=8, hjust=0.5, margin=margin(b=3)),
         panel.background=element_blank(),
         panel.border=element_blank(),
         panel.grid.major=element_blank(),
@@ -106,7 +116,8 @@ ggplot(data, aes(x=timepoint, y=count)) +
         axis.ticks=element_line(size=0.115),
         axis.text=element_text(size=6),
         axis.text.x=element_text(angle=60, hjust=1)) +
-    scale_y_continuous(expand=c(0,0)) +
-    scale_fill_manual(values=levels(data$color))
+    scale_y_continuous(limits=y_lims, expand=c(0,0)) +
+    scale_fill_manual(values=levels(data$color)) +
+    scale_colour_manual(values=levels(data$color))
 
-ggsave(plot_file, height=1.25, width=plot_width, useDingbats=FALSE) # width 14
+ggsave(plot_file, height=1.5, width=plot_width, useDingbats=FALSE) # height 1.25
