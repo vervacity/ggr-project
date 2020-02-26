@@ -123,6 +123,7 @@ def get_vignettes(
                 metadata_string = region_id.split("features=")[-1].replace(":", "_")
                 with h5py.File(h5_file, "r") as hf:
                     #for key in sorted(hf.keys()): print key, hf[key].shape
+                    mut_indices = hf["sequence-weighted.active.pwm-scores.thresh.max.idx.motif_mut"][h5_i,3]
                     
                     # get labels 
                     signals = hf["labels"][h5_i]
@@ -168,44 +169,84 @@ def get_vignettes(
                     mut_mask = hf["sequence.motif_mut.mask"][h5_i] == 0
                     orig_interact_impts = np.multiply(orig_interact_impts, mut_mask)
                     orig_interact_impts = orig_interact_impts[:,best_task_idx]
-                    
-                    # test
-                    orig_interact_impts[0] = importances[best_task_idx]
-                    
-                    # scale appropriately
-                    if False:
-                        match_interact_impts = hf["sequence-weighted.motif_mut"][h5_i]                    
-                        match_interact_impts = match_interact_impts[:,best_task_idx]
-                        interaction_impts = scale_scores(
-                            orig_interact_impts,
-                            match_interact_impts)
-                    else:
-                        orig_interact_impts = np.divide(
-                            orig_interact_impts,
-                            np.sum(abs(orig_interact_impts), axis=(1,2), keepdims=True))
-                        interaction_impts = orig_interact_impts
 
-                    # To consider - multiply by logits?
-                    if True:
-                        logit_factors = np.reshape(logits_best_task, (-1,1,1))
-                        interaction_impts = np.multiply(interaction_impts, logit_factors)
-                        
-                    # clip negative
-                    flattened_vals = np.abs(interaction_impts).flatten()
-                    sort_indices = np.argsort(flattened_vals)
-                    thresh = flattened_vals[sort_indices][-3] # clip worst two
-                    #thresh = np.percentile(np.abs(interaction_impts), 99.99)
-                    interaction_impts[np.where(interaction_impts > thresh)] = thresh
-                    interaction_impts[np.where(interaction_impts < -thresh)] = -thresh
-                    
-                    # plot interaction impts
-                    dir_name = os.path.dirname(prefix)
-                    root_prefix = os.path.basename(prefix)
-                    plot_file = "{}/{}.{}.{}.{}.{}.task-{}.interactions.plot.pdf".format(
-                        dir_name, hgnc_id, root_prefix, gene_id, h5_i, metadata_string, best_orig_task_idx)
-                    print plot_file
-                    plot_weights_group(interaction_impts, plot_file)
-                    total += 1
+                # test
+                orig_interact_impts[0] = importances[best_task_idx]
+
+                # scale appropriately
+                if False:
+                    match_interact_impts = hf["sequence-weighted.motif_mut"][h5_i]                    
+                    match_interact_impts = match_interact_impts[:,best_task_idx]
+                    interaction_impts = scale_scores(
+                        orig_interact_impts,
+                        match_interact_impts)
+                else:
+                    orig_interact_impts = np.divide(
+                        orig_interact_impts,
+                        np.sum(abs(orig_interact_impts), axis=(1,2), keepdims=True))
+                    interaction_impts = orig_interact_impts
+
+                # To consider - multiply by logits?
+                if True:
+                    logit_factors = np.reshape(logits_best_task, (-1,1,1))
+                    interaction_impts = np.multiply(interaction_impts, logit_factors)
+
+                # clip negative
+                flattened_vals = np.abs(interaction_impts).flatten()
+                sort_indices = np.argsort(flattened_vals)
+                thresh = flattened_vals[sort_indices][-3] # clip worst two
+                #thresh = np.percentile(np.abs(interaction_impts), 99.99)
+                interaction_impts[np.where(interaction_impts > thresh)] = thresh
+                interaction_impts[np.where(interaction_impts < -thresh)] = -thresh
+
+                # clip the importances for better fig
+                if np.abs(mut_indices[0] - mut_indices[1]) < 10:
+                    continue
+                clip_extend = 60
+                midpoint = int(np.sum(mut_indices) / 2) - 420
+                start = max(midpoint - clip_extend, 0)
+                end = start + clip_extend*2
+                if end > interaction_impts.shape[1]:
+                    end = interaction_impts.shape[1]
+                    start = end - clip_extend*2
+                
+                interaction_impts = interaction_impts[:,start:end]
+                print interaction_impts.shape
+                
+                # plot interaction impts
+                dir_name = os.path.dirname(prefix)
+                root_prefix = os.path.basename(prefix)
+                plot_prefix = "{}/{}.{}.{}.{}.{}.task-{}".format(
+                    dir_name, hgnc_id, root_prefix, gene_id, h5_i, metadata_string, best_orig_task_idx)
+                plot_file = "{}.interactions.plot.pdf".format(plot_prefix)
+                print plot_file
+                plot_weights_group(interaction_impts, plot_file)
+
+                # plot logits
+                #logits_df = pd.DataFrame(np.expand_dims(logits_best_task, axis=0))
+                logits_tmp_file = "{}.logits.tmp.txt.gz".format(plot_prefix)
+                logits_df = pd.DataFrame({
+                    "logits": logits_best_task,
+                    "mut_type": ["endog", "motif,scr", "scr,motif", "scr,scr"]})
+                logits_df.to_csv(logits_tmp_file, sep="\t", compression="gzip", index=False)
+                git_dir = "/users/dskim89/git/ggr-project/figs/fig_3.interactions"
+                plot_cmd = "{}/plot.interaction.logits.R {} {}.logits.pdf".format(
+                    git_dir, logits_tmp_file, plot_prefix)
+                print plot_cmd
+                os.system(plot_cmd)
+
+                # plot rna bar
+                plot_file = "{}/gene_vals.{}.pdf".format(dir_name, hgnc_id)
+                git_dir = "/users/dskim89/git/ggr-project/figs/fig_1.datasets"
+                GGR_DIR = "/mnt/lab_data/kundaje/users/dskim89/ggr/integrative/v1.0.0a"
+                rna_file = "{}/results/rna/timeseries/matrices/ggr.rna.counts.pc.expressed.timeseries_adj.pooled.rlog.mat.txt.gz".format(GGR_DIR)
+                if not os.path.isfile(plot_file):
+                    plot_cmd = "{}/plot.rna_bar.R {} {} {}".format(
+                        git_dir, rna_file, gene_id, plot_file)
+                    print plot_cmd
+                    os.system(plot_cmd)
+                
+                total += 1
                     
     return total
 
