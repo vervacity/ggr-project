@@ -42,6 +42,7 @@ tss_file=$GGR_DIR/annotations/ggr.rna.tss.expressed.bed.gz
 filter_genes_file=$GGR_DIR/annotations/hg19.genodermatoses.ensembl_ids.txt.gz
 #filter_genes_file=$GGR_DIR/data/ggr.rna.counts.pc.expressed.timeseries_adj.pooled.rlog.dynamic.traj.mat.txt.gz
 chromsizes=$ANNOT_DIR/hg19.chrom.sizes
+gene_id_mapping_file=$GGR_DIR/annotations/hg19.ensembl_geneids.pc.gencode19.mappings.mat.gz
 
 # vignettes that are linked to genodermatoses genes
 #rm -r vignettes.genodermatoses # REMOVE THIS LATER
@@ -49,16 +50,14 @@ chromsizes=$ANNOT_DIR/hg19.chrom.sizes
 
 # vignettes with GWAS/GTEx
 VARIANT_DIR=/mnt/lab_data/kundaje/users/dskim89/ggr/variants/validation.2019-04-27.processed
-#DATA_DIR=/mnt/lab_data3/dskim89/ggr/nn/2020-01-13/scanmotifs
 
 # gwas
-#filter_genes_file=$GGR_DIR/data/ggr.rna.counts.pc.expressed.timeseries_adj.pooled.rlog.dynamic.traj.mat.txt.gz
-#$SCRIPT_DIR/select_vignettes.GWAS_GTEx.py $VARIANT_DIR/gwas.skin.atac_filt.bed.gz vignettes.gwas $filter_genes_file $synergy_dir $summary_file
+filter_genes_file=$GGR_DIR/data/ggr.rna.counts.pc.expressed.timeseries_adj.pooled.rlog.dynamic.traj.mat.txt.gz
+#$SCRIPT_DIR/select_vignettes.GWAS_GTEx.py $VARIANT_DIR/gwas.skin.atac_filt.bed.gz vignettes.gwas $filter_genes_file $gene_id_mapping_file $synergy_dir $summary_file
 
 # gtex
-#filter_genes_file=$GGR_DIR/annotations/hg19.genodermatoses.ensembl_ids.txt.gz
 filter_genes_file=$GGR_DIR/data/ggr.rna.counts.pc.expressed.timeseries_adj.pooled.rlog.dynamic.traj.mat.txt.gz
-$SCRIPT_DIR/select_vignettes.GWAS_GTEx.py $VARIANT_DIR/gtex.skin.atac_filt.bed.gz vignettes.gtex $filter_genes_file $synergy_dir $summary_file
+$SCRIPT_DIR/select_vignettes.GWAS_GTEx.py $VARIANT_DIR/gtex.skin.atac_filt.bed.gz vignettes.gtex $filter_genes_file $gene_id_mapping_file $synergy_dir $summary_file
 
 
 # SUPPL: predicted rule map

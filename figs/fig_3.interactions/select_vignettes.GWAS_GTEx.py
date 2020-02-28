@@ -12,6 +12,13 @@ from tronn.plot.visualization import plot_weights_group
 from tronn.util.formats import array_to_bed
 
 
+SECOND_PASS_KEEP = [
+    "UNKNOWN",
+    "MUC15",
+    "LYPD5",
+    "PIK3C2B"
+]
+
 idx_to_letter = {
     0: "A",
     1: "C",
@@ -80,10 +87,18 @@ def get_vignettes(
                 continue
         else:
             gene_id = "UNKNOWN"
-
+            
         # and get hgnc
         hgnc_id = ensembl_to_hgnc.get(gene_id, "UNKNOWN")
-            
+
+        # manual filtering
+        manual_keep = False
+        for keep_id in SECOND_PASS_KEEP:
+            if hgnc_id in keep_id:
+                manual_keep = True
+        if not manual_keep:
+            continue
+        
         # and get importance score at variant position
         with h5py.File(h5_file, "r") as hf:
             if False:
@@ -218,6 +233,19 @@ def get_vignettes(
                     git_dir, logits_tmp_file, plot_prefix)
                 print plot_cmd
                 os.system(plot_cmd)
+
+                # if there was an associated gene, need the gene rna bar
+                if gene_id != "UNKNOWN":
+                    # plot rna bar
+                    plot_file = "{}/gene_vals.{}.pdf".format(out_dir, hgnc_id)
+                    git_dir = "/users/dskim89/git/ggr-project/figs/fig_1.datasets"
+                    GGR_DIR = "/mnt/lab_data/kundaje/users/dskim89/ggr/integrative/v1.0.0a"
+                    rna_file = "{}/results/rna/timeseries/matrices/ggr.rna.counts.pc.expressed.timeseries_adj.pooled.rlog.mat.txt.gz".format(GGR_DIR)
+                    if not os.path.isfile(plot_file):
+                        plot_cmd = "{}/plot.rna_bar.R {} {} {}".format(
+                            git_dir, rna_file, gene_id, plot_file)
+                        print plot_cmd
+                        os.system(plot_cmd)
                 
             total += 1
             
@@ -234,8 +262,9 @@ def main():
     gwas_file = sys.argv[1]
     out_dir = sys.argv[2]
     filter_genes_file = sys.argv[3]
-    h5_dir = sys.argv[4]
-    summary_file = sys.argv[5]
+    gene_id_mapping_file = sys.argv[4]
+    h5_dir = sys.argv[5]
+    summary_file = sys.argv[6]
     tmp_dir = "{}/tmp".format(out_dir)
     os.system("mkdir -p {}".format(tmp_dir))
 
@@ -249,11 +278,11 @@ def main():
     genes_mat = pd.read_csv(filter_genes_file, sep="\t", index_col=0)
     filter_genes = genes_mat.index.values.tolist()
 
-    # keep hgnc ids?
-    if "genodermatoses" in filter_genes_file:
-        ensembl_to_hgnc = dict(zip(genes_mat.index.values, genes_mat.iloc[:,0]))
-    else:
-        ensembl_to_hgnc = {}
+    # get hgnc ids
+    mappings = pd.read_csv(gene_id_mapping_file, sep="\t", header=0)
+    ensembl_to_hgnc = dict(zip(
+        mappings["ensembl_gene_id"].values,
+        mappings["hgnc_symbol"].values))
     
     # rsid to gene
     rsid_to_genes = {}
