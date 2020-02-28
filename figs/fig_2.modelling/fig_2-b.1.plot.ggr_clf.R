@@ -101,7 +101,7 @@ plot_metric <- function(results, plot_file, title, metric_name, limits) {
         theme(
             text=element_text(family="ArialMT", size=6),
             plot.margin=margin(5,1,1,1),
-            plot.title=element_text(size=8, margin=margin(0,0,0,0)),
+            plot.title=element_text(size=8, hjust=0.5, margin=margin(0,0,0,0)),
             panel.background=element_blank(),
             panel.border=element_blank(),
             panel.grid=element_blank(),
@@ -116,7 +116,7 @@ plot_metric <- function(results, plot_file, title, metric_name, limits) {
         scale_color_npg() +
         scale_fill_npg() +
         scale_y_continuous(limits=limits, expand=c(0,0))
-    ggsave(plot_file, height=1.75, width=1.5, useDingbats=FALSE)
+    ggsave(plot_file, height=1.5, width=1.5, useDingbats=FALSE)
 
 }
 

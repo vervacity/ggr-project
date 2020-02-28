@@ -32,7 +32,9 @@ footprint_end <- -1
 
 # read in data, create index
 data <- read.table(input_file, sep="\t", header=TRUE, row.names=1)
-colnames(data) <- c("NN.inactive", "NN.active")
+if (dim(data)[2] == 2) {
+    colnames(data) <- c("NN.inactive", "NN.active")
+}
 data$position <- as.numeric(rownames(data)) - (nrow(data) / 2)
 
 # normalizations: flank norm. this gives a fold change enrichment over background
@@ -51,17 +53,18 @@ data_flank_adj$position <- as.numeric(rownames(data_flank_adj)) - (nrow(data_fla
 
 # melt
 data_melted <- melt(data_flank_adj, id.vars=c("position"))
-data_melted$variable <- gsub(".", "-", data_melted$variable, fixed=TRUE)
 
 # adjust colors if actually just pos/neg
 if (dim(data)[2] == 3) {
+    data_melted$variable <- gsub(".", "-", data_melted$variable, fixed=TRUE)
     ggr_colors <- brewer.pal(6, "Paired")[1:2]
     data_melted$variable <- factor(data_melted$variable, levels=c("NN-inactive", "NN-active"))
 } else {
     ggr_colors <- get_ggr_timepoint_colors()
     ggr_colors <- ggr_colors[c(2, 7, 10)]
-    ggr_colors <- rev(ggr_colors)
-    data_melted$variable <- factor(data_melted$variable, levels=c("d6.0", "d3.0", "d0.0"))
+    #ggr_colors <- rev(ggr_colors)
+    #data_melted$variable <- factor(data_melted$variable, levels=c("d6.0", "d3.0", "d0.0"))
+    data_melted$variable <- factor(data_melted$variable, levels=c("d0.0", "d3.0", "d6.0"))
 }
 
 # figure out title
@@ -85,11 +88,11 @@ ggplot(data_melted, aes(x=position, y=value, colour=variable)) +
     geom_rect(alpha=0.2, size=0, color=NA, fill="grey95", aes(xmin=-acc_flank_start, xmax=-acc_flank_end, ymin=y_min, ymax=y_max)) +
     geom_rect(alpha=0.2, size=0, color=NA, fill="grey95", aes(xmin=acc_flank_end, xmax=acc_flank_start, ymin=y_min, ymax=y_max)) +
     geom_line(alpha=0.7, size=0.230) + # 0.115
-    labs(title=title_name, x="\nPosition (bp)", y="Fold enrichment\n") +
+    labs(title=paste(title_name, " motif footprinting", sep=""), x="\nPosition (bp)", y="Fold enrichment\n") +
     theme_bw() +
     theme(
         text=element_text(family="ArialMT"),
-        plot.title=element_text(hjust=0.5, size=8, margin=margin(b=1)),
+        plot.title=element_text(hjust=0.5, size=8, margin=margin(b=3)),
         plot.margin=margin(5,5,1,5),
         panel.background=element_blank(),
         panel.border=element_blank(),
@@ -137,11 +140,13 @@ acc_flank_avg_vals <- as.data.frame(t(apply(acc_flank_vals, 2, mean)))
 acc_flank_avg_vals$position <- NULL
 acc_flank_avg_vals <- melt(acc_flank_avg_vals)
 
-acc_flank_avg_vals$variable <- gsub(".", "-", acc_flank_avg_vals$variable, fixed=TRUE)
+
 if (dim(data)[2] == 3) {
+    acc_flank_avg_vals$variable <- gsub(".", "-", acc_flank_avg_vals$variable, fixed=TRUE)
     acc_flank_avg_vals$variable <- factor(acc_flank_avg_vals$variable, levels=c("NN-inactive", "NN-active"))
 } else {
-    acc_flank_avg_vals$variable <- factor(acc_flank_avg_vals$variable, levels=c("d6.0", "d3.0", "d0.0"))
+    #acc_flank_avg_vals$variable <- factor(acc_flank_avg_vals$variable, levels=c("d6.0", "d3.0", "d0.0"))
+    acc_flank_avg_vals$variable <- factor(acc_flank_avg_vals$variable, levels=c("d0.0", "d3.0", "d6.0"))
 }
 print(acc_flank_avg_vals)
 
@@ -173,7 +178,8 @@ ggplot(acc_flank_avg_vals, aes(x=variable, y=value, colour=variable, fill=variab
     scale_fill_manual(values=ggr_colors) +
     scale_y_continuous(limits=c(y_min, y_max), expand=c(0,0))
 
-ggsave(plot_file, height=1.2, width=0.75, useDingbats=FALSE)
+#ggsave(plot_file, height=1.2, width=0.75, useDingbats=FALSE)
+ggsave(plot_file, height=1, width=0.75, useDingbats=FALSE)
 
 
 
@@ -203,11 +209,12 @@ x_lim <- acc_flank_norm_start
 
 # melt
 data_bias_adj_melted <- melt(data_bias_adj, id.vars=c("position"))
-data_bias_adj_melted$variable <- gsub(".", "-", data_bias_adj_melted$variable, fixed=TRUE)
 if (dim(data)[2] == 3) {
+    data_bias_adj_melted$variable <- gsub(".", "-", data_bias_adj_melted$variable, fixed=TRUE)
     data_bias_adj_melted$variable <- factor(data_bias_adj_melted$variable, levels=c("NN-inactive", "NN-active"))
 } else {
-    data_bias_adj_melted$variable <- factor(data_bias_adj_melted$variable, levels=c("d6.0", "d3.0", "d0.0"))
+    #data_bias_adj_melted$variable <- factor(data_bias_adj_melted$variable, levels=c("d6.0", "d3.0", "d0.0"))
+    data_bias_adj_melted$variable <- factor(data_bias_adj_melted$variable, levels=c("d0.0", "d3.0", "d6.0"))
 }
 
 # make pretty y limit
@@ -224,7 +231,7 @@ ggplot(data_bias_adj_melted, aes(x=position, y=value, colour=variable)) +
     theme_bw() +
     theme(
         text=element_text(family="ArialMT"),
-        plot.title=element_text(hjust=0.5, size=8, margin=margin(b=1)),
+        plot.title=element_text(hjust=0.5, size=8, margin=margin(b=3)),
         plot.margin=margin(5,5,1,5),
         panel.background=element_blank(),
         panel.border=element_blank(),
@@ -269,13 +276,13 @@ data_footprints <- data.frame(t(t(footprint_vals) - footprint_max_vals))
 footprint_avg_vals <- as.data.frame(t(apply(data_footprints, 2, mean)))
 footprint_avg_vals$position <- NULL
 footprint_avg_vals <- melt(footprint_avg_vals)
-footprint_avg_vals$variable <- gsub(".", "-", footprint_avg_vals$variable, fixed=TRUE)
-
 
 if (dim(data)[2] == 3) {
+    footprint_avg_vals$variable <- gsub(".", "-", footprint_avg_vals$variable, fixed=TRUE)
     footprint_avg_vals$variable <- factor(footprint_avg_vals$variable, levels=c("NN-inactive", "NN-active"))
 } else {
-    footprint_avg_vals$variable <- factor(footprint_avg_vals$variable, levels=c("d6.0", "d3.0", "d0.0"))
+    #footprint_avg_vals$variable <- factor(footprint_avg_vals$variable, levels=c("d6.0", "d3.0", "d0.0"))
+    footprint_avg_vals$variable <- factor(footprint_avg_vals$variable, levels=c("d0.0", "d3.0", "d6.0"))
 }
 print(footprint_avg_vals)
 
@@ -308,4 +315,5 @@ ggplot(footprint_avg_vals, aes(x=variable, y=value, colour=variable, fill=variab
     scale_fill_manual(values=ggr_colors) +
     scale_y_continuous(limits=c(y_min, y_max))
 
-ggsave(plot_file, height=1.2, width=0.75, useDingbats=FALSE)
+#ggsave(plot_file, height=1.2, width=0.75, useDingbats=FALSE)
+ggsave(plot_file, height=1, width=0.75, useDingbats=FALSE)

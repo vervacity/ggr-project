@@ -106,9 +106,11 @@ BIGWIG_FILE=$CISTROME_DIR/cistrome.48799.ZNF750.hg38.bw
 D0_BAM="/mnt/lab_data/kundaje/projects/skin/data/bds/processed.atac.2019-06-04.bams_bp-resolution/primary_keratinocyte-d00.GGR.Stanford_Greenleaf.ATAC-seq.pooled.fixedtrim.PE2SE.nodup.bam"
 D3_BAM="/mnt/lab_data/kundaje/projects/skin/data/bds/processed.atac.2019-06-04.bams_bp-resolution/primary_keratinocyte-d30.GGR.Stanford_Greenleaf.ATAC-seq.pooled.fixedtrim.PE2SE.nodup.bam"
 D6_BAM="/mnt/lab_data/kundaje/projects/skin/data/bds/processed.atac.2019-06-04.bams_bp-resolution/primary_keratinocyte-d60.GGR.Stanford_Greenleaf.ATAC-seq.pooled.fixedtrim.PE2SE.nodup.bam"
+
+# first pass to look at all of them
 #python /users/dskim89/git/tronn/scripts/ggr/ggr_footprint_motifs.py --motif_list $MOTIFS --data_file $SCANMOTIFS --bam_files $D0_BAM $D3_BAM $D6_BAM -o footprints --prefix ggr --signal_matching_key sequence.active.gc_fract
 
+#python /users/dskim89/git/tronn/scripts/ggr/ggr_footprint_motifs.py --motif_list $MOTIFS --data_file $SCANMOTIFS --bam_files $D0_BAM $D3_BAM $D6_BAM -o footprints --prefix ggr --filter_motifs HOXA1 CEBPD NFAT GRHL DLX3 --signal_matching_key sequence.active.gc_fract
 
-#python /users/dskim89/git/tronn/scripts/ggr/ggr_footprint_motifs.py --motif_list $MOTIFS --data_file $SCANMOTIFS --bam_files $D0_BAM $D3_BAM $D6_BAM -o footprints --prefix ggr --filter_motifs NFKB NFAT GRHL --signal_matching_key ATAC_SIGNALS.NORM
-#python /users/dskim89/git/tronn/scripts/ggr/ggr_footprint_motifs.py --motif_list $MOTIFS --data_file $SCANMOTIFS --bam_files $D0_BAM $D3_BAM $D6_BAM -o footprints --prefix ggr --filter_motifs NFKB NFAT GRHL --signal_matching_key sequence.active.gc_fract
-
+# use if needed
+##python /users/dskim89/git/tronn/scripts/ggr/ggr_footprint_motifs.py --motif_list $MOTIFS --data_file $SCANMOTIFS --bam_files $D0_BAM $D3_BAM $D6_BAM -o footprints --prefix ggr --filter_motifs NFKB NFAT GRHL --signal_matching_key ATAC_SIGNALS.NORM
