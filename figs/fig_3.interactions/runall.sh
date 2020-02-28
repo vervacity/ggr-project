@@ -13,7 +13,7 @@ ANNOT_DIR=/mnt/lab_data3/dskim89/ggr/annotations
 # schematic
 
 # -------------
-# B
+# BCD
 # -------------
 
 # MAIN: pairwise interactions
@@ -29,23 +29,36 @@ summary_files=/mnt/lab_data3/dskim89/ggr/nn/2020-01-13/grammars*/grammars.annota
 #$TRONN_R/plot.combinations.adjacencies.R fig_S3.go_filt TRUE $summary_files
 
 # -------------
-# C
+# E
 # -------------
 
-# MAIN: some nice vignettes <- actually, only pull from those that succeeded?
+# data
 synergy_dir=$WORK_DIR/synergy
-summary_file=$WORK_DIR/grammars.annotated.manual_filt.merged.final/grammars_summary.txt
-summary_file=/mnt/lab_data/kundaje/users/dskim89/ggr/validation/mpra.2019-10-22.results/results/combinatorial_rules/summary.txt.gz
+#summary_file=$WORK_DIR/grammars.annotated.manual_filt.merged.final/grammars_summary.txt
+summary_file=/mnt/lab_data/kundaje/users/dskim89/ggr/validation/mpra.2019-10-22.results/results/combinatorial_rules/summary.txt.gz # NOTE: utilizing only VALIDATED RULES for vignettes
 #links_file=$GGR_DIR/results/linking/hichip/ggr.linking.ALL.overlap.interactions.txt.gz
 links_file=$GGR_DIR/results/linking/proximity/ggr.linking.ALL.overlap.interactions.txt.gz
 tss_file=$GGR_DIR/annotations/ggr.rna.tss.expressed.bed.gz
 filter_genes_file=$GGR_DIR/annotations/hg19.genodermatoses.ensembl_ids.txt.gz
-#filter_genes_fil=$GGR_DIR/data/ggr.rna.counts.pc.expressed.timeseries_adj.pooled.rlog.dynamic.traj.mat.txt.gz
+#filter_genes_file=$GGR_DIR/data/ggr.rna.counts.pc.expressed.timeseries_adj.pooled.rlog.dynamic.traj.mat.txt.gz
 chromsizes=$ANNOT_DIR/hg19.chrom.sizes
 
-# genodermatoses filt
-rm -r vignettes.genodermatoses # REMOVE THIS LATER
-$SCRIPT_DIR/select_vignettes.py fig_3.vignettes $summary_file $synergy_dir $links_file $tss_file $filter_genes_file $chromsizes vignettes.genodermatoses
+# vignettes that are linked to genodermatoses genes
+#rm -r vignettes.genodermatoses # REMOVE THIS LATER
+#$SCRIPT_DIR/select_vignettes.py fig_3.vignettes $summary_file $synergy_dir $links_file $tss_file $filter_genes_file $chromsizes vignettes.genodermatoses
+
+# vignettes with GWAS/GTEx
+VARIANT_DIR=/mnt/lab_data/kundaje/users/dskim89/ggr/variants/validation.2019-04-27.processed
+#DATA_DIR=/mnt/lab_data3/dskim89/ggr/nn/2020-01-13/scanmotifs
+
+# gwas
+#filter_genes_file=$GGR_DIR/data/ggr.rna.counts.pc.expressed.timeseries_adj.pooled.rlog.dynamic.traj.mat.txt.gz
+#$SCRIPT_DIR/select_vignettes.GWAS_GTEx.py $VARIANT_DIR/gwas.skin.atac_filt.bed.gz vignettes.gwas $filter_genes_file $synergy_dir $summary_file
+
+# gtex
+#filter_genes_file=$GGR_DIR/annotations/hg19.genodermatoses.ensembl_ids.txt.gz
+filter_genes_file=$GGR_DIR/data/ggr.rna.counts.pc.expressed.timeseries_adj.pooled.rlog.dynamic.traj.mat.txt.gz
+$SCRIPT_DIR/select_vignettes.GWAS_GTEx.py $VARIANT_DIR/gtex.skin.atac_filt.bed.gz vignettes.gtex $filter_genes_file $synergy_dir $summary_file
 
 
 # SUPPL: predicted rule map

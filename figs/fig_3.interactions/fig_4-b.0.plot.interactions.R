@@ -48,7 +48,7 @@ ggplot(data_endo, aes(x=expected, y=actual)) +
     theme(
         aspect.ratio=1,
         text=element_text(family="ArialMT"),
-        plot.title=element_text(size=8, margin=margin(b=0)),
+        plot.title=element_text(size=8, hjust=0.5, margin=margin(b=3)),
         plot.margin=margin(5,5,1,5),
         panel.background=element_blank(),
         panel.border=element_blank(),
@@ -68,6 +68,7 @@ ggplot(data_endo, aes(x=expected, y=actual)) +
         legend.key.size=unit(0.05, "in"),
         legend.box.margin=margin(0,0,0,0),
         legend.box.spacing=unit(0.05, "in"),
+        legend.spacing.x=unit(0.05, "in"),
         legend.title=element_blank(),
         legend.text=element_text(size=6)) +
     scale_fill_manual(values=colors, drop=FALSE) +
@@ -108,6 +109,7 @@ ggplot(data_endo, aes(x=expected, y=diff)) +
         legend.key.size=unit(0.05, "in"),
         legend.box.margin=margin(0,0,0,0),
         legend.box.spacing=unit(0.05, "in"),
+        legend.spacing.x=unit(0.05, "in"),
         legend.title=element_blank(),
         legend.text=element_text(size=6)) +
     scale_fill_manual(values=colors, drop=FALSE) +
@@ -139,7 +141,7 @@ ggplot(data_sims, aes(x=expected, y=actual)) +
     theme(
         aspect.ratio=1,
         text=element_text(family="ArialMT"),
-        plot.title=element_text(size=8, margin=margin(b=0)),
+        plot.title=element_text(size=8, hjust=0.5, margin=margin(b=3)),
         plot.margin=margin(5,5,1,5),
         panel.background=element_blank(),
         panel.border=element_blank(),
@@ -159,6 +161,7 @@ ggplot(data_sims, aes(x=expected, y=actual)) +
         legend.key.size=unit(0.05, "in"),
         legend.box.margin=margin(0,0,0,0),
         legend.box.spacing=unit(0.05, "in"),
+        legend.spacing.x=unit(0.05, "in"),
         legend.title=element_blank(),
         legend.text=element_text(size=6)) +
     scale_fill_manual(values=colors, drop=FALSE) +
@@ -278,7 +281,7 @@ ggplot(data, aes(x=pwm1, y=pwm2, fill=category)) +
     theme(
         aspect.ratio=1,
         text=element_text(family="ArialMT"),
-        plot.title=element_text(size=8, margin=margin(b=0)),
+        plot.title=element_text(size=8, hjust=0.5, margin=margin(b=3)),
         plot.margin=margin(5,1,1,1),
         panel.background=element_blank(),
         panel.border=element_rect(size=0.115),
@@ -298,6 +301,7 @@ ggplot(data, aes(x=pwm1, y=pwm2, fill=category)) +
         legend.key.size=unit(0.05, "in"),
         legend.box.margin=margin(0,0,0,0),
         legend.box.spacing=unit(0.05, "in"),
+        legend.spacing.x=unit(0.05, "in"),
         legend.title=element_blank(),
         legend.text=element_text(size=5)) +
     scale_colour_manual(values=ggr_colors) +
