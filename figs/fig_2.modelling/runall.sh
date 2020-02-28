@@ -114,3 +114,36 @@ D6_BAM="/mnt/lab_data/kundaje/projects/skin/data/bds/processed.atac.2019-06-04.b
 
 # use if needed
 ##python /users/dskim89/git/tronn/scripts/ggr/ggr_footprint_motifs.py --motif_list $MOTIFS --data_file $SCANMOTIFS --bam_files $D0_BAM $D3_BAM $D6_BAM -o footprints --prefix ggr --filter_motifs NFKB NFAT GRHL --signal_matching_key ATAC_SIGNALS.NORM
+
+
+# -----------
+# SIMS
+# -----------
+
+# see archive for full worked through analyses
+
+# data
+SIM_MULT_ALLNEGS_DIR=/mnt/lab_data/kundaje/users/dskim89/ggr/nn/analysis_homotypic.2019-09-06/sims.multiplicity.full_negatives
+SIM_SPACING_ALLNEGS_DIR=/mnt/lab_data/kundaje/users/dskim89/ggr/nn/analysis_homotypic.2019-09-06/sims.spacing.full_negatives
+
+# multiplicity as seen in simulations
+#$SCRIPT_DIR/analyze.simulations.multiplicity.py $SCRIPT_DIR $SIM_MULT_ALLNEGS_DIR simulations.multiplicity.full_negs
+
+# spacing as seen in simulations
+#$SCRIPT_DIR/analyze.simulations.spacing.py $SCRIPT_DIR $SIM_SPACING_ALLNEGS_DIR simulations.spacing.full_negs
+
+# spacing as seen in the genome
+SIG_PWMS_FILE=$SIG_MOTIFS_DIR/summary/ggr.pwms_patterns_summary.txt
+
+# v4
+#SCANMOTIFS_DIR=/mnt/lab_data/kundaje/users/dskim89/ggr/nn/inference.2019-02-05
+#UNFILT_SCAN_FILE=$SCANMOTIFS_DIR/motifs.input_x_grad.background/ggr.scanmotifs.h5
+
+# v5
+SCANMOTIFS_DIR=/mnt/lab_data3/dskim89/ggr/nn/2020-01-13/scanmotifs
+UNFILT_SCAN_FILE=$SCANMOTIFS_DIR/motifs.background.100k/ggr.scanmotifs.h5
+
+# tODO
+# check whether right script
+# check dataset choice (new or old pwms)
+$SCRIPT_DIR/analyze.genome.spacing.py $SCRIPT_DIR genome.spacing.v5 $UNFILT_SCAN_FILE $SIG_PWMS_FILE
