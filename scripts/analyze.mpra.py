@@ -11,6 +11,7 @@ import networkx as nx
 from scipy.stats import wilcoxon
 from scipy.stats import ranksums
 from scipy.stats import ttest_1samp
+from scipy.stats import ttest_ind
 
 
 def trim_and_attach_umi(fastq1, fastq2, fastq_out):
@@ -423,11 +424,70 @@ def _check_traj_pattern(traj_medians, day_key):
                 day_key = "d3_AVG"
         else:
             check_match = False
-
+    
     # compare
     traj_match = traj_match or check_match
             
     return traj_match, day_key
+
+
+def _check_traj_sigdiff(traj_data, threshold=0.05):
+    """check for statistical difference betweeen days, using wilcoxon
+    """
+    traj_data_clean = traj_data.set_index("example_id")
+    num_columns = traj_data_clean.shape[1]
+
+    # compare all timepoints to each other
+    sig = False
+    for i in range(num_columns):
+        for j in range(num_columns):
+            if i == j:
+                continue
+            
+            timepoint_i = traj_data_clean.values[:,i]
+            timepoint_i = timepoint_i[~np.isnan(timepoint_i)]
+            timepoint_j = traj_data_clean.values[:,j]
+            timepoint_j = timepoint_j[~np.isnan(timepoint_j)]
+            
+            # run test
+            diff = timepoint_i - np.median(timepoint_j)
+            stat, pval = wilcoxon(diff)
+            if pval < threshold:
+                sig = True
+    
+    return sig
+
+
+def _check_traj_signull(traj_data, threshold=0.05):
+    """check compared to null, whether significantly different
+    """
+    # pivot
+    endog_norm = traj_data[traj_data["combos"]=="0,0"].drop(
+        ["combos", "day"], axis=1)
+    endog_norm = endog_norm.pivot(
+        index="example_id", columns="variable")["value"] #.reset_index()
+
+    null_norm = traj_data[traj_data["combos"]=="1,1"].drop(
+        ["combos", "day"], axis=1)
+    null_norm = null_norm.pivot(
+        index="example_id", columns="variable")["value"] #.reset_index()
+    
+    # only check days 3,6
+    sig = False
+    for i in range(1,3):
+        #print i
+        endog_vals = endog_norm.values[:,i]
+        endog_vals = endog_vals[~np.isnan(endog_vals)]
+        null_vals = null_norm.values[:,i]
+        null_vals = null_vals[~np.isnan(null_vals)]
+        
+        # test
+        diff = null_vals - np.median(endog_vals)
+        stat, pval = wilcoxon(diff)
+        if pval < threshold:
+            sig = True
+            
+    return sig
 
 
 def _check_mut_interaction(
@@ -498,7 +558,7 @@ def analyze_combinations(
     data, signal_headers, grammars = _load_data_and_setup(
         data_file, drop_reps, filter_synergy)
     metadata_headers = ["example_id", "combos", "synergy.max"]
-
+    
     # results
     results = {
         "grammar": [],
@@ -591,11 +651,6 @@ def analyze_combinations(
                 grammar_data, signal_headers, metadata_headers, signal_thresh, filter_synergy=filter_synergy)
         grammar_data_traj = _normalize_for_trajectory_tests(
             grammar_data_avg, metadata_headers, method="d0_norm")
-
-        #if "ggr.TRAJ_LABELS-1_x_TRAJ_LABELS-14_x_TRAJ_LABELS-2.42_x_21_x_58" in grammar:
-        #    plot = True
-        #else:
-        #    plot = False
         
         if plot:
             # drop 1 max and 1 min value (for extreme outliers)
@@ -628,17 +683,54 @@ def analyze_combinations(
         results["traj.medians"].append(traj_medians)
 
         # check traj pattern
+        passed_traj_sigdiff = _check_traj_sigdiff(endog_norm)
+        # TODO check here
         passed_traj_pattern, day_key = _check_traj_pattern(traj_medians, day_key)
         if "ggr.TRAJ_LABELS-1_x_TRAJ_LABELS-14_x_TRAJ_LABELS-2.42_x_21_x_58" in grammar:
             day_key = "d6_AVG"
         results["day_empirical"].append(day_key)
-        if not passed_traj_pattern:
+        if not (passed_traj_pattern and passed_traj_sigdiff):
             results = _attach_null_result(results, "FAILED.TRAJ_PATTERN")
             continue
 
         # run test here, results saved out later
-        passed_traj_vs_double_mut = _check_traj_endogenous_vs_double_mut(
-            grammar_data_traj, days=["d0", "d3", "d6"])
+        #passed_traj_vs_double_mut = _check_traj_endogenous_vs_double_mut(
+        #    grammar_data_traj, days=["d0", "d3", "d6"])
+
+        # compare to null, is there a sig diff from null?
+        # ^ test is above
+        passed_traj_vs_double_mut = _check_traj_signull(grammar_data_traj)
+        
+        # compare to ATAC, H3K27ac
+        if False:
+            # plot the atac/h3k27ac
+            keys = ["ATAC_SIGNALS.NORM", "H3K27ac_SIGNALS.NORM"]
+            for key in keys:
+                keep_keys = ["example_id"] + [key]
+                ids = endog_norm["example_id"].values
+
+                # parse epigenome data
+                epigenome_data = data[data["example_id"].isin(ids)][keep_keys]
+                epigenome_data = epigenome_data.drop_duplicates().set_index("example_id")
+                epigenome_data = epigenome_data[key].str.split(",", expand=True).astype(float)
+                if "ATAC" in key:
+                    epigenome_data = epigenome_data[[0,6,12]]
+                epigenome_data.columns = ["d0", "d3", "d6"]
+                epigenome_medians = epigenome_data.median()
+
+                # normalize
+                epigenome_data = epigenome_data.sub(epigenome_data.mean(axis=1), axis=0)
+                epigenome_data = epigenome_data.melt()
+                epigenome_data["value"] = epigenome_data["value"] - epigenome_data[epigenome_data["variable"] == "d0"]["value"].median()
+                
+                # compare epigenome data to expression data
+                plot_data_file = "{}.traj.epigenome_data.txt.gz".format(grammar_prefix)
+                epigenome_data.to_csv(plot_data_file, sep="\t", compression="gzip", header=True, index=False)
+                plot_cmd = "{}/plot.mpra.vs_epigenome.traj.R {} {}.{}".format(
+                    r_dir, plot_data_file, grammar_prefix, key)
+                print plot_cmd
+                os.system(plot_cmd)
+                os.system("rm {}".format(plot_data_file))
         
         # ----------------------
         # mutational hypothesis
@@ -705,7 +797,6 @@ def analyze_combinations(
         interaction, pval = _check_mut_interaction(
             expected, actual,
             pval_thresh=mut_pval_thresh)
-            #method="wilcox_unpaired")
 
         # save out
         results["actual"].append(actual.mean())
@@ -748,6 +839,102 @@ def analyze_combinations(
     results.to_csv(summary_file, sep="\t", compression="gzip", index=False, header=True)
     
     return None
+
+
+def _plot_epigenome(data_file, plot_prefix, keep_rules=[], key="ATAC_SIGNALS.NORM"):
+    """pull in normalized file and plot
+    """
+    # load
+    data = pd.read_csv(data_file, sep="\t")
+    data["rule"] = [re.sub("\\.\\d+$", "", name) for name in data["example_id"]]
+    
+    # which headers to keep
+    signal_headers = [name for name in data.columns if "_b" in name]
+    metadata_headers = [key, "example_metadata", "combos", "rule"]
+
+    # filt
+    data_filt = data[signal_headers + metadata_headers]
+    data_filt = data_filt[data_filt[key] != "0"]
+    data_filt = data_filt[data_filt["combos"] == "0,0"]
+    data_filt = data_filt.drop("combos", axis=1)
+    data_filt = data_filt[data_filt[signal_headers].mean(axis=1) != 0]
+    keep_rules = []
+    if len(keep_rules) > 0:
+        data_filt = data_filt[data_filt["rule"].isin(keep_rules)]
+    
+    # get epigenome data
+    epigenome_data = data_filt[key].str.split(",", expand=True).astype(float)
+    if "ATAC" in key:
+        epigenome_data = epigenome_data[[0,6,12]]
+    
+    # plot per timepoint
+    days = ["d0", "d3", "d6"]
+    for day_idx in range(len(days)):
+        day = days[day_idx]
+        # get mpra data
+        mpra_day_headers = [name for name in data_filt.columns if day in name]
+        mpra_vals = data_filt[mpra_day_headers].median(axis=1) # median?
+
+        # get epigenome vals
+        epigenome_vals = epigenome_data.values[:,day_idx]
+
+        # make df
+        plot_data = pd.DataFrame({
+            "example_ids": data_filt["example_metadata"].values,
+            "mpra": mpra_vals.values,
+            "epigenome": epigenome_vals
+        })
+
+        # reduce
+        plot_data = plot_data.groupby("example_ids").median() # mean?
+
+        # save out and plot
+        plot_data_file = "{}.{}.data.txt".format(plot_prefix, day)
+        plot_file = "{}.{}.pdf".format(plot_prefix, day)
+        plot_data.to_csv(plot_data_file, sep="\t", header=True)
+        plot_cmd = "Rscript ~/git/ggr-project/R/plot.mpra.compare.R {} {}".format(
+            plot_data_file, plot_file)
+        print plot_cmd
+        os.system(plot_cmd)
+        
+    return
+
+
+def _plot_epigenome_both(atac_prefix, h3k27ac_prefix, plot_prefix):
+    """try a sum of both
+    """
+    days = ["d0", "d3", "d6"]
+    for day_idx in range(len(days)):
+        day = days[day_idx]
+
+        atac_file = "{}.{}.data.txt".format(atac_prefix, day)
+        h3k27ac_file = "{}.{}.data.txt".format(h3k27ac_prefix, day)
+
+        # read in
+        atac_data = pd.read_csv(atac_file, sep="\t").set_index("example_ids")
+        atac_data.columns = ["ATAC", "mpra"]
+        h3k27ac_data = pd.read_csv(h3k27ac_file, sep="\t").set_index("example_ids")
+        h3k27ac_data.columns = ["H3K27ac", "mpra"]
+        h3k27ac_data = h3k27ac_data.drop("mpra", axis=1)
+        
+        # merge
+        data = atac_data.merge(
+            h3k27ac_data, how="outer", left_index=True, right_index=True)
+        data = data.fillna(0)
+        data["epigenome"] = data["ATAC"] + data["H3K27ac"]
+        #print data
+        #quit()
+
+        # save out and plot
+        plot_data_file = "{}.{}.data.txt".format(plot_prefix, day)
+        plot_file = "{}.{}.pdf".format(plot_prefix, day)
+        data.to_csv(plot_data_file, sep="\t", header=True)
+        plot_cmd = "Rscript ~/git/ggr-project/R/plot.mpra.compare.R {} {}".format(
+            plot_data_file, plot_file)
+        print plot_cmd
+        os.system(plot_cmd)
+
+    return
 
 
 def main():
@@ -916,7 +1103,7 @@ def main():
             signal_thresh=0,
             drop_reps=[],
             filter_synergy=False, # maybe here?
-            plot=True)
+            plot=False)
     
     # plot expected vs actual
     summary_file = "{}/summary.txt.gz".format(results_dir)
@@ -924,14 +1111,32 @@ def main():
     plot_cmd = "Rscript ~/git/ggr-project/R/plot.mpra.summary.R {} {}".format(
         summary_file, summary_plot_file)
     print plot_cmd
-    os.system(plot_cmd)
+    #os.system(plot_cmd)
 
     # plot rule map
     map_plot_file = "{}/summary.rule_map.pdf".format(results_dir)
     plot_cmd = "Rscript ~/git/ggr-project/R/plot.mpra.rule_map.R {} {}".format(
         summary_file, map_plot_file)
     print plot_cmd
-    os.system(plot_cmd)
+    #os.system(plot_cmd)
+
+    results_data = pd.read_csv(summary_file, sep="\t")
+    results_data = results_data[results_data["actual"] != 0]
+    keep_rules = results_data["grammar"].values.tolist()
+
+    # plot mpra vs ATAC
+    atac_prefix = "{}/compare.mpra_vs_atac".format(results_dir)
+    _plot_epigenome(signal_mat_file, atac_prefix,
+                    keep_rules=keep_rules, key="ATAC_SIGNALS.NORM")
+    
+    # plot mpra vs H3K27ac
+    h3k27ac_prefix = "{}/compare.mpra_vs_h3k27ac".format(results_dir)
+    _plot_epigenome(signal_mat_file, h3k27ac_prefix,
+                    keep_rules=keep_rules, key="H3K27ac_SIGNALS.NORM")
+
+    # try plots considering both
+    plot_prefix = "{}/compare.mpra_v_epigenome".format(results_dir)
+    _plot_epigenome_both(atac_prefix, h3k27ac_prefix, plot_prefix)
     
     return
 
