@@ -32,6 +32,7 @@ ANNOT_DIR=/mnt/lab_data3/dskim89/ggr/annotations
 
 # MAIN: scatter plots for predicted/actual d0,3,6
 #$SCRIPT_DIR/fig_2-c.0.plot.scatter.R $EVAL_DIR/ggr.basset.regr.pretrained.folds.testfold-4/by_task/correlation
+#$SCRIPT_DIR/fig_2-c.0.plot.scatter.ALL.R $EVAL_DIR/ggr.basset.regr.pretrained.folds.testfold-4/by_task/correlation
 
 # SUPPL: evaluation for prediction - heatmaps
 #$SCRIPT_DIR/fig_2-d.0.plot.heatmaps.R $PREDICT_DIR/motifs.input_x_grad.early/ggr.scanmotifs.h5 $PREDICT_DIR/motifs.input_x_grad.mid/ggr.scanmotifs.h5 $PREDICT_DIR/motifs.input_x_grad.late/ggr.scanmotifs.h5
@@ -54,7 +55,7 @@ ANNOT_DIR=/mnt/lab_data3/dskim89/ggr/annotations
 # -----------
 
 # MAIN: vignette
-#$SCRIPT_DIR/choose_vignette.py
+$SCRIPT_DIR/choose_vignette.py
 RNA_MAT=$GGR_DIR/results/rna/timeseries/matrices/ggr.rna.counts.pc.expressed.timeseries_adj.pooled.rlog.mat.txt.gz
 #$GIT_DIR/figs/fig_1.datasets/plot.rna_bar.R $RNA_MAT ENSG00000189182 gene_vals.KRT77.pdf
 #$GIT_DIR/figs/fig_1.datasets/plot.rna_bar.R $RNA_MAT ENSG00000073282 gene_vals.TP63.pdf
@@ -146,4 +147,4 @@ UNFILT_SCAN_FILE=$SCANMOTIFS_DIR/motifs.background.100k/ggr.scanmotifs.h5
 # tODO
 # check whether right script
 # check dataset choice (new or old pwms)
-$SCRIPT_DIR/analyze.genome.spacing.py $SCRIPT_DIR genome.spacing.v5 $UNFILT_SCAN_FILE $SIG_PWMS_FILE
+#$SCRIPT_DIR/analyze.genome.spacing.py $SCRIPT_DIR genome.spacing.v5 $UNFILT_SCAN_FILE $SIG_PWMS_FILE

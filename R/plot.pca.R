@@ -59,8 +59,10 @@ if (!grepl("histone", plot_file, fixed=TRUE) & !grepl("hichip", plot_file, fixed
 }
 
 pca_data$group <- factor(pca_data$group, levels=group_levels)
-pca_data$day <- factor(gsub("_b.", "", pca_data$group))
+pca_data$day <- gsub("_b.", "", pca_data$group)
+pca_data$day <- factor(gsub("d", "day ", pca_data$day))
 pca_data$rep <- as.character(gsub(".+_", "", pca_data$group))
+
 
 # pull GGR colors and adjust
 my_colors <- get_ggr_timepoint_colors()
@@ -109,8 +111,8 @@ p <- ggplot(pca_data, aes(x=x, y=y, colour=group, fill=day)) +
     #geom_point(size=1, show.legend=FALSE) + # size=0.25
     geom_point(shape=21, fill="white", size=1.25, stroke=0.5, show.legend=FALSE) +
     labs(
-        x=paste("PC1 (", format(round(var_explained[1], 2), nsmall=2), ")", sep=""),
-        y=paste("PC2 (", format(round(var_explained[2], 2), nsmall=2), ")", sep=""),
+        x=paste("PC1 (", format(round(var_explained[1]*100, 2), nsmall=2), "%)", sep=""),
+        y=paste("PC2 (", format(round(var_explained[2]*100, 2), nsmall=2), "%)", sep=""),
         title=title) + 
     scale_color_manual(values=my_colors_joint, guide="none") +
     scale_fill_manual(values=my_colors) +
@@ -132,39 +134,47 @@ p <- ggplot(pca_data, aes(x=x, y=y, colour=group, fill=day)) +
         axis.text=element_text(size=6),
         axis.ticks=element_line(size=0.115),
         axis.ticks.length=unit(0.01, "in"),
-        legend.position=c(1.1, 0.5),
+        legend.position=c(1.15, 0.5),
         legend.text=element_text(size=5),
         legend.title=element_blank(),
         legend.spacing.x=unit(0.05, "in"),
         legend.key=element_rect(size=0.1, fill="white", colour="black"),
-        legend.key.size=unit(0.05, 'in'))
+        legend.key.height=unit(0.1, "in"),
+        legend.key.width=unit(0.05, "in"))
+        #legend.key.size=unit(0.05, 'in'))
 
 # default scale (RNA)
-scale_lim <- 110
+min_x <- -100
+max_x <- 100
 
 if (grepl("atac", plot_file, fixed=TRUE)) {
-    scale_lim <- 130
+    min_x <- -170
+    max_x <- 130
 }
 
 if (grepl("H3K27ac", plot_file, fixed=TRUE)) {
-    scale_lim <- 230
+    min_x <- -230
+    max_x <- 230
 }
 
 if (grepl("H3K4me1", plot_file, fixed=TRUE)) {
-    scale_lim <- 200
+    min_x <- -200
+    max_x <- 200
 }
 
 if (grepl("H3K27me3", plot_file, fixed=TRUE)) {
-    scale_lim <- 60
+    min_x <- -60
+    max_x <- 60
 }
 
 if (grepl("hichip", plot_file, fixed=TRUE)) {
-    scale_lim <- 400
+    min_x <- -400
+    max_x <- 400
 }
 
-y_lim <- 0.75*scale_lim
+y_lim <- 0.75*max_x
 
-p <- p + scale_x_continuous(limits=c(-scale_lim, scale_lim), expand=c(0,0)) +
+p <- p + scale_x_continuous(limits=c(min_x, max_x), expand=c(0,0)) +
     scale_y_continuous(limits=c(-y_lim, y_lim), expand=c(0,0))
 
 if (grepl("atac", plot_file, fixed=TRUE)) {

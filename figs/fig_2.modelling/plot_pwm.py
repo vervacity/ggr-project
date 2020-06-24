@@ -2,6 +2,8 @@
 
 import sys
 
+import numpy as np
+
 from tronn.util.pwms import MotifSetManager
 from tronn.plot.visualization import plot_pwm
 
@@ -19,7 +21,8 @@ def main():
     for pwm in print_pwms:
         plot_file = "{}.weights.pdf".format(pwm.name)
         plot_pwm(pwm.get_probs().transpose(), plot_file)
-
+        plot_file = "{}.weights.rev.pdf".format(pwm.name)
+        plot_pwm(np.flip(pwm.get_probs().transpose()), plot_file)
     
     return
 
