@@ -13,8 +13,13 @@ vals <- read.table(val_file, sep="\t", header=TRUE)
 vals$labels <- ""
 vals$labels[vals$timepoint == "d0.0"] <- "d0"
 vals$labels[vals$timepoint == "d6.0"] <- "d6"
+
+vals$ATAC <- vals$ATAC - min(vals$ATAC)
+vals$predicted <- vals$predicted - min(vals$predicted)
+
 vals$ATAC <- vals$ATAC / max(vals$ATAC)
 vals$predicted <- vals$predicted / max(vals$predicted)
+
 
 vals_melt <- melt(vals, id.vars=c("timepoint", "labels"))
 vals_melt$variable <- as.character(vals_melt$variable)

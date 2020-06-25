@@ -1,6 +1,7 @@
 #!/bin/bash
 
 SCRIPT_DIR=/users/dskim89/git/ggr-project/figs/fig_3.interactions
+FIG2_SCRIPT_DIR=/users/dskim89/git/ggr-project/figs/fig_2.modelling
 TRONN_R=/users/dskim89/git/tronn/R
 
 GGR_DIR=/mnt/lab_data/kundaje/users/dskim89/ggr/integrative/v1.0.0a
@@ -25,8 +26,8 @@ simulations_file=$WORK_DIR/synergy_calcs.sims/interactions.summary.txt
 # SUPPL: pairwise combinations, using various signal sources
 ordering_file=ordering.txt # from prev script run, apply ONLY to mut matrices
 summary_files=/mnt/lab_data3/dskim89/ggr/nn/2020-01-13/grammars*/grammars.annotated/grammar_summary.txt
-#$TRONN_R/plot.combinations.adjacencies.R fig_S3.unfiltered FALSE $summary_files
-#$TRONN_R/plot.combinations.adjacencies.R fig_S3.go_filt TRUE $summary_files
+$TRONN_R/plot.combinations.adjacencies.R fig_S3.unfiltered FALSE $summary_files
+$TRONN_R/plot.combinations.adjacencies.R fig_S3.go_filt TRUE $summary_files
 
 # -------------
 # E
@@ -44,20 +45,33 @@ filter_genes_file=$GGR_DIR/annotations/hg19.genodermatoses.ensembl_ids.txt.gz
 chromsizes=$ANNOT_DIR/hg19.chrom.sizes
 gene_id_mapping_file=$GGR_DIR/annotations/hg19.ensembl_geneids.pc.gencode19.mappings.mat.gz
 
+pwm_file=$GGR_DIR/annotations/HOCOMOCOv11_core_pwms_HUMAN_mono.renamed.nonredundant.txt
+
 # vignettes that are linked to genodermatoses genes
 #rm -r vignettes.genodermatoses # REMOVE THIS LATER
 #$SCRIPT_DIR/select_vignettes.py fig_3.vignettes $summary_file $synergy_dir $links_file $tss_file $filter_genes_file $chromsizes vignettes.genodermatoses
+#$FIG2_SCRIPT_DIR/plot_pwm.py $pwm_file NFKB
+#$FIG2_SCRIPT_DIR/plot_pwm.py $pwm_file CBFB
+#$FIG2_SCRIPT_DIR/plot_pwm.py $pwm_file ATF4
+#$FIG2_SCRIPT_DIR/plot_pwm.py $pwm_file GRHL
+#$FIG2_SCRIPT_DIR/plot_pwm.py $pwm_file CEBP
+#$FIG2_SCRIPT_DIR/plot_pwm.py $pwm_file TP53
+#$FIG2_SCRIPT_DIR/plot_pwm.py $pwm_file ATF1
+#$FIG2_SCRIPT_DIR/plot_pwm.py $pwm_file TAF1
+#$FIG2_SCRIPT_DIR/plot_pwm.py $pwm_file TFAP2
+#$FIG2_SCRIPT_DIR/plot_pwm.py $pwm_file NR2C1
+#$FIG2_SCRIPT_DIR/plot_pwm.py $pwm_file MTF1
 
 # vignettes with GWAS/GTEx
 VARIANT_DIR=/mnt/lab_data/kundaje/users/dskim89/ggr/variants/validation.2019-04-27.processed
 
-# gwas
+# gwas - note none found
 filter_genes_file=$GGR_DIR/data/ggr.rna.counts.pc.expressed.timeseries_adj.pooled.rlog.dynamic.traj.mat.txt.gz
 #$SCRIPT_DIR/select_vignettes.GWAS_GTEx.py $VARIANT_DIR/gwas.skin.atac_filt.bed.gz vignettes.gwas $filter_genes_file $gene_id_mapping_file $synergy_dir $summary_file
 
-# gtex
+# gtex - note 1 found
 filter_genes_file=$GGR_DIR/data/ggr.rna.counts.pc.expressed.timeseries_adj.pooled.rlog.dynamic.traj.mat.txt.gz
-$SCRIPT_DIR/select_vignettes.GWAS_GTEx.py $VARIANT_DIR/gtex.skin.atac_filt.bed.gz vignettes.gtex $filter_genes_file $gene_id_mapping_file $synergy_dir $summary_file
+#$SCRIPT_DIR/select_vignettes.GWAS_GTEx.py $VARIANT_DIR/gtex.skin.atac_filt.bed.gz vignettes.gtex $filter_genes_file $gene_id_mapping_file $synergy_dir $summary_file
 
 
 # SUPPL: predicted rule map

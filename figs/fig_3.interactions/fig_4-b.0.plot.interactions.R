@@ -11,8 +11,8 @@ source(load_style_guide)
 ggr_colors <- get_ggr_timepoint_colors()
 print(ggr_colors)
 unique_indices <- c(0,1,2,3,4,5,6,9,10,12)
-category_levels <- c("buffer", "synergy", "additive")
-category_levels <- c("additive", "buffer", "synergy")
+#category_levels <- c("buffer", "synergy", "log-additive")
+category_levels <- c("log-additive", "buffer", "synergy")
 
 # args
 args <- commandArgs(trailingOnly=TRUE)
@@ -28,12 +28,18 @@ colors <- rev(colors[4:6])
 # read endog data, get qvals and adjust
 data_endo <- read.table(endo_file, header=TRUE)
 data_endo$qval <- qvalue(data_endo$pval, lambda=0)$qvalue
-data_endo$category[data_endo$qval > qval_thresh] <- "additive"
+data_endo$category <- as.character(data_endo$category)
+data_endo$category[data_endo$qval > qval_thresh] <- "log-additive"
+data_endo$category[data_endo$category == "additive"] <- "log-additive"
 
 # plot endogenous summary
 plot_file <- "fig_4-b.0.endogenous_seq.pdf"
 data_endo$best_task_index <- as.factor(data_endo$best_task_index)
 data_endo$pval <- -log10(data_endo$pval)
+
+#data_endo$actual <- 2^data_endo$actual
+#data_endo$expected <- 2^data_endo$expected
+
 endo_task_indices <- as.numeric(as.character(data_endo$best_task_index))
 data_endo$best_task_index <- factor(
     endo_task_indices,
@@ -42,8 +48,8 @@ endo_colors <- ggr_colors[unique_indices %in% unique(endo_task_indices)]
 data_endo$category <- factor(data_endo$category, levels=category_levels)
 ggplot(data_endo, aes(x=expected, y=actual)) +
     geom_abline(size=0.115, linetype="dashed") +
-    geom_point(shape=21, stroke=0.115, aes(fill=category)) +
-    labs(x="Linear expectation", y="Observed", title="Genomic instance\nscores") +
+    geom_point(shape=21, size=2, stroke=0.115, aes(fill=category)) +
+    labs(x="NN log-additive\nexpectation", y="NN prediction", title="Interaction scores\nfrom genomic data") +
     theme_bw() +
     theme(
         aspect.ratio=1,
@@ -72,10 +78,13 @@ ggplot(data_endo, aes(x=expected, y=actual)) +
         legend.title=element_blank(),
         legend.text=element_text(size=6)) +
     scale_fill_manual(values=colors, drop=FALSE) +
-    scale_x_continuous(limits=c(0.5, 1.3), expand=c(0,0)) +
-    scale_y_continuous(limits=c(0.5, 1.3), expand=c(0,0))
+    #scale_colour_manual(values=colors, drop=FALSE) +
+    scale_x_continuous(limits=c(0.6, 1.4), expand=c(0,0)) +
+    scale_y_continuous(limits=c(0.6, 1.4), expand=c(0,0))
+    #scale_x_continuous(limits=c(1.5, 2.6), expand=c(0,0)) +
+    #scale_y_continuous(limits=c(1.5, 2.6), expand=c(0,0))
 
-ggsave(plot_file, height=1.5, width=1.5, units="in", useDingbats=FALSE)
+ggsave(plot_file, height=1.7, width=1.5, units="in", useDingbats=FALSE)
 
 
 # different plot for endogenous - rank order?
@@ -85,7 +94,7 @@ plot_file <- "fig_4.b.0.endogenous_seq.DIFF.pdf"
 #ggplot(data_endo, aes(x=diff_order, y=diff)) +
 ggplot(data_endo, aes(x=expected, y=diff)) +
     geom_hline(size=0.115, yintercept=0, linetype="dashed") +
-    geom_point(shape=21, stroke=0.115, aes(fill=category)) +
+    geom_point(shape=21, size=2, stroke=0.115, aes(fill=category)) +
     theme_bw() +
     theme(
         text=element_text(family="ArialMT"),
@@ -123,20 +132,26 @@ data_endo$diff_order <- NULL
 # read simulation data
 data_sims <- read.table(sims_file, header=TRUE)
 data_sims$qval <- qvalue(data_sims$pval, lambda=0)$qvalue
-data_sims$category[data_sims$qval > qval_thresh] <- "additive"
+data_sims$category <- as.character(data_sims$category)
+data_sims$category[data_sims$qval > qval_thresh] <- "log-additive"
+data_sims$category[data_sims$category == "additive"] <- "log-additive"
 
 # plot sims summary
 plot_file <- "fig_4-b.1.simulations_seq.pdf"
 data_sims$best_task_index <- as.factor(data_sims$best_task_index)
 data_sims$pval <- -log10(data_sims$pval)
+
+#data_sims$actual <- 2^data_sims$actual
+#data_sims$expected <- 2^data_sims$expected
+
 data_sims$best_task_index <- factor(
     as.numeric(as.character(data_sims$best_task_index)),
     levels=unique_indices)
 data_sims$category <- factor(data_sims$category, levels=category_levels)
 ggplot(data_sims, aes(x=expected, y=actual)) +
     geom_abline(size=0.115, linetype="dashed") +
-    geom_point(shape=21, stroke=0.115, aes(fill=category)) +
-    labs(x="Linear expectation", y="Observed", title="Synthetic instance\nscores") +
+    geom_point(shape=21, size=2, stroke=0.115, aes(fill=category)) +
+    labs(x="NN log-additive\nexpectation", y="NN prediction", title="Interaction scores\nfrom synthetic data") +
     theme_bw() +
     theme(
         aspect.ratio=1,
@@ -167,8 +182,10 @@ ggplot(data_sims, aes(x=expected, y=actual)) +
     scale_fill_manual(values=colors, drop=FALSE) +
     scale_x_continuous(limits=c(0, 1), expand=c(0,0)) +
     scale_y_continuous(limits=c(0, 1), expand=c(0,0))
+    #scale_x_continuous(limits=c(0.8, 2), expand=c(0,0)) +
+    #scale_y_continuous(limits=c(0.8, 2), expand=c(0,0))
 
-ggsave(plot_file, height=1.5, width=1.5, units="in", useDingbats=FALSE)
+ggsave(plot_file, height=1.7, width=1.5, units="in", useDingbats=FALSE)
 
 # plot differently
 data_sims <- data_sims[order(data_sims$diff),]
@@ -215,6 +232,19 @@ data_sims$diff_order <- NULL
 # adjacency matrix
 # --------------------
 
+# make sure num examples for endo is transferred to sims
+data_endo$pwm_pwm <- paste(data_endo$pwm1, data_endo$pwm2, sep="_")
+data_sims$pwm_pwm <- paste(data_sims$pwm1, data_sims$pwm2, sep="_")
+for (row_idx in 1:nrow(data_endo)) {
+    pwm_pwm <- data_endo$pwm_pwm[row_idx]
+    #print(pwm_pwm)
+    sims_idx <- which(pwm_pwm == data_sims$pwm_pwm)
+    data_sims$num_examples[sims_idx] <- data_endo$num_examples[row_idx]
+    #print(sims_idx)
+}
+
+
+
 # build a joint dataframe
 pwm1_endo <- data_endo$pwm1
 pwm2_endo <- data_endo$pwm2
@@ -223,7 +253,7 @@ data_endo$pwm1 <- pwm2_endo
 data_endo$seq_type <- "endogenous"
 data_sims$seq_type <- "simulation"
 data <- rbind(data_endo, data_sims)
-print(dim(data))
+
 
 # get an ordering
 data_unmelted <- dcast(data, pwm1 ~ pwm2, value.var="actual")
@@ -270,13 +300,16 @@ data$pval[data$pval > thresh] <- thresh
 # plot abs val of diff
 data$diff_abs <- abs(data$diff)
 
+#print(head(data))
+
 plot_file <- "fig_4-c.adjacency.pdf"
 #ggplot(data, aes(x=pwm1, y=pwm2, fill=best_task_index, colour=category)) +
 #ggplot(data, aes(x=pwm1, y=pwm2, fill=category, colour=best_task_index)) +
 ggplot(data, aes(x=pwm1, y=pwm2, fill=category)) +
     #geom_point(shape=21, stroke=0.115, aes(size=pval), show.legend=FALSE) +
-    geom_point(shape=21, stroke=0.115, aes(size=diff_abs)) +
-    labs(x="Motif", y="Motif", title="Pairwise interaction effects") +
+    #geom_point(shape=21, stroke=0.115, aes(size=diff_abs)) +
+    geom_point(shape=21, stroke=0.115, aes(size=num_examples)) +
+    labs(x="Motif", y="Motif", title="Predicted pairwise interactions driving accessibility") +
     theme_bw() +
     theme(
         aspect.ratio=1,
@@ -305,7 +338,7 @@ ggplot(data, aes(x=pwm1, y=pwm2, fill=category)) +
         legend.title=element_blank(),
         legend.text=element_text(size=5)) +
     scale_colour_manual(values=ggr_colors) +
-    scale_size_continuous(range=c(0.3,3)) +
+    scale_size_continuous(range=c(0.2,2.5)) +
     scale_fill_manual(values=colors, drop=FALSE)
 
 ggsave(plot_file, height=3.25, width=3.25, units="in", useDingbats=FALSE)

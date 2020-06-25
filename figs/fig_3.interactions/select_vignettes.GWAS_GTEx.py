@@ -172,6 +172,14 @@ def get_vignettes(
                     orig_interact_impts = np.multiply(orig_interact_impts, mut_mask)
                     orig_interact_impts = orig_interact_impts[:,best_task_idx]
 
+                    # also grab actual v predicted
+                    keep_indices = [0,1,2,3,4,5,6,9,10,12]
+                    actual = hf["ATAC_SIGNALS.NORM"][h5_i][keep_indices]
+                    #actual = hf["labels"][h5_i][keep_indices]
+                    predicted = hf["logits.norm"][h5_i][keep_indices]
+
+
+
                 # test
                 orig_interact_impts[0] = importances[best_task_idx]
 
@@ -196,7 +204,7 @@ def get_vignettes(
                 # clip negative
                 flattened_vals = np.abs(interaction_impts).flatten()
                 sort_indices = np.argsort(flattened_vals)
-                thresh = flattened_vals[sort_indices][-3] # clip worst two
+                thresh = flattened_vals[sort_indices][-7] # clip worst two
                 #thresh = np.percentile(np.abs(interaction_impts), 99.99)
                 interaction_impts[np.where(interaction_impts > thresh)] = thresh
                 interaction_impts[np.where(interaction_impts < -thresh)] = -thresh
@@ -214,6 +222,20 @@ def get_vignettes(
                 
                 interaction_impts = interaction_impts[:,start:end]
                 print interaction_impts.shape
+
+                # TODO plot out ATAC vs predicted
+                actual_v_predicted = pd.DataFrame({
+                    "timepoint": ["d0.0", "d0.5", "d1.0", "d1.5", "d2.0", "d2.5", "d3.0", "d4.5", "d5.0", "d6.0"],
+                    "ATAC": actual,
+                    "predicted": predicted}).set_index("timepoint")
+                plot_data_file = "{}.atac.actual_v_predicted.txt".format(plot_prefix)
+                actual_v_predicted.to_csv(plot_data_file, header=True, index=True, sep="\t")
+                plot_file = "{}.atac.actual_v_predicted.pdf".format(plot_prefix)
+                fig2_dir = "/users/dskim89/git/ggr-project/figs/fig_2.modelling"
+                plot_cmd = "{}/plot.atac.actual_v_pred.R {} {}".format(
+                    fig2_dir, plot_data_file, plot_file)
+                print plot_cmd
+                os.system(plot_cmd)
                 
                 # plot interaction impts
                 plot_file = "{}.pos-{}.impts-interact.task-{}.pdf".format(
