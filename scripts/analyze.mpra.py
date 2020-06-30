@@ -659,6 +659,10 @@ def analyze_combinations(
             # TODO - think about just adjusting plot area rather than removing this
             plot_data = plot_data[plot_data["value"] != plot_data["value"].max()]
             plot_data = plot_data[plot_data["value"] != plot_data["value"].min()]
+            # do again (drop 2 maxes, 2 mins)
+            plot_data = plot_data[plot_data["value"] != plot_data["value"].max()]
+            plot_data = plot_data[plot_data["value"] != plot_data["value"].min()]
+
             # adjust combo names
             plot_data["pwms"] = "scr-CTL"
             plot_data.loc[plot_data["combos"] == "0,0", "pwms"] = "{0},{1}".format(pwm1_clean,pwm2_clean)
@@ -702,7 +706,7 @@ def analyze_combinations(
         passed_traj_vs_double_mut = _check_traj_signull(grammar_data_traj)
         
         # compare to ATAC, H3K27ac
-        if False:
+        if True:
             # plot the atac/h3k27ac
             keys = ["ATAC_SIGNALS.NORM", "H3K27ac_SIGNALS.NORM"]
             for key in keys:
@@ -865,6 +869,8 @@ def _plot_epigenome(data_file, plot_prefix, keep_rules=[], key="ATAC_SIGNALS.NOR
     # get epigenome data
     epigenome_data = data_filt[key].str.split(",", expand=True).astype(float)
     if "ATAC" in key:
+        epigenome_data = epigenome_data[[0,6,12]]
+    if "logit" in key:
         epigenome_data = epigenome_data[[0,6,12]]
     
     # plot per timepoint
@@ -1102,8 +1108,8 @@ def main():
             results_dir,
             signal_thresh=0,
             drop_reps=[],
-            filter_synergy=False, # maybe here?
-            plot=False)
+            filter_synergy=False,
+            plot=True)
     
     # plot expected vs actual
     summary_file = "{}/summary.txt.gz".format(results_dir)
@@ -1111,7 +1117,7 @@ def main():
     plot_cmd = "Rscript ~/git/ggr-project/R/plot.mpra.summary.R {} {}".format(
         summary_file, summary_plot_file)
     print plot_cmd
-    #os.system(plot_cmd)
+    os.system(plot_cmd)
 
     # plot rule map
     map_plot_file = "{}/summary.rule_map.pdf".format(results_dir)
@@ -1120,23 +1126,30 @@ def main():
     print plot_cmd
     #os.system(plot_cmd)
 
-    results_data = pd.read_csv(summary_file, sep="\t")
-    results_data = results_data[results_data["actual"] != 0]
-    keep_rules = results_data["grammar"].values.tolist()
+    if True:
+        results_data = pd.read_csv(summary_file, sep="\t")
+        results_data = results_data[results_data["actual"] != 0]
+        keep_rules = results_data["grammar"].values.tolist()
 
-    # plot mpra vs ATAC
-    atac_prefix = "{}/compare.mpra_vs_atac".format(results_dir)
-    _plot_epigenome(signal_mat_file, atac_prefix,
-                    keep_rules=keep_rules, key="ATAC_SIGNALS.NORM")
-    
-    # plot mpra vs H3K27ac
-    h3k27ac_prefix = "{}/compare.mpra_vs_h3k27ac".format(results_dir)
-    _plot_epigenome(signal_mat_file, h3k27ac_prefix,
-                    keep_rules=keep_rules, key="H3K27ac_SIGNALS.NORM")
+        # plot mpra vs ATAC
+        atac_prefix = "{}/compare.mpra_vs_atac".format(results_dir)
+        _plot_epigenome(signal_mat_file, atac_prefix,
+                        keep_rules=keep_rules, key="ATAC_SIGNALS.NORM")
 
-    # try plots considering both
-    plot_prefix = "{}/compare.mpra_v_epigenome".format(results_dir)
-    _plot_epigenome_both(atac_prefix, h3k27ac_prefix, plot_prefix)
+        # plot mpra vs H3K27ac
+        h3k27ac_prefix = "{}/compare.mpra_vs_h3k27ac".format(results_dir)
+        _plot_epigenome(signal_mat_file, h3k27ac_prefix,
+                        keep_rules=keep_rules, key="H3K27ac_SIGNALS.NORM")
+
+        # plot mpra vs logit
+        logit_prefix = "{}/compare.mpra_vs_logit".format(results_dir)
+        _plot_epigenome(signal_mat_file, logit_prefix,
+                        keep_rules=keep_rules, key="logits.norm")
+
+        
+        # try plots considering both
+        plot_prefix = "{}/compare.mpra_v_epigenome".format(results_dir)
+        _plot_epigenome_both(atac_prefix, h3k27ac_prefix, plot_prefix)
     
     return
 

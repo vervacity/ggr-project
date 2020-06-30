@@ -30,7 +30,9 @@ ggplot(data, aes(x=expected, y=actual, colour=interaction)) +
     geom_abline(intercept=0, slope=1, size=0.115, linetype="dashed") +
     geom_point() +
     #geom_text(aes(label=labels, vjust=1, hjust=1), size=1) +
-    labs(x="Expected", y="Actual", title="Additive expectation vs actual activity") +
+    labs(
+        x="Log-additive expectation", y="Observed",
+        title="Log-additive expectation vs observed expression") +
     coord_fixed() +
     theme_bw() +
     theme(

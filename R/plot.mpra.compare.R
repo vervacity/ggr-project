@@ -4,14 +4,14 @@ library(ggplot2)
 library(reshape2)
 #library(ggsci)
 
-plot_fn <- function(data, plot_file) {
+plot_fn <- function(data, plot_file, xlab) {
 
     p <- ggplot(data, aes(x=epigenome, y=mpra)) +
         geom_point(
             shape=20, size=0.5, alpha=0.5, show.legend=FALSE) +
         geom_smooth(method = "lm", se=TRUE, size=0.5, colour="black") +
         ylab("MPRA") +
-        xlab("ATAC") +
+        xlab(xlab) +
         theme_bw() +
         theme(
             text=element_text(family="ArialMT"),
@@ -64,6 +64,16 @@ data <- data[data$mpra != 0,]
 r <- cor.test(data$epigenome, data$mpra, method="spearman")
 print(r)
 
+if (grepl("atac", plot_file)) {
+    xlab <- "ATAC"
+}
+if (grepl("h3k27ac", plot_file)) {
+    xlab <- "H3K27ac"
+}
+if (grepl("logit", plot_file)) {
+    xlab <- "NN ATAC prediction"
+}
+
 
 # plot
-plot_fn(data, plot_file)
+plot_fn(data, plot_file, xlab)
