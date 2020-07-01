@@ -51,7 +51,14 @@ PREDICTED_RULE_DIR=/mnt/lab_data3/dskim89/ggr/nn/2019-03-12.freeze/dmim.shuffle.
 # SUPPL
 # ----------------------------------
 
-SIGNAL_FILE=$MPRA_DIR/results/ggr.signal.w_metadata.mat.txt.gz
+# QC
+# plasmid lib - distribution of representation across whole lib
+PLASMID_FILE=$MPRA_DIR/results/plasmid.dedup.counts.txt.gz
+COUNTS_FILE=$MPRA_DIR/results/ggr.counts.raw.mat.txt.gz
+#SIGNAL_FILE=$MPRA_DIR/results/ggr.signal.w_metadata.mat.txt.gz
+SIGNAL_FILE=$MPRA_DIR/results/ggr.signal.mat.txt.gz
+#$GIT_DIR/R/qc.mpra.R $PLASMID_FILE $COUNTS_FILE $SIGNAL_FILE
 
-# plot mpra vs epigenome signals
-$SCRIPT_DIR/plot.mpra_v_epigenome.R $SIGNAL_FILE fig_SX.mpra_compare
+
+# plot mpra vs epigenome signals <- OLD dont use
+#$SCRIPT_DIR/plot.mpra_v_epigenome.R $SIGNAL_FILE fig_SX.mpra_compare

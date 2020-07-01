@@ -56,13 +56,23 @@ def main():
 
     # now need to attach relevant metadata
     metadata_headers = [
-        "sequence.nn", "ATAC_SIGNALS.NORM", "H3K27ac_SIGNALS.NORM", "example_metadata", "example_combo_id"]
-    results_metadata = results[metadata_headers].set_index("example_combo_id")
+        "sequence.nn",
+        #"sequence.mpra",
+        "ATAC_SIGNALS.NORM",
+        "H3K27ac_SIGNALS.NORM",
+        "example_metadata",
+        "example_combo_id"]
+    results_metadata = results[metadata_headers]
     results_metadata = results_metadata.drop_duplicates()
-    
-    # merge
-    rep_avgs = rep_avgs.merge(results_metadata, how="left", left_index=True, right_index=True).reset_index()
+    results_metadata = results_metadata.set_index("example_combo_id")
 
+    # merge
+    rep_avgs = rep_avgs.merge(
+        results_metadata, how="left", left_index=True, right_index=True).reset_index()
+
+    # adjust combo id
+    rep_avgs["example_combo_id"] = rep_avgs["example_combo_id"].str.replace("-", "_")
+    
     # save this file out
     summ_file = "{}/ggr.mpra_signal.summarized.txt.gz".format(OUT_DIR)
     rep_avgs.to_csv(summ_file, sep="\t", header=True, index=False, compression="gzip")
@@ -79,11 +89,17 @@ def main():
     with open(new_fasta_file, "w") as out:
         for line_idx in range(rep_avgs.shape[0]):
             example = rep_avgs.iloc[line_idx]
+            
             # header
             out.write(">{}\n".format(example["example_combo_id"]))
 
             # sequence
             sequence = str(example["sequence.nn"])
+            if len(sequence) != mpra_seq_len:
+                print "problem", example["example_combo_id"], sequence
+                print example
+                quit()
+            
             sequence = left_random_seq + sequence + right_random_seq + "\n"
             out.write(sequence)
 
