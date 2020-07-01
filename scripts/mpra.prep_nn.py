@@ -8,7 +8,6 @@ from numpy.random import RandomState
 
 _BASES = ["A", "C", "G", "T"]
 
-
 def generate_random_seq(rand_seed, length):
     """generate random seq
     """
@@ -81,9 +80,9 @@ def main():
     final_len = 1000
     mpra_seq_len = 160
     left_extend = (1000 - mpra_seq_len) / 2
-    left_random_seq, _ = generate_random_seq(0, left_extend)
+    left_random_seq, _ = generate_random_seq(100, left_extend) # seed 0
     right_extend = (1000 - mpra_seq_len) / 2
-    right_random_seq, _ = generate_random_seq(1, right_extend)
+    right_random_seq, _ = generate_random_seq(50, right_extend) # seed 1
 
     new_fasta_file = "{}/sequences_adjusted.fa".format(OUT_DIR)
     with open(new_fasta_file, "w") as out:
