@@ -22,6 +22,10 @@ plot_heatmap <- function(data) {
 
     # color
     my_palette <- colorRampPalette(brewer.pal(9, "Reds"))(49)
+
+    labRow <- gsub("_b", ", rep ", rownames(data))
+    labRow <- gsub("d", "day ", labRow)
+    labCol <- labRow
     
     # heatmap
     heatmap.2(
@@ -33,8 +37,9 @@ plot_heatmap <- function(data) {
         trace="none",
         density.info="none",
 
-        labRow=gsub("_", " ", rownames(data)),
-        labCol=gsub("_", " ", colnames(data)),
+        labRow=labRow,
+        labCol=labCol,
+        srtCol=60,
         
         colsep=0:(ncol(data)+1),
         rowsep=0:(nrow(data)+1),
@@ -98,7 +103,7 @@ uniform_expectation <- sum(plasmid_counts$counts) / nrow(plasmid_counts)
 # subsample for plotting
 row_sorted_indices <- order(plasmid_counts$counts, decreasing=TRUE)
 plasmid_counts <- plasmid_counts[row_sorted_indices,]
-subsample_indices <- seq(1, nrow(plasmid_counts), 50)
+subsample_indices <- seq(1, nrow(plasmid_counts), 1000)
 plasmid_counts_subsample <- plasmid_counts[subsample_indices,]
 plasmid_counts_subsample$id <- factor(
     plasmid_counts_subsample$id, levels=plasmid_counts_subsample$id)
@@ -107,8 +112,9 @@ uniform_expectation <- log10(uniform_expectation)
 
 # plot the barcodes ordered by representation in libary
 plot_file <- "mpra.plasmid_lib.ordered_counts.pdf"
-ggplot(plasmid_counts_subsample, aes(x=id, y=counts_log10)) +
-    geom_point(shape=20, size=0.230) +
+ggplot(plasmid_counts_subsample, aes(x=id, y=counts_log10, group=1)) +
+    geom_line(size=0.230) +
+    #geom_point(shape=20, size=0.230) +
     geom_hline(yintercept=uniform_expectation, size=0.115, linetype="dashed") +
     labs(
         x=paste("Ordered barcodes (n=", nrow(plasmid_counts), ")", sep=""),
@@ -125,7 +131,8 @@ ggplot(plasmid_counts_subsample, aes(x=id, y=counts_log10)) +
         axis.ticks.y=element_line(size=0.115),
         axis.ticks.length=unit(0.01, "in"),
         axis.ticks.x=element_blank(),
-        axis.text.x=element_blank())
+        axis.text.x=element_blank()) +
+    scale_y_continuous(expand=c(0,0))
 ggsave(plot_file, height=2, width=1.5, useDingbats=FALSE)
 
 # plot the barcodes per tested sequence
@@ -139,8 +146,8 @@ plot_file <- "mpra.plasmid_lib.barcodes_per_seq.pdf"
 ggplot(plasmid_counts_per_seq, aes(x=barcodes_seen)) +
     geom_histogram(bins=7) +
     labs(
-        x="Number of barcodes seen", y="Number of sequences in library",
-        title="Number of barcodes per\nsequence in plasmid library") +
+        x="Number of barcodes seen", y="Number of fragments",
+        title="Number of barcodes per\nfragment in plasmid library") +
     theme_classic() +
     theme(
         text=element_text(family="ArialMT", size=6),
@@ -150,7 +157,8 @@ ggplot(plasmid_counts_per_seq, aes(x=barcodes_seen)) +
         axis.title=element_text(size=6),
         axis.text=element_text(size=6),
         axis.ticks=element_line(size=0.115),
-        axis.ticks.length=unit(0.01, "in"))
+        axis.ticks.length=unit(0.01, "in")) +
+    scale_y_continuous(expand=c(0,0))
 ggsave(plot_file, height=2, width=1.5, useDingbats=FALSE)
 
 }
@@ -195,7 +203,8 @@ ggplot(count_sums, aes(x=sample, y=counts)) +
         axis.text.x=element_text(size=6, angle=45, vjust=1, hjust=1),
         axis.text.y=element_text(size=6),
         axis.ticks=element_line(size=0.115),
-        axis.ticks.length=unit(0.01, "in"))
+        axis.ticks.length=unit(0.01, "in")) +
+    scale_y_continuous(expand=c(0,0))
 ggsave(plot_file, height=2, width=2, useDingbats=FALSE)
 
 # plot: barcodes per sequence in MPRA RNA reads
@@ -210,8 +219,8 @@ plot_file <- "mpra.counts.barcodes_per_seq.pdf"
 ggplot(rna_counts_per_seq, aes(x=barcodes_seen)) +
     geom_histogram(bins=7) +
     labs(
-        x="Number of barcodes seen", y="Number of sequences in library",
-        title="Number of barcodes per\nsequence in MPRA RNA reads") +
+        x="Number of barcodes seen", y="Number of fragments",
+        title="Number of barcodes per\nfragment in MPRA RNA reads") +
     theme_classic() +
     theme(
         text=element_text(family="ArialMT", size=6),
@@ -221,7 +230,8 @@ ggplot(rna_counts_per_seq, aes(x=barcodes_seen)) +
         axis.title=element_text(size=6),
         axis.text=element_text(size=6),
         axis.ticks=element_line(size=0.115),
-        axis.ticks.length=unit(0.01, "in"))
+        axis.ticks.length=unit(0.01, "in")) +
+    scale_y_continuous(expand=c(0,0))
 ggsave(plot_file, height=2, width=1.5, useDingbats=FALSE)
 
 }
@@ -313,11 +323,27 @@ print(dim(data))
 
 # get representative correlation plot
 scatter_data <- data.frame(d0_b3=data$d0_b3, d0_b4=data$d0_b4)
+scatter_data <- scatter_data[scatter_data$d0_b3 != 0,]
+scatter_data <- scatter_data[scatter_data$d0_b4 != 0,]
+
+r_p <- cor(scatter_data$d0_b3, scatter_data$d0_b4, method="pearson")
+r_p <- r_p^2
+r_p <- format(round(r_p, 3), nsmall=3)
+r_p <- paste("R[P]^2==", r_p, sep="")
+
+#scatter_indices <- sample(1:nrow(scatter_data), 1000, replace=FALSE)
+#scatter_data <- scatter_data[scatter_indices,]
 plot_file <- "mpra.signal.example_scatter.d0_b3_v_d0_b4.pdf"
 ggplot(scatter_data, aes(x=d0_b3, y=d0_b4)) +
-    geom_point(shape=20, alpha=0.5, size=0.5) +
+    geom_hex(binwidth=c(0.1, 0.1), show.legend=FALSE) +
+    annotate(
+        "text", x=7.5, y=0.1, size=2, vjust="inward", hjust="inward",
+        label=r_p, parse=TRUE) +
+    #geom_point(shape=20, alpha=0.5, size=0.5) +
     coord_fixed() +
-    labs(x="day 0, rep 3", y="day 0, rep 4", title="MPRA replicate\nsignal consistency") +
+    labs(
+        x="day 0, rep 3", y="day 0, rep 4",
+        title="Representative MPRA replicate\nsignal consistency") +
     theme_classic() +
     theme(
         text=element_text(family="ArialMT", size=6),
@@ -327,7 +353,9 @@ ggplot(scatter_data, aes(x=d0_b3, y=d0_b4)) +
         axis.title=element_text(size=6),
         axis.text=element_text(size=6),
         axis.ticks=element_line(size=0.115),
-        axis.ticks.length=unit(0.01, "in"))
+        axis.ticks.length=unit(0.01, "in")) +
+    scale_x_continuous(expand=c(0,0)) +
+    scale_y_continuous(expand=c(0,0))
 ggsave(plot_file, height=2, width=2, useDingbats=FALSE)
 
 # correlations
@@ -337,16 +365,12 @@ if (TRUE) {
 
     data_cor <- data[grep("ggr", rownames(data)),]
     data_cor <- data_cor[grep("combo-00", rownames(data_cor)),]
-    #data_cor <- data.frame(data)
 
     data_cor[data_cor < 1] <- 0
     data_cor <- data_cor[apply(data_cor != 0, 1, all),]
-    #print(head(data_cor))
-    #print(dim(data_cor))
-    
-    data_cor <- cor(data_cor, method="pearson") #cor_method)
+    data_cor <- cor(data_cor, method="pearson")
     data_r2 <- data_cor^2
-    print(data_r2)
+    #print(data_r2)
     pdf(plot_file, height=2.5, width=2.5, useDingbats=FALSE)
     plot_heatmap(data_r2)
     dev.off()
@@ -356,11 +380,8 @@ if (TRUE) {
 plot_file <- "mpra.normalized.barcode_agg.pca.pdf"
 if (!file.exists(plot_file)) {
 
-    #print(dim(data))
     data_pca <- data[grep("ggr", rownames(data)),]
     data_pca <- data_pca[grep("combo-00", rownames(data_pca)),]
-    #print(dim(data_pca))
-    #data_pca <- data.frame(data)
     
     data_pca <- prcomp(t(data_pca), scale=TRUE, center=TRUE)
     x <- data_pca$x[,1]
@@ -475,8 +496,8 @@ print(unique(data_plot$group))
 
 # other adjust
 data_plot$group <- gsub("GGR", "ATAC", data_plot$group)
-data_plot$group <- gsub("_negative", "", data_plot$group)
-group_ordering <- c("genomic", "shuffle", "ATAC", "promoter")
+data_plot$group <- gsub("_", " ", data_plot$group)
+group_ordering <- c("genomic negative", "shuffle", "ATAC", "promoter")
 
 # get means per group and plot
 plot_file <- "mpra.signal.category_means.pdf"
@@ -490,7 +511,7 @@ signal_means <- aggregate(
     mean)
 signal_means$Group.1 <- factor(signal_means$Group.1, levels=group_ordering)
 ggplot(signal_means, aes(x=Group.2, y=x, fill=Group.1)) +
-    geom_col(width=0.8, position=position_dodge(width=0.9)) +
+    geom_col(color="black", size=0.115, width=0.7, position=position_dodge(width=0.8)) +
     labs(
         x="MPRA sample", y="Mean signal",
         title="Mean MPRA signals compared to controls") +
@@ -514,7 +535,9 @@ ggplot(signal_means, aes(x=Group.2, y=x, fill=Group.1)) +
         legend.box.margin=margin(0,0,0,0),
         legend.box.spacing=unit(0.05, "in"),
         legend.title=element_blank(),
-        legend.text=element_text(size=6)) +    
+        legend.text=element_text(size=6)) +
+    scale_y_continuous(expand=c(0,0)) +
+    scale_fill_brewer(palette="Set2")
 ggsave(plot_file, width=2.5, height=2, useDingbats=FALSE)
 
 quit()

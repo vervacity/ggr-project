@@ -28,17 +28,17 @@ colors <- rev(colors[4:6])
 # plot
 ggplot(data, aes(x=expected, y=actual, colour=interaction)) +
     geom_abline(intercept=0, slope=1, size=0.115, linetype="dashed") +
-    geom_point() +
+    geom_point(shape=21, stroke=0.345, fill=NA) +
     #geom_text(aes(label=labels, vjust=1, hjust=1), size=1) +
     labs(
         x="Log-additive expectation", y="Observed",
-        title="Log-additive expectation vs observed expression") +
+        title="Interaction effects of motif pairs by MPRA expression") +
     coord_fixed() +
     theme_bw() +
     theme(
         text=element_text(family="ArialMT"),
         plot.margin=margin(5,10,6,5),
-        plot.title=element_text(size=8, margin=margin(b=1)),
+        plot.title=element_text(size=8, hjust=0.5, margin=margin(b=1)),
             
         panel.background=element_blank(),
         panel.border=element_blank(),
@@ -62,7 +62,7 @@ ggplot(data, aes(x=expected, y=actual, colour=interaction)) +
         legend.spacing.x=unit(0.05, "in"),
         legend.title=element_blank(),
         legend.text=element_text(size=5),
-        legend.position="bottom") +
+        legend.position="right") +
     scale_colour_manual(values=colors, drop=FALSE) +
     scale_y_continuous(limits=c(0,1), expand=c(0,0))
 

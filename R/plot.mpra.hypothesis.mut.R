@@ -4,7 +4,7 @@ library(ggplot2)
 library(reshape2)
 library(ggsci)
 
-plot_fn <- function(data, plot_file) {
+plot_fn <- function(data, tested_pair, plot_file) {
 
     p <- ggplot(data, aes(x=pwms, y=value, colour=pwms)) +
         geom_hline(yintercept=0, size=0.115, linetype="dashed") +
@@ -15,13 +15,16 @@ plot_fn <- function(data, plot_file) {
             position=position_dodge(), size=0.230, width=0.3, outlier.shape=NA, show.legend=FALSE) +
         geom_point(
             position=position_jitterdodge(jitter.width=0.01), size=0.5, alpha=0.5, show.legend=FALSE) +
-        ylab("log2(FC)") +
-        xlab("Combinations") +
+        labs(
+            x="Combinations", y="log2(FC)",
+            title=paste(
+                "Combinatorial activity of fragments\nwith ",
+                tested_pair, " motifs", sep="")) +
         theme_bw() +
         theme(
             text=element_text(family="ArialMT"),
             plot.margin=margin(5,10,6,5),
-            plot.title=element_text(size=8, margin=margin(b=1)),
+            plot.title=element_text(size=8, hjust=0.5, margin=margin(b=1)),
             
             panel.background=element_blank(),
             panel.border=element_blank(),
@@ -50,7 +53,7 @@ plot_fn <- function(data, plot_file) {
         scale_colour_brewer(palette="Dark2") +
         coord_flip()
             
-    ggsave(plot_file, height=1.5, width=2, useDingbats=FALSE)
+    ggsave(plot_file, height=1.6, width=2, useDingbats=FALSE)
 
 }
 
@@ -77,12 +80,17 @@ for (i in 1:length(combo_order)) {
 keep_headers <- c("example_id", "pwms", "combos", day)
 data <- data[keep_headers]
 
+# get the combo
+tested_pair <- data[data$combos == "0,0",]
+tested_pair <- unique(as.character(tested_pair$pwms))[1]
+print(tested_pair)
+
 # take out 1,1 and -1
 plot_file <- paste(plot_prefix, ".normalized.pdf", sep="")
 data_filt <- data[(data$combos != "1,1") & (data$combos != "-1"),]
 data_filt$pwms <- factor(as.character(data_filt$pwms), levels=pwm_order) # order
 colnames(data_filt) <- c("example_id", "pwms", "combos", "value")
-plot_fn(data_filt, plot_file)
+plot_fn(data_filt, tested_pair, plot_file)
 
 
 

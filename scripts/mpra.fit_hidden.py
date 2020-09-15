@@ -14,7 +14,7 @@ def main():
     """use hidden layer to try and fit to MPRA data
     """
     WORK_DIR = "/mnt/lab_data/kundaje/users/dskim89/ggr/validation/mpra.2020-06-29.fit_nn"
-    data_file = "{}/ggr.predictions.h5".format(WORK_DIR)
+    data_file = "{}/ggr.predictions.model-4.h5".format(WORK_DIR)
 
     # pull features
     with h5py.File(data_file, "r") as hf:

@@ -150,7 +150,8 @@ pwm_data$pwm <- factor(as.character(pwm_data$pwm), levels=pwm_order)
 # plot
 p_motifs <- ggplot(pwm_data, aes(x=pwm, y=grammar, fill=log2FC)) +
     geom_line(size=0.230, aes(group=grammar), colour="black") +
-    geom_point(shape=21, size=1, stroke=0.230, color="black", aes(fill=log2FC), show.legend=FALSE) +
+    #geom_point(shape=21, size=1, stroke=0.230, color="black", aes(fill=log2FC), show.legend=FALSE) +
+    geom_point(shape=21, size=1.3, stroke=0.345, color="black", fill="white", show.legend=FALSE) +
     theme_bw() +    
     theme(
         text=element_text(family="ArialMT"),
@@ -211,7 +212,8 @@ p_mpra_traj <- ggplot(data_traj, aes(x=variable, y=grammar, fill=value)) +
         legend.box.spacing=unit(0.05, "in"),
         legend.title=element_blank(),
         legend.text=element_text(size=5)) +
-    my.scale_fill_distiller(palette="RdBu", direction=-1, limits=c(-limit, limit)) 
+    my.scale_fill_distiller(palette="RdBu", direction=-1, limits=c(-limit, limit)) +
+    guides(fill=guide_colorbar(ticks=FALSE))
 
 # ==========================
 # MERGE WITH PREDICTED INFO
@@ -260,7 +262,8 @@ p_atac <- ggplot(atac_melt, aes(x=variable, y=ids, fill=value)) +
         legend.title=element_blank(),
         legend.text=element_text(size=5)) +
         #legend.spacing.x=unit(0.05, "in")) +
-    my.scale_fill_distiller(palette="RdBu", direction=-1, limits=c(-limit, limit)) 
+    my.scale_fill_distiller(palette="RdBu", direction=-1, limits=c(-limit, limit)) +
+    guides(fill=guide_colorbar(ticks=FALSE))
 
 # RNA
 rna_data <- read.table(rna_mat_file, header=TRUE, sep="\t", row.names=1)
@@ -296,7 +299,8 @@ p_rna <- ggplot(rna_melt, aes(x=variable, y=ids, fill=value)) +
         legend.box.spacing=unit(0.05, "in"),
         legend.title=element_blank(),
         legend.text=element_text(size=5)) +
-    my.scale_fill_distiller(palette="RdBu", direction=-1, limits=c(-limit, limit)) 
+    my.scale_fill_distiller(palette="RdBu", direction=-1, limits=c(-limit, limit)) +
+    guides(fill=guide_colorbar(ticks=FALSE))
 
 
 # GO term map, reorder, plot

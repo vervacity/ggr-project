@@ -12,7 +12,8 @@ ggr_colors <- get_ggr_timepoint_colors()
 print(ggr_colors)
 unique_indices <- c(0,1,2,3,4,5,6,9,10,12)
 #category_levels <- c("buffer", "synergy", "log-additive")
-category_levels <- c("log-additive", "buffer", "synergy")
+#category_levels <- c("log-additive", "buffer", "synergy")
+category_levels <- c("multiplicative", "sub-multiplicative", "super-multiplicative")
 
 # args
 args <- commandArgs(trailingOnly=TRUE)
@@ -29,8 +30,10 @@ colors <- rev(colors[4:6])
 data_endo <- read.table(endo_file, header=TRUE)
 data_endo$qval <- qvalue(data_endo$pval, lambda=0)$qvalue
 data_endo$category <- as.character(data_endo$category)
-data_endo$category[data_endo$qval > qval_thresh] <- "log-additive"
-data_endo$category[data_endo$category == "additive"] <- "log-additive"
+data_endo$category[data_endo$qval > qval_thresh] <- "multiplicative"
+data_endo$category[data_endo$category == "additive"] <- "multiplicative"
+data_endo$category[data_endo$category == "buffer"] <- "sub-multiplicative"
+data_endo$category[data_endo$category == "synergy"] <- "super-multiplicative"
 
 # plot endogenous summary
 plot_file <- "fig_4-b.0.endogenous_seq.pdf"
@@ -49,7 +52,7 @@ data_endo$category <- factor(data_endo$category, levels=category_levels)
 ggplot(data_endo, aes(x=expected, y=actual)) +
     geom_abline(size=0.115, linetype="dashed") +
     geom_point(shape=21, size=2, stroke=0.115, aes(fill=category)) +
-    labs(x="NN log-additive\nexpectation", y="NN prediction", title="Interaction scores\nfrom genomic data") +
+    labs(x="NN multiplicative\n(log-additive) expectation", y="NN prediction", title="Interaction scores\nfrom genomic data") +
     theme_bw() +
     theme(
         aspect.ratio=1,
@@ -67,16 +70,18 @@ ggplot(data_endo, aes(x=expected, y=actual)) +
         axis.line=element_line(color="black", size=0.115, lineend="square"),
         axis.ticks=element_line(size=0.115),
         axis.ticks.length=unit(0.01, "in"),
-        legend.position="bottom",
+        #legend.position="bottom",
+        legend.position=c(0.8, 0.17),
         legend.background=element_blank(),
         legend.box.background=element_blank(),
+        legend.direction="vertical",
         legend.margin=margin(0,0,0,0),
         legend.key.size=unit(0.05, "in"),
         legend.box.margin=margin(0,0,0,0),
         legend.box.spacing=unit(0.05, "in"),
         legend.spacing.x=unit(0.05, "in"),
         legend.title=element_blank(),
-        legend.text=element_text(size=6)) +
+        legend.text=element_text(size=5)) +
     scale_fill_manual(values=colors, drop=FALSE) +
     #scale_colour_manual(values=colors, drop=FALSE) +
     scale_x_continuous(limits=c(0.6, 1.4), expand=c(0,0)) +
@@ -84,7 +89,8 @@ ggplot(data_endo, aes(x=expected, y=actual)) +
     #scale_x_continuous(limits=c(1.5, 2.6), expand=c(0,0)) +
     #scale_y_continuous(limits=c(1.5, 2.6), expand=c(0,0))
 
-ggsave(plot_file, height=1.7, width=1.5, units="in", useDingbats=FALSE)
+#ggsave(plot_file, height=1.7, width=1.5, units="in", useDingbats=FALSE)
+ggsave(plot_file, height=1.7, width=1.4, units="in", useDingbats=FALSE)
 
 
 # different plot for endogenous - rank order?
@@ -133,8 +139,10 @@ data_endo$diff_order <- NULL
 data_sims <- read.table(sims_file, header=TRUE)
 data_sims$qval <- qvalue(data_sims$pval, lambda=0)$qvalue
 data_sims$category <- as.character(data_sims$category)
-data_sims$category[data_sims$qval > qval_thresh] <- "log-additive"
-data_sims$category[data_sims$category == "additive"] <- "log-additive"
+data_sims$category[data_sims$qval > qval_thresh] <- "multiplicative"
+data_sims$category[data_sims$category == "additive"] <- "multiplicative"
+data_sims$category[data_sims$category == "buffer"] <- "sub-multiplicative"
+data_sims$category[data_sims$category == "synergy"] <- "super-multiplicative"
 
 # plot sims summary
 plot_file <- "fig_4-b.1.simulations_seq.pdf"
@@ -151,7 +159,7 @@ data_sims$category <- factor(data_sims$category, levels=category_levels)
 ggplot(data_sims, aes(x=expected, y=actual)) +
     geom_abline(size=0.115, linetype="dashed") +
     geom_point(shape=21, size=2, stroke=0.115, aes(fill=category)) +
-    labs(x="NN log-additive\nexpectation", y="NN prediction", title="Interaction scores\nfrom synthetic data") +
+    labs(x="NN multiplicative\n(log-additive) expectation", y="NN prediction", title="Interaction scores\nfrom synthetic data") +
     theme_bw() +
     theme(
         aspect.ratio=1,
@@ -169,23 +177,26 @@ ggplot(data_sims, aes(x=expected, y=actual)) +
         axis.line=element_line(color="black", size=0.115, lineend="square"),
         axis.ticks=element_line(size=0.115),
         axis.ticks.length=unit(0.01, "in"),
-        legend.position="bottom",
+        #legend.position="bottom",
+        legend.position=c(0.8, 0.17),
         legend.background=element_blank(),
         legend.box.background=element_blank(),
+        legend.direction="vertical",
         legend.margin=margin(0,0,0,0),
         legend.key.size=unit(0.05, "in"),
         legend.box.margin=margin(0,0,0,0),
         legend.box.spacing=unit(0.05, "in"),
         legend.spacing.x=unit(0.05, "in"),
         legend.title=element_blank(),
-        legend.text=element_text(size=6)) +
+        legend.text=element_text(size=5)) +
     scale_fill_manual(values=colors, drop=FALSE) +
     scale_x_continuous(limits=c(0, 1), expand=c(0,0)) +
     scale_y_continuous(limits=c(0, 1), expand=c(0,0))
     #scale_x_continuous(limits=c(0.8, 2), expand=c(0,0)) +
     #scale_y_continuous(limits=c(0.8, 2), expand=c(0,0))
 
-ggsave(plot_file, height=1.7, width=1.5, units="in", useDingbats=FALSE)
+#ggsave(plot_file, height=1.7, width=1.5, units="in", useDingbats=FALSE)
+ggsave(plot_file, height=1.7, width=1.4, units="in", useDingbats=FALSE)
 
 # plot differently
 data_sims <- data_sims[order(data_sims$diff),]
@@ -219,7 +230,7 @@ ggplot(data_sims, aes(x=expected, y=diff)) +
         legend.box.margin=margin(0,0,0,0),
         legend.box.spacing=unit(0.05, "in"),
         legend.title=element_blank(),
-        legend.text=element_text(size=6)) +
+        legend.text=element_text(size=5)) +
     scale_fill_manual(values=colors, drop=FALSE) +
     scale_size_continuous(range=c(0,2)) +
     scale_x_continuous(limits=c(0, 1), expand=c(0,0)) +
@@ -332,6 +343,7 @@ ggplot(data, aes(x=pwm1, y=pwm2, fill=category)) +
         legend.box.background=element_blank(),
         legend.margin=margin(0,0,0,0),
         legend.key.size=unit(0.05, "in"),
+        legend.box="vertical",
         legend.box.margin=margin(0,0,0,0),
         legend.box.spacing=unit(0.05, "in"),
         legend.spacing.x=unit(0.05, "in"),
@@ -341,4 +353,5 @@ ggplot(data, aes(x=pwm1, y=pwm2, fill=category)) +
     scale_size_continuous(range=c(0.2,2.5)) +
     scale_fill_manual(values=colors, drop=FALSE)
 
-ggsave(plot_file, height=3.25, width=3.25, units="in", useDingbats=FALSE)
+#ggsave(plot_file, height=3.25, width=3.25, units="in", useDingbats=FALSE)
+ggsave(plot_file, height=3.5, width=3.25, units="in", useDingbats=FALSE)

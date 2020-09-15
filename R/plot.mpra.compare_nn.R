@@ -7,17 +7,19 @@ library(reshape2)
 plot_fn <- function(data, plot_file, xlab) {
 
     p <- ggplot(data, aes(x=NN, y=MPRA)) +
-        geom_point(
-            shape=20, size=0.5, alpha=0.5, show.legend=FALSE) +
+        geom_hex(bins=30, show.legend=FALSE) +
+        #geom_point(
+        #    shape=20, size=0.5, alpha=0.5, show.legend=FALSE) +
         geom_smooth(method = "lm", se=TRUE, size=0.5, colour="black") +
-        ylab("MPRA") +
-        xlab(xlab) +
-        #coord_fixed() +
+        labs(
+            x=xlab, y="MPRA",
+            title=paste("Correlating MPRA expression \nto ", xlab, sep="")) + 
+           #coord_fixed() +
         theme_bw() +
         theme(
             text=element_text(family="ArialMT"),
             plot.margin=margin(5,10,1,5),
-            plot.title=element_text(size=8, margin=margin(b=1)),
+            plot.title=element_text(size=8, hjust=0.5, margin=margin(b=1)),
             
             panel.background=element_blank(),
             panel.border=element_blank(),
@@ -41,10 +43,11 @@ plot_fn <- function(data, plot_file, xlab) {
             legend.spacing.x=unit(0.05, "in"),
             legend.title=element_blank(),
             legend.text=element_text(size=5),
-            legend.position="bottom")
-        #scale_y_continuous(limits=c(0,4))
+            legend.position="bottom") +
+        scale_y_continuous(expand=c(0,0)) +
+        scale_x_continuous(expand=c(0,0), limits=c(1,4))
     
-    ggsave(plot_file, height=1.5, width=2, useDingbats=FALSE)
+    ggsave(plot_file, height=1.75, width=1.75, useDingbats=FALSE)
 
 }
 

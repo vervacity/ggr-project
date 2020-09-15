@@ -5,7 +5,7 @@ library(reshape2)
 library(ggsci)
 
 
-plot_fn <- function(data, plot_file) {
+plot_fn <- function(data, tested_pair, plot_file) {
 
     p <- ggplot(data, aes(x=day, y=value, colour=pwms)) +
         geom_hline(yintercept=0, size=0.115, linetype="dashed") +
@@ -17,13 +17,16 @@ plot_fn <- function(data, plot_file) {
         geom_point(
             position=position_jitterdodge(dodge.width=0.9, jitter.width=0.05),
             size=0.5, alpha=0.5, show.legend=FALSE) +
-        ylab("log2(FC)") +
-        xlab("Timepoint") +
+        labs(
+            x="Timepoint", y="log2(FC)",
+            title=paste(
+                "Trajectory activity of fragments\nwith ",
+                tested_pair, " motifs", sep="")) +
         theme_bw() +
         theme(
             text=element_text(family="ArialMT"),
             plot.margin=margin(5,10,1,5),
-            plot.title=element_text(size=8, margin=margin(b=1)),
+            plot.title=element_text(size=8, hjust=0.5, margin=margin(b=1)),
             
             panel.background=element_blank(),
             panel.border=element_blank(),
@@ -55,7 +58,7 @@ plot_fn <- function(data, plot_file) {
         p <- p + scale_colour_brewer(palette="Paired", direction=-1)
     }
     
-    ggsave(plot_file, height=1.5, width=2, useDingbats=FALSE)
+    ggsave(plot_file, height=1.6, width=2, useDingbats=FALSE)
 
 }
 
@@ -74,12 +77,18 @@ pwms <- pwms[pwms != "double scramble"]
 pwms_order <- c(pwms, "double scramble")
 data$pwms <- factor(as.character(data$pwms), levels=pwms_order)
 
+# get the combo
+tested_pair <- data[data$combos == "0,0",]
+tested_pair <- unique(as.character(tested_pair$pwms))[1]
+print(tested_pair)
+
+
 # plot just 0,0 first
 plot_file <- paste(plot_prefix, ".endog_only.pdf", sep="")
 data_filt <- data[data$combos == "0,0",]
-plot_fn(data_filt, plot_file)
+plot_fn(data_filt, tested_pair, plot_file)
 
 # plot with null
 plot_file <- paste(plot_prefix, ".endog_and_null.pdf", sep="")
 data_filt <- data[(data$combos == "0,0") | (data$combos == "1,1"),]
-plot_fn(data_filt, plot_file)
+plot_fn(data_filt, tested_pair, plot_file)
