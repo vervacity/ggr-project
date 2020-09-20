@@ -4,7 +4,8 @@ import glob
 import numpy as np
 import pandas as pd
 
-
+from scipy.stats import pearsonr
+from scipy.stats import spearmanr
 
 
 def main():
@@ -39,7 +40,8 @@ def main():
     results["num_unique_mappers"] = []
     results["num_multi_mappers"] = []
     results["rsem_total_counts"] = []
-    #results["rep_correlation"] = []
+    results["rep_corr_pearsonr"] = []
+    results["rep_corr_spearmanr"] = []
     
     # collect for each day
     for day in days:
@@ -69,7 +71,12 @@ def main():
             results["rsem_total_counts"].append(rsem_mat[rsem_header].sum().astype(int))
 
             # rsem corr
-            # TODO
+            b1_header = "{}_b1".format(day)
+            b2_header = "{}_b2".format(day)
+            pearson_r = pearsonr(rsem_mat[b1_header].values, rsem_mat[b2_header].values)[0]
+            results["rep_corr_pearsonr"].append(pearson_r)
+            spearman_r = spearmanr(rsem_mat[b1_header].values, rsem_mat[b2_header].values)[0]
+            results["rep_corr_spearmanr"].append(spearman_r)
             
     # dataframe
     results = pd.DataFrame(results)
@@ -79,7 +86,9 @@ def main():
         "num_input_reads",
         "num_unique_mappers",
         "num_multi_mappers",
-        "rsem_total_counts"]
+        "rsem_total_counts",
+        "rep_corr_pearsonr",
+        "rep_corr_spearmanr"]
     results = results[ordered_headers]
     out_file = "ggr.PAS-seq.QC.summary.txt"
     results.to_csv(out_file, sep="\t", header=True, index=False)
