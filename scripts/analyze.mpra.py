@@ -1117,7 +1117,7 @@ def main():
     plot_cmd = "Rscript ~/git/ggr-project/R/plot.mpra.summary.R {} {}".format(
         summary_file, summary_plot_file)
     print plot_cmd
-    os.system(plot_cmd)
+    #os.system(plot_cmd)
 
     # plot rule map
     map_plot_file = "{}/summary.rule_map.pdf".format(results_dir)
@@ -1148,8 +1148,8 @@ def main():
 
         
         # try plots considering both
-        plot_prefix = "{}/compare.mpra_v_epigenome".format(results_dir)
-        _plot_epigenome_both(atac_prefix, h3k27ac_prefix, plot_prefix)
+        #plot_prefix = "{}/compare.mpra_v_epigenome".format(results_dir)
+        #_plot_epigenome_both(atac_prefix, h3k27ac_prefix, plot_prefix)
     
     return
 

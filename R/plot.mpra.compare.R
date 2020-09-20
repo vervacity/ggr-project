@@ -6,11 +6,27 @@ library(reshape2)
 
 plot_fn <- function(data, plot_file, xlab) {
 
+    # get R vals (spearman and pearson)
+    r_s <- cor(data$epigenome, data$mpra, method="spearman")
+    r_s <- format(round(r_s, 3), nsmall=3)
+    r_s <- paste("R[S]==", r_s, sep="")
+    
+    r_p <- cor(data$epigenome, data$mpra, method="pearson")
+    r_p <- format(round(r_p, 3), nsmall=3)
+    r_p <- paste("R[P]==", r_p, sep="")
+
+    
     p <- ggplot(data, aes(x=epigenome, y=mpra)) +
         geom_hex(bins=30, show.legend=FALSE) +
         #geom_point(
         #    shape=20, size=0.5, alpha=0.5, show.legend=FALSE) +
         geom_smooth(method = "lm", se=TRUE, size=0.5, colour="black") +
+        annotate(
+            "text", x=0.2, y=8.3, size=1.5, vjust="inward", hjust="inward",
+            label=r_s, parse=TRUE) +
+        annotate(
+            "text", x=0.2, y=7.8, size=1.5, vjust="inward", hjust="inward",
+            label=r_p, parse=TRUE) +
         labs(
             x=xlab, y="MPRA",
             title=paste("Correlating MPRA expression \nto ", xlab, sep="")) + 

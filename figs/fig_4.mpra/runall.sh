@@ -59,6 +59,7 @@ COUNTS_FILE=$MPRA_DIR/results/ggr.counts.raw.mat.txt.gz
 SIGNAL_FILE=$MPRA_DIR/results/ggr.signal.mat.txt.gz
 #$GIT_DIR/R/qc.mpra.R $PLASMID_FILE $COUNTS_FILE $SIGNAL_FILE
 
-
-# plot mpra vs epigenome signals <- OLD dont use
-#$SCRIPT_DIR/plot.mpra_v_epigenome.R $SIGNAL_FILE fig_SX.mpra_compare
+# mpra vs epigenome signals and fitting
+# NOTE that epigenome signals are first plotted using analyze mpra script analyze.mpra.py
+# and then the nn ones are in the other analysis folder
+fit_dir=/mnt/lab_data/kundaje/users/dskim89/ggr/validation/mpra.2020-06-29.fit_nn
