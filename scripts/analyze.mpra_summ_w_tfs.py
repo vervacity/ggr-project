@@ -106,21 +106,64 @@ def main():
     # files
     summary_file = sys.argv[1]
     pwms_to_tfs_file = sys.argv[2]
-    # TODO could read in RNA data file too, to pick up the max val point
-    # but really need to pull in the vector to show vector shift across time
+    expressed_tfs_file = sys.argv[3] # TODO
+
+    # TODO pull in num regions to resize things? but complicated with overlaps etc
+    # TODO edit edges with type of interaction
+    # TODO may want to color by trajectory, to demonstrate waves of trajectory
     
     # read in data
     summary = pd.read_csv(summary_file, sep="\t")
     pwms_to_tfs = pd.read_csv(pwms_to_tfs_file, sep="\t")
-    pwms_to_tfs = dict(zip(pwms_to_tfs["hclust_model_name"], pwms_to_tfs["expressed_hgnc"]))
-    
+    pwms_to_tfs = pwms_to_tfs[pwms_to_tfs["expressed"].notna()]
+    pwms_to_filt_tfs = {} # dict: key - pwm names, vals - dict of ensembl ids to hgnc ids
+    for line_idx in range(pwms_to_tfs.shape[0]):
+        pwm_info = pwms_to_tfs.iloc[line_idx,:]
+        pwm_name = pwm_info["hclust_model_name"]
+        pwm_to_tf = dict(zip(pwm_info["expressed"].split(";"), pwm_info["expressed_hgnc"].split(";")))
+        pwms_to_filt_tfs[pwm_name] = pwm_to_tf
+
+        
+    # filter expressed hgncs for dynamic ones only
+    tfs_filt = pd.read_csv(expressed_tfs_file, sep="\t", index_col=0)
+    for pwm_name in pwms_to_filt_tfs.keys():
+        tfs_tmp = pwms_to_filt_tfs[pwm_name]
+        for ensembl_tf in tfs_tmp.keys():
+            if ensembl_tf not in tfs_filt.index:
+                del tfs_tmp[ensembl_tf]
+        if len(tfs_tmp.keys()) == 0:
+            del pwms_to_filt_tfs[pwm_name]
+        pwms_to_filt_tfs[pwm_name] = tfs_tmp
+
     # add in tfs column
-    summary["tf1"] = [pwms_to_tfs[pwm] for pwm in summary["pwm1"]]
-    summary["tf2"] = [pwms_to_tfs[pwm] for pwm in summary["pwm2"]]
+    tf1 = []
+    for pwm in summary["pwm1"]:
+        tf_str = []
+        for ensembl_id in pwms_to_filt_tfs[pwm]:
+            tf_str.append(pwms_to_filt_tfs[pwm][ensembl_id])
+            # TODO try add in max point
+            expression = tfs_filt.loc[ensembl_id,:]
+            max_idx = np.argmax(expression.values)
+            tf_str.append(str(max_idx))
+        tf_str = (";").join(tf_str)
+        tf1.append(tf_str)
+    summary["tf1"] = tf1
+
+    tf2 = []
+    for pwm in summary["pwm2"]:
+        tf_str = []
+        for ensembl_id in pwms_to_filt_tfs[pwm]:
+            tf_str.append(pwms_to_filt_tfs[pwm][ensembl_id])
+            expression = tfs_filt.loc[ensembl_id,:]
+            max_idx = np.argmax(expression.values)
+            tf_str.append(str(max_idx))
+        tf_str = (";").join(tf_str)
+        tf2.append(tf_str)
+    summary["tf2"] = tf2
     
     # remove failed rules
     summary = summary[~summary["interaction"].str.contains("FAILED")]
-
+    
     # make graph
     graph = nx.from_pandas_edgelist(summary, "tf1", "tf2")
 
