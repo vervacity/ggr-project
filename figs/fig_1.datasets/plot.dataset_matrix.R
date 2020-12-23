@@ -13,7 +13,7 @@ source(load_style_guide)
 # args
 args <- commandArgs(trailingOnly=TRUE)
 dataset_file <- args[1] # "~/git/ggr-project/ggr/data/ggr_datasets.txt"
-plot_file <- "fig_1.datasets.matrix.pdf"
+plot_file <- "fig_1.datasets.revised.matrix.pdf"
 
 # read in file
 data <- read.table(dataset_file, sep="\t", header=TRUE)
@@ -33,6 +33,9 @@ data_melted <- melt(data)
 colnames(data_melted) <- c("assay", "day", "harvested")
 data_melted$assay <- factor(data_melted$assay, levels=rev(unique(data[,1])), ordered=TRUE)
 data_melted$day <- gsub("day.", "", data_melted$day)
+data_melted$day <- as.numeric(data_melted$day)
+#print(data_melted)
+#quit()
 
 # get colors
 palette <- get_ggr_timepoint_colors()
@@ -80,7 +83,8 @@ p <- p +
         axis.line=element_line(color="black", size=0.115, lineend="square"),
         axis.ticks=element_line(size=0.115),
         axis.ticks.length=unit(0.01, "in"),
-        legend.position="none")
-
+        legend.position="none") +
+    scale_x_continuous(breaks=seq(0,6,by=0.5))
+        
 # save
 ggsave(plot_file, height=1.5, width=2.5, useDingbats=FALSE)

@@ -100,11 +100,15 @@ plot_file <- "fig_4.b.0.endogenous_seq.DIFF.pdf"
 #ggplot(data_endo, aes(x=diff_order, y=diff)) +
 ggplot(data_endo, aes(x=expected, y=diff)) +
     geom_hline(size=0.115, yintercept=0, linetype="dashed") +
-    geom_point(shape=21, size=2, stroke=0.115, aes(fill=category)) +
+    geom_point(shape=21, size=1.2, stroke=0.115, aes(fill=category)) +
+    labs(
+        x="Sum of NN predicted marginal\neffects of each motif\n(log-additive expectation)",
+        y="Predicted joint effect\n - sum of marginal effects",
+        title="Interaction scores\nfrom genomic data") +
     theme_bw() +
     theme(
         text=element_text(family="ArialMT"),
-        plot.title=element_text(size=8, margin=margin(b=0)),
+        plot.title=element_text(size=8, hjust=0.5, margin=margin(b=3)),
         plot.margin=margin(5,5,1,5),
         panel.background=element_blank(),
         panel.border=element_blank(),
@@ -118,21 +122,24 @@ ggplot(data_endo, aes(x=expected, y=diff)) +
         axis.ticks=element_line(size=0.115),
         axis.ticks.length=unit(0.01, "in"),
         legend.position="bottom",
+        #legend.position=c(0.8, 0.17),
         legend.background=element_blank(),
         legend.box.background=element_blank(),
+        legend.direction="vertical",
         legend.margin=margin(0,0,0,0),
         legend.key.size=unit(0.05, "in"),
         legend.box.margin=margin(0,0,0,0),
         legend.box.spacing=unit(0.05, "in"),
         legend.spacing.x=unit(0.05, "in"),
         legend.title=element_blank(),
-        legend.text=element_text(size=6)) +
+        legend.text=element_text(size=5)) +
     scale_fill_manual(values=colors, drop=FALSE) +
     scale_size_continuous(range=c(0,2)) +
-    scale_x_continuous(limits=c(0.5, 1.3), expand=c(0,0)) +
-    scale_y_continuous(expand=c(0,0))
+    scale_x_continuous(limits=c(0.4, 1.3), expand=c(0,0)) +
+    #scale_y_continuous(limits=c(-0.04, 0.14), expand=c(0,0))
+    scale_y_continuous(limits=c(-0.15, 0.25), expand=c(0,0))
 
-ggsave(plot_file, height=1, width=2, units="in", useDingbats=FALSE)
+ggsave(plot_file, height=1.8, width=1.4, units="in", useDingbats=FALSE)
 data_endo$diff_order <- NULL
 
 # read simulation data
@@ -205,11 +212,15 @@ plot_file <- "fig_4.b.1.simulations_seq.DIFF.pdf"
 #ggplot(data_sims, aes(x=diff_order, y=diff)) +
 ggplot(data_sims, aes(x=expected, y=diff)) +
     geom_hline(size=0.115, yintercept=0, linetype="dashed") +
-    geom_point(shape=21, stroke=0.115, aes(fill=category)) +
+    geom_point(shape=21, size=1.2, stroke=0.115, aes(fill=category)) +
+    labs(
+        x="Sum of NN predicted marginal\neffects of each motif\n(log-additive expectation)",
+        y="Predicted joint effect\n - sum of marginal effects",
+        title="Interaction scores\nfrom synthetic data") +
     theme_bw() +
     theme(
         text=element_text(family="ArialMT"),
-        plot.title=element_text(size=8, margin=margin(b=0)),
+        plot.title=element_text(size=8, hjust=0.5, margin=margin(b=3)),
         plot.margin=margin(5,5,1,5),
         panel.background=element_blank(),
         panel.border=element_blank(),
@@ -223,20 +234,23 @@ ggplot(data_sims, aes(x=expected, y=diff)) +
         axis.ticks=element_line(size=0.115),
         axis.ticks.length=unit(0.01, "in"),
         legend.position="bottom",
+        #legend.position=c(0.8, 0.17),
         legend.background=element_blank(),
         legend.box.background=element_blank(),
+        legend.direction="vertical",
         legend.margin=margin(0,0,0,0),
         legend.key.size=unit(0.05, "in"),
         legend.box.margin=margin(0,0,0,0),
         legend.box.spacing=unit(0.05, "in"),
+        legend.spacing.x=unit(0.05, "in"),
         legend.title=element_blank(),
         legend.text=element_text(size=5)) +
     scale_fill_manual(values=colors, drop=FALSE) +
     scale_size_continuous(range=c(0,2)) +
     scale_x_continuous(limits=c(0, 1), expand=c(0,0)) +
-    scale_y_continuous(expand=c(0,0))
+    scale_y_continuous(limits=c(-0.15, 0.25), expand=c(0,0))
 
-ggsave(plot_file, height=1, width=2, units="in", useDingbats=FALSE)
+ggsave(plot_file, height=1.8, width=1.4, units="in", useDingbats=FALSE)
 data_sims$diff_order <- NULL
 
 # --------------------

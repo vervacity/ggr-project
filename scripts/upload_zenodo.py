@@ -1,4 +1,5 @@
 
+import os
 import sys
 import json
 import requests
@@ -26,28 +27,34 @@ def _upload_file(
 def main():
     """upload script
     """
-    # USER DEFINED PARAMS
+    # USER INPUT
     ACCESS_TOKEN = sys.argv[1] # always read in access token, do not save to script!!
-    deposition_id = "4057204"
+    deposition_id = None # either none or a numerical ID
 
     # file(s) - give with full paths
+    UPLOAD_DIR = "/srv/scratch/dskim89/ggr/ggr.paper.2020-09-27.datasets_compressed/ggr/submit_models"
     filenames = [
-        "/srv/scratch/dskim89/ggr/ggr.paper.2020-09-27.datasets_compressed/test.txt"
+        "{}/nn.ggr.models.basset.clf.tar.gz".format(UPLOAD_DIR),
+        "{}/nn.ggr.models.basset.regr.tar.gz".format(UPLOAD_DIR)
     ]
 
     # deposition metadata - fill this out as needed
     metadata = {
         "metadata": {
-            "title": "Genomics of gene regulation",
+            "title": "Convolutional Neural Net (CNN) models for epigenomic landscapes in epithelial differentiation - Basset architecture, classification and regression",
             "upload_type": "dataset",
-            "description": "test upload",
+            "description": "Deep learning models trained on epigenomic landscapes in keratinocyte differentiation",
             "creators": [
                 {"name": "Kim, Daniel Sunwook",
+                 "affiliation": "Stanford School of Medicine"},
+                {"name": "Kundaje, Anshul",
                  "affiliation": "Stanford School of Medicine"}
             ]
         }
     }    
 
+    # END USER INPUT
+    
     
     # set up
     if deposition_id is None:

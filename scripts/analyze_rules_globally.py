@@ -1,15 +1,11 @@
 
-
 import os
-import re
 import sys
-import glob
-import json
 
 import pandas as pd
-
 import networkx as nx
 
+from ggr.analyses.linking import regions_to_genes
 
 def get_bed_from_nx_graph(
         graph,
@@ -64,67 +60,72 @@ def get_bed_from_nx_graph(
     return return_intervals
 
 
-def _make_json_bed_entry(bed_file, display_name, dir_url):
-    """add a bed file to json
-    """
-    entry = {}
-    entry["type"] = "bed"
-    entry["url"] = "{}/{}".format(dir_url, bed_file)
-    entry["name"] = display_name
-    entry["mode"] = "full"
-    
-    return entry
-
 
 def main():
-    """pull the region sets as bed files to visualize results
+    """analyses across all rules and effects on landscape
     """
     # input files
     mpra_file = sys.argv[1]
     rule_dir = sys.argv[2]
-    dir_url = "http://mitra.stanford.edu/kundaje/dskim89/ggr/paper"
     
-    # for rule in rule dir, pull the BED file from it
+    # use the validated rules only
     rules = pd.read_csv(mpra_file, sep="\t")
     rules = rules[~rules["interaction"].str.contains("FAILED")]
-    json_entries = []
+
+    # get bed files
+    bed_files = []
     for rule_idx in range(rules.shape[0]):
         rule_name = rules["grammar"].iloc[rule_idx]
         pwm1_name = rules["pwm1_clean"].iloc[rule_idx]
         pwm2_name = rules["pwm2_clean"].iloc[rule_idx]
-
+        
         # get gml file
         gml_file = "{}/{}.gml".format(rule_dir, rule_name)
         graph = nx.read_gml(gml_file)
 
-        # make bed file
+        # get bed file
         bed_file = "{}.{}_x_{}.bed.gz".format(rule_name, pwm1_name, pwm2_name)
         if not os.path.isfile(bed_file):
             print bed_file
             get_bed_from_nx_graph(
                 graph,
                 bed_file,
-                interval_key="active",
+                interval_key="region",
                 merge=True,
                 return_key="region")
-            os.system("chmod a+x {}".format(bed_file))
-        display_name = bed_file.split(".")[-3]
-        json_entry = _make_json_bed_entry(bed_file, display_name, dir_url)
-        json_entries.append(json_entry)
-            
-        # also make a tbi file
-        make_tbi = "tabix -p bed {}".format(bed_file)
-        tbi_file = "{}.tbi".format(bed_file)
-        if not os.path.isfile(tbi_file):
-            os.system(make_tbi)
-            
-    # set up json file with appropriate names
-    json_file = "combinatorial_rules.json"
-    json_data = json.dumps(json_entries, indent=1)
-    json_data = re.sub(r'"(.*?)"(?=:)', r'\1', json_data)
-    with open(json_file, "w") as fp:
-        fp.write(json_data)
+        bed_files.append(bed_file)
         
+    # summary info
+    all_regions_file = "rules_all_regions.bed.gz"
+    if not os.path.isfile(all_regions_file):
+        merge_cmd = "zcat {} | sort -k1,1 -k2,2n | bedtools merge -i stdin | gzip -c > {}".format(
+            " ".join(bed_files), all_regions_file)
+        print merge_cmd
+        os.system(merge_cmd)
+        
+
+    # how many genes covered
+    links_file = "/mnt/lab_data/kundaje/users/dskim89/ggr/integrative/v1.0.0a/results/linking/proximity/ggr.linking.ALL.overlap.interactions.txt.gz"
+    tss_file = "/mnt/lab_data/kundaje/users/dskim89/ggr/integrative/v1.0.0a/annotations/ggr.rna.tss.expressed.bed.gz"
+    out_file = "./test.txt.gz"
+
+    # make a tss file of just dynamic genes
+    dynamic_genes_mat = "/mnt/lab_data/kundaje/users/dskim89/ggr/integrative/v1.0.0a/data/ggr.rna.counts.pc.expressed.timeseries_adj.pooled.rlog.dynamic.traj.mat.txt.gz"
+    dynamic_genes = pd.read_csv(dynamic_genes_mat, sep="\t", index_col=0)
+    #print dynamic_genes
+    #quit()
+
+    
+    regions_to_genes(
+        all_regions_file,
+        links_file,
+        tss_file,
+        out_file,
+        filter_genes=dynamic_genes.index.values,
+        filter_by_score=0.5)
+    
+
+    
     return
 
 main()
