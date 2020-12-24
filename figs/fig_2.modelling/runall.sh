@@ -26,6 +26,9 @@ ANNOT_DIR=/mnt/lab_data3/dskim89/ggr/annotations
 #$SCRIPT_DIR/fig_2-b.0.plot.encode_clf.R fig_2-b.0 $EVAL_DIR/encode-roadmap.basset.clf.testfold-*/by_task/*txt
 #$SCRIPT_DIR/fig_2-b.1.plot.ggr_clf.R fig_2-b.1 $EVAL_DIR/ggr.basset.clf.random_init.testfold-*/by_task/*txt $EVAL_DIR/ggr.basset.clf.pretrained.folds.testfold-*/by_task/*txt
 
+# REVISION: PR curves - just show one fold examples?
+$SCRIPT_DIR/fig_2-b.2.plot.ggr_clf_pr_curves.R fig_2-b.1 $EVAL_DIR/ggr.basset.clf.pretrained.folds.testfold-*/by_task/auprc
+
 # -----------
 # B
 # -----------
@@ -55,7 +58,7 @@ ANNOT_DIR=/mnt/lab_data3/dskim89/ggr/annotations
 # -----------
 
 # MAIN: vignette
-$SCRIPT_DIR/choose_vignette.py
+#$SCRIPT_DIR/choose_vignette.py
 RNA_MAT=$GGR_DIR/results/rna/timeseries/matrices/ggr.rna.counts.pc.expressed.timeseries_adj.pooled.rlog.mat.txt.gz
 #$GIT_DIR/figs/fig_1.datasets/plot.rna_bar.R $RNA_MAT ENSG00000189182 gene_vals.KRT77.pdf
 #$GIT_DIR/figs/fig_1.datasets/plot.rna_bar.R $RNA_MAT ENSG00000073282 gene_vals.TP63.pdf
