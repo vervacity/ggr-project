@@ -822,6 +822,55 @@ def add_expressed_genes_to_metadata(metadata_file, out_metadata_file, gene_list_
                 
     return None
 
+
+
+def transfer_homer_metadata(pwm_file, pwm_metadata_file, homer_file, out_file):
+    """after RSAT clustering, may need homer metadata (log odds threshold)
+    to be able to run homer on new pwm file. this file adds in that metadata
+    """
+    # read in homer file
+    hocomoco_name_to_metadata = {}
+    with open(homer_file) as fp:
+        for line in fp:
+            if line.startswith(">"):
+                pwm_name = line.strip().split()[1]
+                pwm_name_simple = pwm_name.split("_HUM")[0]
+                hocomoco_name_to_metadata[pwm_name_simple] = line.strip()
+
+    # read in metadata file - connects pwm name back to original hocomoco name
+    rsat_name_to_hocomoco_name = {}
+    with open(pwm_metadata_file, "r") as fp:
+        for line in fp:
+            if line.startswith("Model"):
+                continue
+            fields = line.strip().split()
+            hocomoco_name = fields[0].split("_HUM")[0]
+            rsat_name = fields[1]
+            rsat_name_to_hocomoco_name[rsat_name] = hocomoco_name
+    
+    # now read in pwm file and add metadata to lines
+    with open(pwm_file, "r") as fp:
+        with open(out_file, "w") as out:
+            for line in fp:
+                # if header, add in thresholds
+                if line.startswith(">"):
+                    pwm_name = line.split("_")[1].split(".UNK")[0]
+                    hocomoco_name = rsat_name_to_hocomoco_name[pwm_name]
+                    metadata_fields = hocomoco_name_to_metadata[hocomoco_name].split()
+                    metadata_fields[1] = pwm_name
+                    out.write("{}\n".format("\t".join(metadata_fields)))
+                # otherwise, just write out
+                else:
+                    out.write(line)
+    
+    return
+
+
+
+
+
+
+
 # HOCOMOCO v11
 pwm_file = "/mnt/lab_data/kundaje/users/dskim89/annotations/hocomoco/v11/HOCOMOCOv11_core_pwms_HUMAN_mono.txt"
 metadata_file = "/mnt/lab_data/kundaje/users/dskim89/annotations/hocomoco/v11/HOCOMOCOv11_core_annotation_HUMAN_mono.tsv"

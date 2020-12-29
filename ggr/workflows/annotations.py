@@ -12,7 +12,7 @@ from ggr.analyses.annotations import hgnc_list_to_ensembl_ids
 
 from ggr.analyses.motifs import add_hocomoco_metadata
 from ggr.analyses.motifs import reduce_pwm_redundancy
-
+from ggr.analyses.motifs import transfer_homer_metadata
 
 def setup_hocomoco_motifs_workflow(args, prefix):
     """Run workflow to set up hocomoco motif set
@@ -71,6 +71,17 @@ def setup_hocomoco_motifs_workflow(args, prefix):
             tmp_prefix="{}/hocomoco".format(pwm_dir),
             num_threads=28)
 
+    # make HOMER compatible file
+    nonredundant_homer_pwms_key = "{}.homer".format(nonredundant_pwms_key)
+    outputs[nonredundant_homer_pwms_key] = "{}.homer.motif".format(
+        outputs[nonredundant_pwms_key].split(".txt")[0])
+    if not os.path.isfile(outputs[nonredundant_homer_pwms_key]):
+        transfer_homer_metadata(
+            outputs[nonredundant_pwms_key],
+            inputs["hocomoco_metadata"],
+            inputs["hocomoco_homer_pwms"],
+            outputs[nonredundant_homer_pwms_key])
+    
     # later add in RNA expression information
     
     return args
