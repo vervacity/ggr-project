@@ -9,6 +9,7 @@ def run_homer(
         bed_file,
         background_bed_file,
         out_dir,
+        mknown=None,
         parallel=24):
     """Generic wrapper to run homer on a set of regions (vs background)
     """
@@ -24,6 +25,9 @@ def run_homer(
             background_bed_file,
             out_dir,
             parallel)
+
+    if mknown is not None:
+        run_homer_cmd += " -mknown {}".format(mknown)
     
     print run_homer_cmd
     os.system('GREPDB="{}"; /bin/bash -c "$GREPDB"'.format(run_homer_cmd))
@@ -90,9 +94,11 @@ def run_gsea(rank_file, gene_sets=[]):
     return
 
 
-def run_bioinformatics_on_bed(bed_file, background_bed_file, out_dir):
+def run_bioinformatics_on_bed(bed_file, background_bed_file, out_dir,
+                              mknown=None, mknown_name="CUSTOM"):
     """Given a bed file and background bed file, 
     run HOMER/GREAT
+    mknown - homer style motifs file to run with different motifs
     """
     assert bed_file.endswith(".gz")
     assert background_bed_file.endswith(".gz")
@@ -107,6 +113,16 @@ def run_bioinformatics_on_bed(bed_file, background_bed_file, out_dir):
         background_bed_file,
         homer_dir)
 
+    # run homer with custom motifs if needed
+    if mknown is not None:
+        homer_dir = "{}/homer_{}/{}".format(out_dir, mknown_name, prefix)
+        run_shell_cmd("mkdir -p {}".format(homer_dir))
+        run_homer(
+            bed_file,
+            background_bed_file,
+            homer_dir,
+            mknown=mknown)
+    
     # run GREAT
     great_dir = "{}/great/{}".format(out_dir, prefix)
     run_shell_cmd("mkdir -p {}".format(great_dir))
@@ -114,7 +130,7 @@ def run_bioinformatics_on_bed(bed_file, background_bed_file, out_dir):
         bed_file,
         background_bed_file,
         great_dir)
-
+        
     return homer_dir, great_dir
 
 

@@ -301,11 +301,13 @@ def runall(args, prefix):
     logger.info("ANALYSIS: run HOMER/GREAT on clusters")
     bed_files = glob.glob("{}/*bed.gz".format(cluster_bed_dir))
     background_bed_file = out_data[master_regions_key]
-    if not os.path.isdir("{}/homer".format(cluster_bed_dir)):
+    if not os.path.isdir("{}/homer_HOCOMOCO".format(cluster_bed_dir)):
         for bed_file in bed_files:
             run_bioinformatics_on_bed(
                 bed_file,
                 background_bed_file,
-                cluster_bed_dir)
+                cluster_bed_dir,
+                mknown=args.outputs["annotations"]["pwms.renamed.nonredundant.homer"],
+                mknown_name="HOCOMOCO")
 
     return args

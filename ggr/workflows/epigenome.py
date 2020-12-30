@@ -584,7 +584,7 @@ def run_dynamic_epigenome_workflow(
     bioinformatics_bed_dirs = [mark_bed_dir, state_bed_dir]
     for bioinformatics_bed_dir in bioinformatics_bed_dirs:
 
-        if not os.path.isdir("{}/homer".format(bioinformatics_bed_dir)):
+        if not os.path.isdir("{}/homer_HOCOMOCO".format(bioinformatics_bed_dir)):
             
             bed_files = glob.glob("{}/*.bed.gz".format(bioinformatics_bed_dir))
             
@@ -605,8 +605,10 @@ def run_dynamic_epigenome_workflow(
                 run_bioinformatics_on_bed(
                     bed_file,
                     background_bed_file,
-                    bioinformatics_bed_dir)
-
+                    bioinformatics_bed_dir,
+                    mknown=args.outputs["annotations"]["pwms.renamed.nonredundant"],
+                    mknown_name="HOCOMOCO")
+                
     return args
 
 
@@ -958,7 +960,7 @@ def run_stable_epigenome_workflow(
     bioinformatics_bed_dirs = [mark_bed_dir, state_bed_dir]
     for bioinformatics_bed_dir in bioinformatics_bed_dirs:
 
-        if not os.path.isdir("{}/homer".format(bioinformatics_bed_dir)):
+        if not os.path.isdir("{}/homer_HOCOMOCO".format(bioinformatics_bed_dir)):
             
             bed_files = glob.glob("{}/*.bed.gz".format(bioinformatics_bed_dir))
             
@@ -979,7 +981,10 @@ def run_stable_epigenome_workflow(
                 run_bioinformatics_on_bed(
                     bed_file,
                     background_bed_file,
-                    bioinformatics_bed_dir)
+                    bioinformatics_bed_dir,
+                    mknown=args.outputs["annotations"]["pwms.renamed.nonredundant.homer"],
+                    mknown_name="HOCOMOCO")
+
 
     return args
 
