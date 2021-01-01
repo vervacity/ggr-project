@@ -1,7 +1,13 @@
 """Contains wrappers to quickly work with bioinformatics tools
 """
 
+import re
 import os
+import glob
+import h5py
+
+import numpy as np
+import pandas as pd
 
 from ggr.util.utils import run_shell_cmd
 
@@ -132,6 +138,81 @@ def run_bioinformatics_on_bed(bed_file, background_bed_file, out_dir,
         great_dir)
         
     return homer_dir, great_dir
+
+
+def aggregate_homer_results_h5(
+        pwm_file, work_dir, out_file, qval_thresh=0.10):
+    """take the homer results and aggregate back into
+    a pvals file for easy use in downstream analyses with tronn
+    """
+
+    # read in pwm file to get index ordering
+    pwm_idx = 0
+    name_to_idx = {}
+    pwm_names = []
+    with open(pwm_file, "r") as fp:
+        for line in fp:
+            if line.startswith(">"):
+                pwm_name = line.strip()
+                pwm_name = re.sub(">HCLUST-\d+_", "", pwm_name)
+                pwm_name = re.sub(".UNK.+", "", pwm_name)
+                name_to_idx[pwm_name] = pwm_idx
+                pwm_names.append(pwm_name)
+                pwm_idx += 1
+    
+    # get results files
+    results_files = sorted(
+        glob.glob("{}/*/knownResults.txt".format(work_dir)))
+
+    # GGR - drop 15
+    results_files = [filename for filename in results_files
+                     if "cluster_15" not in filename]
+    
+    # for each results file, pull in results, filter, and save out
+    for results_idx in range(len(results_files)):
+        results_file = results_files[results_idx]
+        
+        # read in results file
+        results = pd.read_csv(results_file, sep="\t")
+
+        # filter for those with appropriate q value
+        results = results[results["q-value (Benjamini)"] < qval_thresh]
+
+        # then take these and put into appropriate vector
+        pvals = np.ones((1, len(name_to_idx.keys())))
+        for pwm_row_idx in range(results.shape[0]):
+            pwm_name = results.iloc[pwm_row_idx]["Motif Name"]
+            pwm_vector_idx = name_to_idx[pwm_name]
+
+            # insert
+            pvals[0, pwm_vector_idx] = results.iloc[
+                pwm_row_idx]["q-value (Benjamini)"]
+
+        # sig vector - just the bool version
+        sig = np.any(pvals < qval_thresh, axis=0).astype(int)
+
+        # save to h5 file
+        with h5py.File(out_file, "a") as hf:
+            pvals_key = "pvals/TRAJ_LABELS-{}/pvals".format(results_idx)
+            sig_key = "pvals/TRAJ_LABELS-{}/sig".format(results_idx)
+            hf.create_dataset(pvals_key, data=pvals)
+            hf.create_dataset(sig_key, data=sig)
+            hf[pvals_key].attrs["pwm_names"] = pwm_names
+            hf[sig_key].attrs["pwm_names"] = pwm_names
+
+        # sanity check
+        print "file had {} sig at qvalue {}, saved out {}".format(
+            results.shape[0], qval_thresh, np.sum(pvals < qval_thresh))
+
+    # make foregrounds metadata and save to h5 file
+    traj_order = [0, 7, 8, 10, 11, 9, 12, 13, 1, 2, 3, 4, 5]
+    foregrounds = ["TRAJ_LABELS={}".format(traj) for traj in traj_order]
+    foregrounds_keys = ["TRAJ_LABELS-{}".format(traj) for traj in traj_order]
+    with h5py.File(out_file, "a") as hf:
+        hf["pvals"].attrs["foregrounds"] = foregrounds
+        hf["pvals"].attrs["foregrounds.keys"] = foregrounds_keys
+    
+    return
 
 
 def make_deeptools_heatmap(

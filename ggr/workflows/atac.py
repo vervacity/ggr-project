@@ -23,6 +23,7 @@ from ggr.analyses.utils import plot_PCA
 from ggr.workflows.timeseries import run_timeseries_workflow
 
 from ggr.analyses.bioinformatics import run_bioinformatics_on_bed
+from ggr.analyses.bioinformatics import aggregate_homer_results_h5
 
 def runall(args, prefix):
     """all workflows for atac-seq data
@@ -309,5 +310,14 @@ def runall(args, prefix):
                 cluster_bed_dir,
                 mknown=args.outputs["annotations"]["pwms.renamed.nonredundant.homer"],
                 mknown_name="HOCOMOCO")
+
+    # make a pvals file of ATAC trajectory results that can be run through tronn script
+    pval_file = "{}/homer_HOCOMOCO/pvals.h5".format(cluster_bed_dir)
+    out_results["homer.sig_motifs.pvals"] = pval_file
+    if not os.path.isfile(pval_file):
+        aggregate_homer_results_h5(
+            args.outputs["annotations"]["pwms.renamed.nonredundant"],
+            "{}/homer_HOCOMOCO".format(cluster_bed_dir),
+            pval_file)
 
     return args

@@ -5,6 +5,7 @@ import os
 import glob
 import logging
 
+from ggr.analyses.tronn_scripts import tronn_intersect_with_expression_cmd
 from ggr.util.utils import run_shell_cmd
 
 
@@ -177,5 +178,19 @@ def runall(args, prefix):
         run_shell_cmd("echo '{}' > {}/preprocess.tmp".format(preprocess, results_dir))
         #run_shell_cmd("source preprocess.tmp")
 
+    # NOTE: in a linear run, the tronn processes (train, eval, interpret, etc) would all
+    # be here in the code
+        
+    # run the baseline version of getting motifs/TFs using just homer and ATAC trajectory info
+    out_dir = "{}/dp_gp/reproducible/hard/reordered/bed/homer_HOCOMOCO".format(
+        args.outputs["results"]["atac"]["timeseries"]["dir"])
+    if not os.path.isdir("{}/motifs.rna_filt".format(out_dir)):
+        tronn_intersect_with_expression_cmd(
+            args.outputs["results"]["atac"]["homer.sig_motifs.pvals"],
+            args.outputs["annotations"]["pwms.renamed.nonredundant"],
+            args.outputs["annotations"]["pwms.metadata.nonredundant.expressed"],
+            "{}/matrices/ggr.rna.counts.pc.expressed.timeseries_adj.pooled.rlog.mat.txt.gz".format(
+                args.outputs["results"]["rna"]["timeseries"]["dir"]),
+            out_dir)
                     
     return args
