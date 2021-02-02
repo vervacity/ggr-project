@@ -943,6 +943,7 @@ def regions_to_genes_w_correlation_filtering(
         chromsizes=None,
         extend_len=0,
         corr_thresh=0,
+        corr_direction="positive",
         pval_thresh=1):
     """extends regions to genes with correlation filtering
     """
@@ -983,7 +984,12 @@ def regions_to_genes_w_correlation_filtering(
         index=rna_signal.index)
 
     # threshold
-    keep_genes = keep_genes[keep_genes["corr"] > corr_thresh]
+    if corr_direction == "positive":
+        keep_genes = keep_genes[keep_genes["corr"] > corr_thresh]
+    elif corr_direction == "negative":
+        keep_genes = keep_genes[keep_genes["corr"] < corr_thresh]
+    else:
+        raise ValueError, "correlation direction not understood!"
     keep_genes = keep_genes[keep_genes["pval"] <= pval_thresh]
 
     # filter
@@ -995,8 +1001,20 @@ def regions_to_genes_w_correlation_filtering(
     linked_genes.reset_index().to_csv(
         out_file, columns=["gene_id"], index=False, compression="gzip")
 
+    # TODO save out file of filtered regions
+    tmp_regions_file = "{}/{}.linked_regions.txt.gz".format(
+        tmp_dir, os.path.basename(region_file).split(".bed")[0].split(".txt")[0])
+    filt_regions = linked_genes.reset_index()
+    filt_regions = pd.DataFrame(
+        filt_regions["region_ids"].str.split(';').tolist(),
+        index=filt_regions["gene_id"]).stack()
+    filt_regions = filt_regions.reset_index()[[0, 'gene_id']]
+    filt_regions["region_ids"] = filt_regions[0].str.split(",", n=2, expand=True)[0]
+    filt_regions.to_csv(
+        tmp_regions_file, columns=["region_ids"], index=False, compression="gzip")
+    
     # clean up
-    os.system("rm {}".format(tmp_out_file))
+    #os.system("rm {}".format(tmp_out_file))
     
     return linked_genes, rna_signal
     

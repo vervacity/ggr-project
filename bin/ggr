@@ -129,6 +129,10 @@ def main():
     from ggr.workflows.linking import runall
     args = runall(args, "ggr.linking")
 
+    # run repression workflow
+    from ggr.workflows.repression import runall
+    args = runall(args, "ggr.repression")
+
     # run deep learning workflow
     from ggr.workflows.learning import runall
     args = runall(args, "ggr")
