@@ -12,6 +12,7 @@ import pandas as pd
 from ggr.util.utils import run_shell_cmd
 
 from ggr.analyses.bioinformatics import run_gprofiler
+from ggr.analyses.bioinformatics import run_homer
 from ggr.analyses.linking import regions_to_genes_w_correlation_filtering
 
 
@@ -51,10 +52,13 @@ def runall(args, prefix):
         "rna.counts.pc.expressed.timeseries_adj.pooled.rlog.dynamic.traj.mat"]
     rna_mat = pd.read_csv(rna_mat_file, sep="\t", index_col=0)
     
-    # get linking file
+    # linking file
     links_dir = "{}/linking/proximity".format(args.outputs["results"]["dir"])
     interactions_file = "{}/ggr.linking.ALL.overlap.interactions.txt.gz".format(links_dir)
 
+    # background atac file
+    atac_background_file = args.outputs["data"]["atac.master.bed"]
+    
     # ---------------------------
     # ANALYSIS: dynamic region sets - ATAC
     # ---------------------------
@@ -73,7 +77,7 @@ def runall(args, prefix):
     for region_set in region_sets:
 
         # debug
-        continue
+        #continue
         
         # setup
         region_dir = "{}/{}".format(
@@ -101,16 +105,28 @@ def runall(args, prefix):
             corr_direction="negative")
         
         # and run enrichments
-        run_gprofiler(
-            gene_file,
-            args.outputs["data"]["rna.counts.pc.expressed.mat"],
-            region_dir, ordered=True, header=True)
+        gprofiler_output = "{}/genes.go_gprofiler.txt".format(region_dir)
+        if not os.path.isfile(gprofiler_output):
+            run_gprofiler(
+                gene_file,
+                args.outputs["data"]["rna.counts.pc.expressed.mat"],
+                region_dir, ordered=True, header=True)
 
-        # homer analysis?
+        # homer analysis
+        homer_dir = "{}/homer".format(region_dir)
+        if not os.path.isdir(homer_dir):
+            run_shell_cmd("mkdir -p {}".format(homer_dir))
+            filt_bed_file = "{}.linked_regions.bed.gz".format(
+                tmp_file.split(".bed")[0])
+            run_homer(
+                filt_bed_file,
+                atac_background_file,
+                homer_dir)
         
         # clean up
         #run_shell_cmd("rm {}".format(tmp_file))
 
+    quit()
     
     # ---------------------------
     # ANALYSIS: H3K27me3, ATAC-centric
@@ -162,7 +178,7 @@ def runall(args, prefix):
             filter_by_score=0.5, # proximity corr thresh
             corr_thresh=0,
             corr_direction="positive")
-        
+
         # and run enrichments
         run_gprofiler(
             gene_file,
@@ -174,7 +190,6 @@ def runall(args, prefix):
         # clean up
         #run_shell_cmd("rm {}".format(tmp_file))
 
-    
     # ---------------------------
     # ANALYSIS: H3K27me3, dynamic
     # ---------------------------

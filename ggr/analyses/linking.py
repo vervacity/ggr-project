@@ -1001,8 +1001,8 @@ def regions_to_genes_w_correlation_filtering(
     linked_genes.reset_index().to_csv(
         out_file, columns=["gene_id"], index=False, compression="gzip")
 
-    # TODO save out file of filtered regions
-    tmp_regions_file = "{}/{}.linked_regions.txt.gz".format(
+    # save out file of filtered regions
+    tmp_regions_file = "{}/{}.linked_regions.bed.gz".format(
         tmp_dir, os.path.basename(region_file).split(".bed")[0].split(".txt")[0])
     filt_regions = linked_genes.reset_index()
     filt_regions = pd.DataFrame(
@@ -1010,8 +1010,13 @@ def regions_to_genes_w_correlation_filtering(
         index=filt_regions["gene_id"]).stack()
     filt_regions = filt_regions.reset_index()[[0, 'gene_id']]
     filt_regions["region_ids"] = filt_regions[0].str.split(",", n=2, expand=True)[0]
+    filt_regions[["chrom", "start-stop"]] = filt_regions["region_ids"].str.split(":", n=2, expand=True)
+    filt_regions[["start", "stop"]] = filt_regions["start-stop"].str.split("-", n=2, expand=True)
     filt_regions.to_csv(
-        tmp_regions_file, columns=["region_ids"], index=False, compression="gzip")
+        tmp_regions_file,
+        columns=["chrom", "start", "stop", "region_ids"],
+        sep="\t",
+        index=False, header=False, compression="gzip")
     
     # clean up
     #os.system("rm {}".format(tmp_out_file))
