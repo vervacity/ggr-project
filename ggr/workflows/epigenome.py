@@ -21,6 +21,8 @@ from ggr.analyses.epigenome import split_stable_atac_by_dynamic_marks
 from ggr.analyses.epigenome import get_best_summit
 from ggr.analyses.epigenome import convert_overlaps_bed_to_id_mappings
 from ggr.analyses.epigenome import get_aggregate_chromatin_state_summary
+from ggr.analyses.epigenome import plot_region_set_chromatin_summary
+from ggr.analyses.epigenome import plot_signal_aggregation_plots
 
 from ggr.analyses.filtering import sort_by_clusters
 from ggr.analyses.filtering import get_ordered_subsample
@@ -319,6 +321,62 @@ def make_fake_cluster_file(id_list_file, out_file):
     return None
 
 
+def _run_region_set_epigenome_plotting(
+        args, id_file, plot_dir, signal_matrices, convert_beds, atac_timeseries_files):
+    """given region ids, plot out dynamics and agg plots
+    """
+    plot_prefix = "{}/{}".format(
+        plot_dir, os.path.basename(id_file).split(".txt")[0])
+
+    # plot average dynamics across timepoints
+    plot_file = "{}.TEST.pdf".format(plot_prefix)
+    if not os.path.isfile(plot_file):
+        plot_region_set_chromatin_summary(
+            id_file,
+            plot_prefix,
+            convert_beds,
+            signal_matrices)
+            
+    # TODO - deeptools to get agg plots to check for spreading
+    # plot agg plots: ATAC, H3K27ac, H3K4me1
+    id_summit_file = "{}/{}.summit.bed".format(
+        plot_dir, os.path.basename(id_file).split(".txt")[0])
+    if not os.path.isfile(id_summit_file):
+        get_best_summit(
+            id_file.replace("/ids", "/bed").replace(".txt.gz", ".bed.gz"),
+            atac_timeseries_files,
+            id_summit_file)
+        
+    plot_prefix = "{}.agg".format(plot_prefix)
+
+    # plot ATAC agg - look for spreading, landscape
+    plot_atac_prefix = "{}.ATAC".format(plot_prefix)
+    if not os.path.isfile("{}.agg_plot.pdf".format(plot_atac_prefix)):
+        atac_bigwigs = sorted(glob.glob("{}/{}".format(
+            args.inputs["atac"][args.cluster]["data_dir"],
+            args.inputs["atac"][args.cluster]["bigwig_pooled_glob"])))
+        plot_signal_aggregation_plots(
+            id_summit_file, atac_bigwigs, plot_atac_prefix,
+            extend_dist=2000, bin_total=200)
+
+    # plot histone agg - look for spreading, landscape
+    histones_agg = ["H3K27ac", "H3K4me1"]
+    for histone_idx in range(len(histones_agg)):
+        histone = histones_agg[histone_idx]
+        histone_bigwigs = sorted(
+            glob.glob("{}/{}".format(
+                args.inputs["chipseq"][args.cluster]["data_dir"],
+                args.inputs["chipseq"][args.cluster]["histones"][histone]["pooled_bigwig_glob"])))
+        plot_histone_prefix = "{}.{}".format(plot_prefix, histone)
+        if not os.path.isfile("{}.agg_plot.pdf".format(plot_histone_prefix)):
+            plot_signal_aggregation_plots(
+                id_summit_file, histone_bigwigs, plot_histone_prefix,
+                extend_dist=2000, bin_total=200)
+    
+    return
+
+
+
 def run_dynamic_epigenome_workflow(
         args,
         prefix,
@@ -458,6 +516,9 @@ def run_dynamic_epigenome_workflow(
     logger.info("ANALYSIS: separate out cluster files")
     mark_dir = "{}/clusters/by_mark".format(results_dir)
     state_dir = "{}/clusters/by_state".format(results_dir)
+
+    # for plotting
+    
     if not os.path.isdir(state_dir):
         run_shell_cmd("mkdir -p {0}/ids {0}/bed {1}/ids {1}/bed".format(
             mark_dir, state_dir))
@@ -482,13 +543,59 @@ def run_dynamic_epigenome_workflow(
             state_bed_file = "{0}/bed/{1}.bed.gz".format(
                 state_dir, os.path.basename(state_file).split('.txt')[0])
             id_to_bed(state_file, state_bed_file, sort=True)
-
+            
     mark_bed_dir = "{}/clusters/by_mark/bed".format(results_dir)
     state_bed_dir = "{}/clusters/by_state/bed".format(results_dir)
             
     args.outputs["results"]["label_dirs"].append(mark_bed_dir)
     args.outputs["results"]["label_dirs"].append(state_bed_dir)
-        
+
+    # for plotting dynamics plots
+    signal_matrices = [
+        out_data["atac.counts.pooled.rlog.mat"],
+        out_data["H3K27ac.counts.pooled.rlog.mat"],
+        out_data["H3K4me1.counts.pooled.rlog.mat"]
+    ]
+    convert_beds = [
+        (out_data["atac.master.bed"], out_data["atac.master.bed"]),
+        (out_data["atac.master.bed"], out_data["atac.midpoints.slop_H3K27ac.bed"]),
+        (out_data["atac.master.bed"], out_data["atac.midpoints.slop_H3K4me1.bed"]),
+    ]
+
+    # for plotting agg plots
+    timeseries_dir = args.outputs["results"]["atac"]["timepoint_region_dir"]
+    atac_timeseries_files = sorted(
+        glob.glob("{}/*narrowPeak.gz".format(timeseries_dir)))
+    
+    # summary plots
+    mark_id_dir = "{}/clusters/by_mark/ids".format(results_dir)
+    mark_plot_dir = "{}/clusters/by_mark/plots".format(results_dir)
+    os.system("mkdir -p {}".format(mark_plot_dir))
+    id_files = sorted(glob.glob("{}/*.txt.gz".format(mark_id_dir)))
+    for id_file in id_files:
+
+        # ignore non-changing histone info
+        if "cluster_4.txt" in id_file:
+            continue
+
+        # run plotting
+        _run_region_set_epigenome_plotting(
+            args, id_file, mark_plot_dir, signal_matrices, convert_beds, atac_timeseries_files)
+
+    state_id_dir = "{}/clusters/by_state/ids".format(results_dir)
+    state_plot_dir = "{}/clusters/by_state/plots".format(results_dir)
+    os.system("mkdir -p {}".format(state_plot_dir))
+    id_files = sorted(glob.glob("{}/*.txt.gz".format(state_id_dir)))
+    for id_file in id_files:
+
+        # ignore non-changing histone info
+        if "cluster_44.txt" in id_file:
+            continue
+
+        # run plotting
+        _run_region_set_epigenome_plotting(
+            args, id_file, state_plot_dir, signal_matrices, convert_beds, atac_timeseries_files)
+
     # -----------------------------------------
     # ANALYSIS 3 - plot this out
     # inputs: dynamic ATAC ids, and all clusters

@@ -384,3 +384,125 @@ def get_aggregate_chromatin_state_summary(
         summary.index = [index]
         
     return summary
+
+
+def plot_region_set_chromatin_summary(
+        id_file,
+        plot_prefix,
+        convert_beds,
+        signal_matrices):
+    """plot out summary plots for a group of regions
+    
+    id_file: has the ids of regions to summarize
+    plot_prefix: prefix onto the plot files
+    convert_beds: list of tuples per signal matrix file, (ids matching id_file, ids matching signal matrix)
+    signal_matrices: list of signal matrices to use
+    
+    """
+    # read in data
+    master_ids = pd.read_csv(id_file, sep="\t", header=None)
+
+    # go through signal files
+    subsetted_signal_files = []
+    for signal_i in range(len(signal_matrices)):
+        # read in conversion ids, and subset to correct out ids
+        conversion_files = convert_beds[signal_i]
+        convert_in = pd.read_csv(conversion_files[0], sep="\t", header=None)
+        convert_in_ids = convert_in[0] + ":" + convert_in[1].astype(str) + "-" + convert_in[2].astype(str)
+        convert_out = pd.read_csv(conversion_files[1], sep="\t", header=None)
+        convert_out_ids = convert_out[0] + ":" + convert_out[1].astype(str) + "-" + convert_out[2].astype(str)
+        convert_table = pd.DataFrame({"in": convert_in_ids, "out": convert_out_ids})
+        convert_table = convert_table[convert_table["in"].isin(master_ids[0].values)]
+
+        # read in signal matrix and subset
+        signal_matrix_file = signal_matrices[signal_i]
+        signals = pd.read_csv(signal_matrix_file, sep="\t", index_col=0)
+        signals = signals[signals.index.isin(convert_table["out"].values)]
+
+        # save out
+        subset_signal_file = "{}.{}.txt.gz".format(
+            plot_prefix, os.path.basename(signal_matrix_file).split(".txt")[0])
+        signals.to_csv(subset_signal_file, sep="\t", compression="gzip")
+        subsetted_signal_files.append(subset_signal_file)
+        
+    # and push all these files to R to plot
+    r_cmd = "~/git/ggr-project/R/plot.region_set_chromatin_summary.R {} {}".format(
+        plot_prefix, " ".join(subsetted_signal_files))
+    print r_cmd
+    os.system(r_cmd)
+    
+    return
+
+
+def plot_signal_aggregation_plots(
+        point_file,
+        bigwig_files,
+        prefix,
+        extend_dist=2000,
+        bin_total=100):
+    """build signal aggregation plots to look for histone mark spreading
+    """
+    # set up bin size
+    bin_size = extend_dist * 2 / bin_total
+    
+    # use deeptools to compute matrix from bigwigs
+    mat_file = "{}.coverage.mat.tmp.txt.gz".format(point_file.split(".bed")[0])
+    compute_matrix_cmd = (
+        "computeMatrix reference-point "
+        "--referencePoint {0} "
+        "-b {1} -a {1} -bs {2} "
+        "-R {3} "
+        "-S {4} "
+        "-o {5}").format(
+            "TSS",
+            extend_dist,
+            bin_size,
+            point_file,
+            " ".join(bigwig_files),
+            mat_file)
+    print compute_matrix_cmd
+    os.system(compute_matrix_cmd)
+    
+    # read in, average down columns
+    mat_data = pd.read_csv(mat_file, sep="\t", header=None, comment="@")
+    mat_array = mat_data.iloc[:,6:].values
+
+    # normalize to flanks, per region
+    timepoints = np.zeros(mat_array.shape[1])
+    positions = np.zeros(mat_array.shape[1])
+
+    for i in range(len(bigwig_files)):
+        start_pos = i*bin_total
+        stop_pos = start_pos + bin_total
+
+        # normalize to flanks
+        mat_slice = mat_array[:,start_pos:stop_pos]
+        flank_avgs = (
+            np.sum(mat_slice[:,0:10], axis=1) +
+            np.sum(mat_slice[:,-10:], axis=1)) / 20.
+        mat_slice = np.divide(mat_slice, np.expand_dims(flank_avgs, 1))
+        mat_array[:,start_pos:stop_pos] = mat_slice
+
+        # set up timepoints and positions
+        timepoints[start_pos:stop_pos] = i
+        positions[start_pos:stop_pos] = np.arange(-extend_dist, extend_dist, bin_size) + (bin_size / 2)
+
+    # now recalculate mean and sd
+    mat_avgs = np.mean(mat_array, axis=0)
+    mat_std = np.std(mat_array, axis=0)
+
+    # make summary file
+    mat_summary = pd.DataFrame({
+        "mean": mat_avgs,
+        "sd": mat_std,
+        "timepoint": timepoints,
+        "position": positions})
+    mat_sum_file = "{}.summary.txt.gz".format(prefix)
+    mat_summary.to_csv(mat_sum_file, index=False, sep="\t", compression="gzip")
+    
+    # and plot out in R
+    plot_cmd = "~/git/ggr-project/R/plot.agg_signal.R {} {}.agg_plot.pdf".format(mat_sum_file, prefix)
+    print plot_cmd
+    os.system(plot_cmd)
+
+    return
