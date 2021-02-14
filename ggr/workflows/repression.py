@@ -75,14 +75,12 @@ def runall(args, prefix):
 
     # for each region set, run analysis
     for region_set in region_sets:
-
-        # debug
-        #continue
         
         # setup
         region_dir = "{}/{}".format(
             work_dir, os.path.basename(region_set).split(".bed")[0])
-        run_shell_cmd("mkdir -p {}".format(region_dir))
+        if not os.path.isdir(region_dir):
+            run_shell_cmd("mkdir -p {}".format(region_dir))
 
         # make sure it has ATAC oriented IDs
         tmp_file = "{}/{}".format(region_dir, os.path.basename(region_set))
@@ -92,17 +90,18 @@ def runall(args, prefix):
         
         # get genes
         gene_file = "{}/genes.txt.gz".format(region_dir)
-        regions_to_genes_w_correlation_filtering(
-            tmp_file,
-            interactions_file,
-            args.outputs["annotations"]["tss.pc.bed"],
-            gene_file,
-            atac_mat,
-            rna_mat,
-            tmp_dir=region_dir,
-            filter_by_score=0.5, # proximity corr thresh
-            corr_thresh=0,
-            corr_direction="negative")
+        if not os.path.isfile(gene_file):
+            regions_to_genes_w_correlation_filtering(
+                tmp_file,
+                interactions_file,
+                args.outputs["annotations"]["tss.pc.bed"],
+                gene_file,
+                atac_mat,
+                rna_mat,
+                tmp_dir=region_dir,
+                filter_by_score=0.5, # proximity corr thresh
+                corr_thresh=0,
+                corr_direction="negative")
         
         # and run enrichments
         gprofiler_output = "{}/genes.go_gprofiler.txt".format(region_dir)
@@ -125,16 +124,15 @@ def runall(args, prefix):
         
         # clean up
         #run_shell_cmd("rm {}".format(tmp_file))
-
-    quit()
-    
+        
     # ---------------------------
     # ANALYSIS: H3K27me3, ATAC-centric
     # ---------------------------
     
     # work dir
     work_dir = "{}/H3K27me3".format(results_dir)
-    run_shell_cmd("mkdir -p {}".format(work_dir))
+    if not os.path.isdir(work_dir):
+        run_shell_cmd("mkdir -p {}".format(work_dir))
 
     # regions
     region_bed_dir = "{}/clusters/by_state/bed".format(
@@ -151,9 +149,6 @@ def runall(args, prefix):
     # for each region set, run analysis
     for region_set in region_sets:
 
-        # debug
-        continue
-
         # setup
         region_dir = "{}/{}".format(
             work_dir, os.path.basename(region_set).split(".bed")[0])
@@ -167,23 +162,26 @@ def runall(args, prefix):
         
         # get genes
         gene_file = "{}/genes.txt.gz".format(region_dir)
-        regions_to_genes_w_correlation_filtering(
-            tmp_file,
-            interactions_file,
-            args.outputs["annotations"]["tss.pc.bed"],
-            gene_file,
-            atac_mat,
-            rna_mat,
-            tmp_dir=region_dir,
-            filter_by_score=0.5, # proximity corr thresh
-            corr_thresh=0,
-            corr_direction="positive")
+        if not os.path.isfile(gene_file):
+            regions_to_genes_w_correlation_filtering(
+                tmp_file,
+                interactions_file,
+                args.outputs["annotations"]["tss.pc.bed"],
+                gene_file,
+                atac_mat,
+                rna_mat,
+                tmp_dir=region_dir,
+                filter_by_score=0.5, # proximity corr thresh
+                corr_thresh=0,
+                corr_direction="positive")
 
         # and run enrichments
-        run_gprofiler(
-            gene_file,
-            args.outputs["data"]["rna.counts.pc.expressed.mat"],
-            region_dir, ordered=True, header=True)
+        gprofiler_output = "{}/genes.go_gprofiler.txt".format(region_dir)
+        if not os.path.isfile(gprofiler_output):
+            run_gprofiler(
+                gene_file,
+                args.outputs["data"]["rna.counts.pc.expressed.mat"],
+                region_dir, ordered=True, header=True)
 
         # homer analysis?
         
@@ -212,7 +210,8 @@ def runall(args, prefix):
 
         # setup
         region_dir = "{}/cluster_{}".format(work_dir, cluster_id)
-        run_shell_cmd("mkdir -p {}".format(region_dir))
+        if not os.path.isdir(region_dir):
+            run_shell_cmd("mkdir -p {}".format(region_dir))
         
         # make a bed id file
         tmp_file = "{}/cluster_{}.bed.gz".format(region_dir, cluster_id)
@@ -224,30 +223,26 @@ def runall(args, prefix):
     
         # get genes
         gene_file = "{}/genes.txt.gz".format(region_dir)
-        regions_to_genes_w_correlation_filtering(
-            tmp_file,
-            interactions_file,
-            args.outputs["annotations"]["tss.pc.bed"],
-            gene_file,
-            h3k27me3_mat,
-            rna_for_h3k27me3_mat,
-            tmp_dir=region_dir,
-            filter_by_score=0.5, # proximity corr thresh
-            corr_thresh=0,
-            corr_direction="negative")
+        if not os.path.isfile(gene_file):
+            regions_to_genes_w_correlation_filtering(
+                tmp_file,
+                interactions_file,
+                args.outputs["annotations"]["tss.pc.bed"],
+                gene_file,
+                h3k27me3_mat,
+                rna_for_h3k27me3_mat,
+                tmp_dir=region_dir,
+                filter_by_score=0.5, # proximity corr thresh
+                corr_thresh=0,
+                corr_direction="negative")
         
         # and run enrichments
-        run_gprofiler(
-            gene_file,
-            args.outputs["data"]["rna.counts.pc.expressed.mat"],
-            region_dir, ordered=True, header=True)
-
-    
-    
-
-    quit()
-    
-
+        gprofiler_output = "{}/genes.go_gprofiler.txt".format(region_dir)
+        if not os.path.isfile(gprofiler_output):
+            run_gprofiler(
+                gene_file,
+                args.outputs["data"]["rna.counts.pc.expressed.mat"],
+                region_dir, ordered=True, header=True)
 
 
     return args
