@@ -12,7 +12,8 @@ def tronn_intersect_with_expression_cmd(
         pwm_metadata_file,
         rna_file,
         out_dir,
-        nn_motifs=False):
+        nn_motifs=False,
+        min_cor=0.75): # adjust to 0.5 for homer runs
     """intersect sig motifs with pwms
     """
     # scanmotifs dir and files
@@ -22,7 +23,6 @@ def tronn_intersect_with_expression_cmd(
                         for val in foreground_main_groups]
     
     # params
-    min_cor = 0.50 #0.75 for NN runs
     use_max_pwm_length = "--max_pwm_length 17 "
     out_dir = "{}/motifs.rna_filt".format(out_dir)
 

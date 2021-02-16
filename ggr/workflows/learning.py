@@ -8,6 +8,9 @@ import logging
 from ggr.analyses.tronn_scripts import tronn_intersect_with_expression_cmd
 from ggr.util.utils import run_shell_cmd
 
+from ggr.analyses.baselines import compare_sig_motifs
+from ggr.analyses.baselines import compare_tf_motif_corrs
+
 
 def runall(args, prefix):
     """all workflows for deep learning (TRONN)
@@ -180,11 +183,27 @@ def runall(args, prefix):
 
     # NOTE: in a linear run, the tronn processes (train, eval, interpret, etc) would all
     # be here in the code
-        
-    # run the baseline version of getting motifs/TFs using just homer and ATAC trajectory info
-    out_dir = "{}/dp_gp/reproducible/hard/reordered/bed/homer_HOCOMOCO".format(
-        args.outputs["results"]["atac"]["timeseries"]["dir"])
-    if not os.path.isdir("{}/motifs.rna_filt".format(out_dir)):
+
+    # -------------------------------------------
+    # ANALYSIS - baselines: compare results to non-NN framework
+    # -------------------------------------------
+    baselines_dir = "{}/baselines".format(results_dir)
+    if not os.path.isdir(baselines_dir):
+        os.system("mkdir -p {}".format(baselines_dir))
+    prefix = "nn_vs_homerATAC"
+
+    # NN results - pvals file
+    nn_sig_motifs_dir = "/mnt/lab_data3/dskim89/ggr/nn/2019-03-12.freeze/motifs.sig"
+    nn_pvals_file = "{}/motifs.adjust.diff.rna_filt.dmim/pvals.rna_filt.corr_filt.h5".format(
+        nn_sig_motifs_dir)
+    
+    # 1) for venn diagram overlap, use the intersect file that matches correlation
+    out_dir = "{}/corr_75".format(baselines_dir)
+    if not os.path.isdir(out_dir):
+        os.system("mkdir -p {}".format(out_dir))
+    homer_pvals_file = "{}/motifs.rna_filt/pvals.rna_filt.corr_filt.h5".format(
+        out_dir)
+    if not os.path.isfile(homer_pvals_file):
         tronn_intersect_with_expression_cmd(
             args.outputs["results"]["atac"]["homer.sig_motifs.pvals"],
             args.outputs["annotations"]["pwms.renamed.nonredundant"],
@@ -192,5 +211,55 @@ def runall(args, prefix):
             "{}/matrices/ggr.rna.counts.pc.expressed.timeseries_adj.pooled.rlog.mat.txt.gz".format(
                 args.outputs["results"]["rna"]["timeseries"]["dir"]),
             out_dir)
+
+    # plot
+    plot_file = "{}/{}.compare_sig.plot.pdf".format(baselines_dir, prefix)
+    if not os.path.isfile(plot_file):
+        compare_sig_motifs(
+            nn_pvals_file,
+            homer_pvals_file,
+            ["NN", "Homer+ATAC"],
+            baselines_dir, prefix)
+        
+    # 2) for the correlation plot, use the intersect file that shows as many correlation values for homer+ATAC
+    # TODO also for nn
+    out_dir = "{}/corr_00.nn".format(results_dir)
+    if not os.path.isdir(out_dir):
+        os.system("mkdir -p {}".format(out_dir))
+    nn_pvals_file = "{}/motifs.rna_filt/pvals.rna_filt.corr_filt.h5".format(
+        out_dir)
+    if not os.path.isfile(nn_pvals_file):
+        tronn_intersect_with_expression_cmd(
+            "{}/motifs.adjust.diff/pvals.h5".format(nn_sig_motifs_dir),
+            args.outputs["annotations"]["pwms.renamed.nonredundant"],
+            args.outputs["annotations"]["pwms.metadata.nonredundant.expressed"],
+            "{}/matrices/ggr.rna.counts.pc.expressed.timeseries_adj.pooled.rlog.mat.txt.gz".format(
+                args.outputs["results"]["rna"]["timeseries"]["dir"]),
+            out_dir,
+            min_cor=0)
+    
+    out_dir = "{}/corr_00".format(results_dir)
+    if not os.path.isdir(out_dir):
+        os.system("mkdir -p {}".format(out_dir))
+    homer_pvals_file = "{}/motifs.rna_filt/pvals.rna_filt.corr_filt.h5".format(
+        out_dir)
+    if not os.path.isfile(homer_pvals_file):
+        tronn_intersect_with_expression_cmd(
+            args.outputs["results"]["atac"]["homer.sig_motifs.pvals"],
+            args.outputs["annotations"]["pwms.renamed.nonredundant"],
+            args.outputs["annotations"]["pwms.metadata.nonredundant.expressed"],
+            "{}/matrices/ggr.rna.counts.pc.expressed.timeseries_adj.pooled.rlog.mat.txt.gz".format(
+                args.outputs["results"]["rna"]["timeseries"]["dir"]),
+            out_dir,
+            min_cor=0)
+
+    plot_file = "{}/{}.compare_corr.plot.pdf".format(baselines_dir, prefix)
+    if not os.path.isfile(plot_file):
+        compare_tf_motif_corrs(
+            nn_pvals_file,
+            homer_pvals_file,
+            ["NN", "Homer+ATAC"],
+            baselines_dir, prefix)
+    
                     
     return args
