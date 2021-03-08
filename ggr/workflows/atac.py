@@ -14,6 +14,7 @@ from ggr.util.utils import parallel_copy
 from ggr.util.bed_utils import merge_regions
 from ggr.util.bed_utils import id_to_bed
 
+from ggr.analyses.atac import compare_to_scATAC
 from ggr.analyses.filtering import filter_for_ids
 from ggr.analyses.counting import make_count_matrix
 from ggr.analyses.counting import count_present_regions_per_sample
@@ -24,6 +25,7 @@ from ggr.workflows.timeseries import run_timeseries_workflow
 
 from ggr.analyses.bioinformatics import run_bioinformatics_on_bed
 from ggr.analyses.bioinformatics import aggregate_homer_results_h5
+
 
 def runall(args, prefix):
     """all workflows for atac-seq data
@@ -320,4 +322,18 @@ def runall(args, prefix):
             "{}/homer_HOCOMOCO".format(cluster_bed_dir),
             pval_file)
 
+    # compare results to scATAC
+    compare_dir = "{}/sc_vs_bulk".format(results_dir)
+    if not os.path.isdir(compare_dir):
+        os.system("mkdir -p {}".format(compare_dir))
+    scATAC_file = "/mnt/lab_data3/dskim89/ggr/data_external/GSE116248_scATAC/GSE116248_Peak_counts_Keratinocyte_WT.txt.gz"
+
+    if False:
+        compare_to_scATAC(
+            args.outputs["data"]["atac.counts.pooled.mat"],
+            scATAC_file,
+            compare_dir)
+    
+
+        
     return args
