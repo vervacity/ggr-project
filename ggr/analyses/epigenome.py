@@ -418,7 +418,10 @@ def plot_region_set_chromatin_summary(
         signal_matrix_file = signal_matrices[signal_i]
         signals = pd.read_csv(signal_matrix_file, sep="\t", index_col=0)
         signals = signals[signals.index.isin(convert_table["out"].values)]
-
+        
+        # normalize to day 0
+        signals = signals.subtract(signals.iloc[:,0].values, axis=0)
+        
         # save out
         subset_signal_file = "{}.{}.txt.gz".format(
             plot_prefix, os.path.basename(signal_matrix_file).split(".txt")[0])
@@ -446,7 +449,7 @@ def plot_signal_aggregation_plots(
     bin_size = extend_dist * 2 / bin_total
     
     # use deeptools to compute matrix from bigwigs
-    mat_file = "{}.coverage.mat.tmp.txt.gz".format(point_file.split(".bed")[0])
+    mat_file = "{}.coverage.mat.tmp.txt.gz".format(prefix)
     compute_matrix_cmd = (
         "computeMatrix reference-point "
         "--referencePoint {0} "
@@ -488,7 +491,8 @@ def plot_signal_aggregation_plots(
         positions[start_pos:stop_pos] = np.arange(-extend_dist, extend_dist, bin_size) + (bin_size / 2)
 
     # now recalculate mean and sd
-    mat_avgs = np.mean(mat_array, axis=0)
+    #mat_avgs = np.mean(mat_array, axis=0)
+    mat_avgs = np.median(mat_array, axis=0)
     mat_std = np.std(mat_array, axis=0)
 
     # make summary file

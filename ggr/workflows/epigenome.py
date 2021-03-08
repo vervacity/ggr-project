@@ -329,7 +329,7 @@ def _run_region_set_epigenome_plotting(
         plot_dir, os.path.basename(id_file).split(".txt")[0])
 
     # plot average dynamics across timepoints
-    plot_file = "{}.TEST.pdf".format(plot_prefix)
+    plot_file = "{}.avg_dynamics.pdf".format(plot_prefix)
     if not os.path.isfile(plot_file):
         plot_region_set_chromatin_summary(
             id_file,
