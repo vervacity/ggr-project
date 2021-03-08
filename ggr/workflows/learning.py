@@ -5,11 +5,14 @@ import os
 import glob
 import logging
 
-from ggr.analyses.tronn_scripts import tronn_intersect_with_expression_cmd
-from ggr.util.utils import run_shell_cmd
-
 from ggr.analyses.baselines import compare_sig_motifs
 from ggr.analyses.baselines import compare_tf_motif_corrs
+from ggr.analyses.linking import regions_to_genes
+from ggr.analyses.nn import get_motif_region_set
+from ggr.analyses.nn import compare_nn_gene_set_to_diff_expr
+from ggr.analyses.tronn_scripts import tronn_intersect_with_expression_cmd
+
+from ggr.util.utils import run_shell_cmd
 
 
 def runall(args, prefix):
@@ -184,6 +187,9 @@ def runall(args, prefix):
     # NOTE: in a linear run, the tronn processes (train, eval, interpret, etc) would all
     # be here in the code
 
+    # results dir
+    NN_DIR = "/mnt/lab_data3/dskim89/ggr/nn/2019-03-12.freeze"
+
     # -------------------------------------------
     # ANALYSIS - baselines: compare results to non-NN framework
     # -------------------------------------------
@@ -193,7 +199,7 @@ def runall(args, prefix):
     prefix = "nn_vs_homerATAC"
 
     # NN results - pvals file
-    nn_sig_motifs_dir = "/mnt/lab_data3/dskim89/ggr/nn/2019-03-12.freeze/motifs.sig"
+    nn_sig_motifs_dir = "{}/motifs.sig".format(NN_DIR)
     nn_pvals_file = "{}/motifs.adjust.diff.rna_filt.dmim/pvals.rna_filt.corr_filt.h5".format(
         nn_sig_motifs_dir)
     
@@ -260,6 +266,144 @@ def runall(args, prefix):
             homer_pvals_file,
             ["NN", "Homer+ATAC"],
             baselines_dir, prefix)
+
+    # -------------------------------------------
+    # ANALYSIS - predicting enhancers as defined by chromatin state
+    # -------------------------------------------
+
+    evals_dir = ""
+
     
+
+    quit()
+
+
+        
+    # -------------------------------------------
+    # ANALYSIS - predicting TF KD/KO gene sets from learning results
+    # -------------------------------------------
+    tf_kd_dir = "{}/tfs".format(results_dir)
+    print tf_kd_dir
+    if not os.path.isdir(tf_kd_dir):
+        os.system("mkdir -p {}".format(tf_kd_dir))
+
+    # motif inputs
+    motifs = [
+        ("TP53", 6, "/mnt/lab_data3/dskim89/labmembers/margaret/TP63_GSE33495_dex_results.csv"),
+        ("TP53", 6, "/mnt/lab_data3/dskim89/labmembers/margaret/TP63_GSE67382_dex_results.csv"),
+        ("KLF12", 6, "/mnt/lab_data3/dskim89/labmembers/margaret/KLF4_GSE32685_dex_results.csv"),
+        #("KLF12", 6, "/mnt/lab_data3/dskim89/labmembers/margaret/KLF4_GSE111786_dex_results.csv"),
+        #("KLF12", 6, "/mnt/lab_data3/dskim89/labmembers/margaret/KLF4_GSE140992_dex_results.csv"),
+        ("TFAP2A", 6, "/mnt/lab_data3/dskim89/labmembers/margaret/ZNF750_GSE32685_dex_results.csv"),
+        ("MAFB", 9, "/mnt/lab_data3/dskim89/labmembers/margaret/MAF_GSE52651_dex_results.csv"),
+        #("FOXA1", 0, "/mnt/lab_data3/dskim89/labmembers/margaret/FOXC1_D0_GSE76647_dex_results.csv"),
+        ("FOXA1", 9, "/mnt/lab_data3/dskim89/labmembers/margaret/FOXC1_D5_GSE76647_dex_results.csv")
+    ]
+
+    if False:
+        # ATAC traj files
+        atac_clusters_file = args.outputs["results"]["atac"]["timeseries"]["dp_gp"][
+            "clusters.reproducible.hard.reordered.list"]
+        atac_mat_file = args.outputs["data"]["atac.counts.pooled.rlog.dynamic.traj.mat"]
+        atac_mat = pd.read_csv(atac_mat_file, sep="\t", index_col=0)
+        atac_mat = atac_mat.drop("d05", axis=1)
+        
+        # RNA traj files
+        rna_clusters_file = args.outputs["results"]["rna"]["timeseries"]["dp_gp"][
+            "clusters.reproducible.hard.reordered.list"]
+        rna_mat_file = args.outputs["data"][
+            "rna.counts.pc.expressed.timeseries_adj.pooled.rlog.dynamic.traj.mat"]
+        rna_mat = pd.read_csv(rna_mat_file, sep="\t", index_col=0)
+    
+    # linking file
+    links_dir = "{}/linking/proximity".format(args.outputs["results"]["dir"])
+    #links_dir = "{}/linking/hichip".format(args.outputs["results"]["dir"])
+    interactions_file = "{}/ggr.linking.ALL.overlap.interactions.txt.gz".format(links_dir)
+
+    # background atac file
+    atac_background_file = args.outputs["data"]["atac.master.bed"]
+    
+    # nn files
+    #nn_motif_files = glob.glob(
+    #    "{}/motifs.input_x_grad.lite/ggr.scanmotifs.h5".format(NN_DIR))
+    nn_motif_files = [
+        "/mnt/lab_data3/dskim89/ggr/nn/2020-01-13/scanmotifs/motifs.background.lite/ggr.scanmotifs.h5"
+    ]
+    
+    #if True:
+    #    nn_motif_files = glob.glob(
+    #        "{}/motifs.input_x_grad.mid/ggr.scanmotifs.h5".format(NN_DIR))
+
+    
+    # run for each motif-timepoint
+    for motif_name, timepoint_idx, diff_expr_file in motifs:
+        print ">>", motif_name
+
+        # first run with motif hits
+        
+        # get bed file of regions
+        bed_file = "{}/{}-{}.bed.gz".format(tf_kd_dir, motif_name, timepoint_idx)
+        #if not os.path.isfile(bed_file):
+        if True:
+            get_motif_region_set(
+                nn_motif_files,
+                motif_name,
+                timepoint_idx,
+                bed_file)
+            
+        # link to nearby genes
+        # TODO how are we up/downweighting things?
+        genes_file = "{}.genes.txt.gz".format(bed_file.split(".bed")[0])
+        #if not os.path.isfile(genes_file):
+        if True:
+            regions_to_genes(
+                bed_file,
+                interactions_file,
+                args.outputs["annotations"]["tss.pc.bed"],
+                genes_file,
+                filter_by_score=0.00)
+                #filter_by_score=0.5) # proximity corr thresh
+        
+        # compare to differential dataset
+        if True:
+            compare_nn_gene_set_to_diff_expr(
+                genes_file,
+                diff_expr_file,
+                convert_table=args.outputs["annotations"]["geneids.mappings.mat"])
+
+
+        # then run with NN-active motifs
+        bed_file = "{}/{}-{}.bed.gz".format(tf_kd_dir, motif_name, timepoint_idx)
+        #if not os.path.isfile(bed_file):
+        if True:
+            get_motif_region_set(
+                nn_motif_files,
+                motif_name,
+                timepoint_idx,
+                bed_file,
+                motif_key="sequence.active.pwm-scores.thresh.sum")
+            
+        # link to nearby genes
+        # TODO how are we up/downweighting things?
+        genes_file = "{}.genes.txt.gz".format(bed_file.split(".bed")[0])
+        #if not os.path.isfile(genes_file):
+        if True:
+            regions_to_genes(
+                bed_file,
+                interactions_file,
+                args.outputs["annotations"]["tss.pc.bed"],
+                genes_file,
+                filter_by_score=0.00)
+                #filter_by_score=0.5) # proximity corr thresh
+        
+        # compare to differential dataset
+        if True:
+            compare_nn_gene_set_to_diff_expr(
+                genes_file,
+                diff_expr_file,
+                convert_table=args.outputs["annotations"]["geneids.mappings.mat"])
+        
+        
+    quit()
                     
     return args
