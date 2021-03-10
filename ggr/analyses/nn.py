@@ -7,6 +7,11 @@ import h5py
 import numpy as np
 import pandas as pd
 
+from sklearn import linear_model
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import auc
+from sklearn.metrics import precision_recall_curve
+
 def get_motif_region_set(
         nn_files,
         motif_name,
@@ -160,4 +165,98 @@ def compare_nn_gene_set_to_diff_expr(genes_file, diff_file, convert_table=None):
     #print genes_a.shape, genes_b.shape, len(set(genes_a).intersection(set(genes_b)))
 
     
+    return
+
+
+
+def evaluate_enhancer_prediction(eval_files, prefix):
+    """defining enhancer as a chrom state definition, figure out
+    genome-wide enhancer prediction performance and plot out
+    """
+    for eval_file_i in range(len(eval_files)):
+        eval_file = eval_files[eval_file_i]
+        print eval_file
+        
+        with h5py.File(eval_file, "r") as hf:
+
+            # make enhancer label - strong enhancer state of ATAC + H3K27ac + H3K4me1
+            peaks_ATAC = np.any(hf["ATAC_LABELS"][:] != 0, axis=1).astype(int)
+            peaks_H3K27ac = np.any(hf["H3K27ac_LABELS"][:] != 0, axis=1).astype(int)
+            peaks_H3K4me1 = np.any(hf["H3K4me1_LABELS"][:] != 0, axis=1).astype(int)
+            #y = np.all(
+            #    [peaks_ATAC, peaks_H3K27ac, peaks_H3K4me1], axis=0)
+            y = np.any(
+                [peaks_H3K27ac, peaks_H3K4me1], axis=0)
+            #print y.shape
+            #print "positives:", np.sum(y)
+            
+            # baseline - just using ATAC
+            signals_ATAC = hf["ATAC_SIGNALS.NORM"][:]
+            #signals_H3K27ac = hf["H3K27ac_SIGNALS.NORM"][:]
+            #signals_H3K4me1 = hf["H3K4me1_SIGNALS.NORM"][:]
+            #X_baseline = np.concatenate([signals_ATAC, signals_H3K27ac, signals_H3K4me1], axis=1)
+            X_baseline = signals_ATAC
+            
+            # get features
+            X = hf["final_hidden"][:]
+
+        # train test splits
+        X_train_baseline, X_test_baseline, y_train, y_test = train_test_split(
+            X_baseline, y, test_size=0.20, random_state=42)
+        #print X_train_baseline.shape, y_train.shape, np.sum(y_train)
+        #print X_test_baseline.shape, y_test.shape, np.sum(y_test)
+
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=0.20, random_state=42)
+        #print X_train.shape, y_train.shape, np.sum(y_train)
+        #print X_test.shape, y_test.shape, np.sum(y_test)
+
+        # baseline
+        clf_baseline = linear_model.LogisticRegression()
+        clf_baseline.fit(X_train_baseline, y_train)
+        y_pred_baseline = clf_baseline.predict_proba(X_test_baseline)[:,1]
+        
+        pr_curve = precision_recall_curve(y_test, y_pred_baseline)
+        precision, recall = pr_curve[:2]
+        print auc(recall, precision)
+        
+        # hidden layer
+        clf = linear_model.LogisticRegression()
+        clf.fit(X_train, y_train)
+        y_pred = clf.predict_proba(X_test)[:,1]
+
+        pr_curve = precision_recall_curve(y_test, y_pred)
+        precision, recall = pr_curve[:2]
+        print auc(recall, precision)
+
+        results = pd.DataFrame({
+            "precision": precision,
+            "recall": recall})
+        results["fold"] = eval_file_i
+
+        # subsample the PR curve
+        if results.shape[0] > 100:
+            step_size = int(results.shape[0] / 100.)
+            keep_indices = np.arange(0, results.shape[0], step_size)
+            keep_indices = np.append(keep_indices, results.shape[0]-1)
+            results = results.iloc[keep_indices]
+            results = results.append(
+                pd.DataFrame(
+                    [[0, 1, eval_file_i]],
+                    columns=["precision", "recall", "fold"]))
+
+        if eval_file_i == 0:
+            all_results = results
+        else:
+            all_results = pd.concat([all_results, results], axis=0)
+            
+    # save out results
+    out_data_file = "{}.pr_curve_data.mat.txt.gz".format(prefix)
+    all_results.to_csv(out_data_file, sep="\t", compression="gzip", header=True, index=False)
+
+    # plot with R
+    r_cmd = "~/git/ggr-project/R/plot.pr_curves.R {} {}".format(out_data_file, prefix)
+    print r_cmd
+    os.system(r_cmd)
+        
     return

@@ -10,6 +10,7 @@ from ggr.analyses.baselines import compare_tf_motif_corrs
 from ggr.analyses.linking import regions_to_genes
 from ggr.analyses.nn import get_motif_region_set
 from ggr.analyses.nn import compare_nn_gene_set_to_diff_expr
+from ggr.analyses.nn import evaluate_enhancer_prediction
 from ggr.analyses.tronn_scripts import tronn_intersect_with_expression_cmd
 
 from ggr.util.utils import run_shell_cmd
@@ -200,9 +201,22 @@ def runall(args, prefix):
 
     # NN results - pvals file
     nn_sig_motifs_dir = "{}/motifs.sig".format(NN_DIR)
-    nn_pvals_file = "{}/motifs.adjust.diff.rna_filt.dmim/pvals.rna_filt.corr_filt.h5".format(
+    nn_pvals_file = "{}/motifs.adjust.diff/pvals.h5".format(
         nn_sig_motifs_dir)
     
+    # for first venn diagram, compare full homer results (not expr filt) with NN results
+    plot_file = "{}/{}.homer_unfilt.compare_sig.plot.pdf".format(baselines_dir, prefix)
+    if not os.path.isfile(plot_file):
+        compare_sig_motifs(
+            nn_pvals_file,
+            args.outputs["results"]["atac"]["homer.sig_motifs.pvals"],
+            ["NN", "Homer+ATAC"],
+            baselines_dir, "{}.homer_unfilt".format(prefix))
+
+    # switch to expression filt pvals file
+    nn_pvals_file = "{}/motifs.adjust.diff.rna_filt.dmim/pvals.rna_filt.corr_filt.h5".format(
+        nn_sig_motifs_dir)
+        
     # 1) for venn diagram overlap, use the intersect file that matches correlation
     out_dir = "{}/corr_75".format(baselines_dir)
     if not os.path.isdir(out_dir):
@@ -229,7 +243,7 @@ def runall(args, prefix):
         
     # 2) for the correlation plot, use the intersect file that shows as many correlation values for homer+ATAC
     # TODO also for nn
-    out_dir = "{}/corr_00.nn".format(results_dir)
+    out_dir = "{}/corr_00.nn".format(baselines_dir)
     if not os.path.isdir(out_dir):
         os.system("mkdir -p {}".format(out_dir))
     nn_pvals_file = "{}/motifs.rna_filt/pvals.rna_filt.corr_filt.h5".format(
@@ -244,7 +258,7 @@ def runall(args, prefix):
             out_dir,
             min_cor=0)
     
-    out_dir = "{}/corr_00".format(results_dir)
+    out_dir = "{}/corr_00".format(baselines_dir)
     if not os.path.isdir(out_dir):
         os.system("mkdir -p {}".format(out_dir))
     homer_pvals_file = "{}/motifs.rna_filt/pvals.rna_filt.corr_filt.h5".format(
@@ -267,13 +281,24 @@ def runall(args, prefix):
             ["NN", "Homer+ATAC"],
             baselines_dir, prefix)
 
+    quit()
+
     # -------------------------------------------
     # ANALYSIS - predicting enhancers as defined by chromatin state
     # -------------------------------------------
-
-    evals_dir = ""
-
+    enhancer_dir = "{}/enh_state".format(results_dir)
+    if not os.path.isdir(enhancer_dir):
+        os.system("mkdir -p {}".format(enhancer_dir))
     
+    evals_dir = "/mnt/lab_data/kundaje/users/dskim89/ggr/nn/evals.2018-12-03"
+    model_prefix = "ggr.basset.clf.pretrained.folds.testfold-"
+    eval_files = sorted(glob.glob(
+        "{}/{}*/ggr.eval.h5".format(evals_dir, model_prefix)))
+
+    plot_prefix = "{}/enh_state".format(enhancer_dir)
+    if not os.path.isfile("{}.pdf".format(plot_prefix)):
+        evaluate_enhancer_prediction(eval_files, plot_prefix)
+
 
     quit()
 
