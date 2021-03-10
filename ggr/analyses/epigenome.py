@@ -510,3 +510,16 @@ def plot_signal_aggregation_plots(
     os.system(plot_cmd)
 
     return
+
+
+def get_distances_to_nearest_region(anchor_bed, other_bed, out_file):
+    """compard to anchor_bed, how far away is the closest region
+    in other_bed
+    """
+    # bedtools
+    bedtools_cmd = "bedtools closest -d -t first -a {} -b {} | gzip -c > {}".format(
+        anchor_bed, other_bed, out_file)
+    print bedtools_cmd
+    os.system(bedtools_cmd)
+    
+    return

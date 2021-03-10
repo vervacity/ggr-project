@@ -13,6 +13,7 @@ from ggr.util.utils import run_shell_cmd
 
 from ggr.analyses.bioinformatics import run_gprofiler
 from ggr.analyses.bioinformatics import run_homer
+from ggr.analyses.epigenome import get_distances_to_nearest_region
 from ggr.analyses.linking import regions_to_genes_w_correlation_filtering
 
 
@@ -244,5 +245,52 @@ def runall(args, prefix):
                 args.outputs["data"]["rna.counts.pc.expressed.mat"],
                 region_dir, ordered=True, header=True)
 
+    # ---------------------------
+    # ANALYSIS: TSS-centric viewpoint
+    # ---------------------------
+    work_dir = "{}/tss-centric".format(results_dir)
+    if not os.path.isdir(work_dir):
+        run_shell_cmd("mkdir -p {}".format(work_dir))
+    out_prefix = "{}/{}".format(work_dir, prefix)
+    
+    # first, look at distances to TSSs from epigenetic feature
+    tss_file = args.outputs["annotations"]["tss.pc.bed"]
 
+    # get nearest TSS and distances for ATAC
+    atac_file = args.outputs["data"]["atac.master.bed"]
+    atac_distances_file = "{}.distance_to_tss.ATAC.txt.gz".format(out_prefix)
+    if not os.path.isfile(atac_distances_file):
+        get_distances_to_nearest_region(
+            atac_file, tss_file, atac_distances_file)
+
+    # nearest for histones
+    histones = ["H3K27ac", "H3K4me1", "H3K27me3"]    
+    for histone in histones:
+        # get nearest TSS and distances
+        histone_file = args.outputs["data"]["{}.master.bed".format(histone)]
+        histone_distances_file = "{}.distance_to_tss.{}.txt.gz".format(out_prefix, histone)
+        if not os.path.isfile(histone_distances_file):
+            get_distances_to_nearest_region(
+                histone_file, tss_file, histone_distances_file)
+
+    # plot all together
+    distance_files = sorted(glob.glob("{}*distance_to_tss*txt.gz".format(out_prefix)))
+    plot_file = "{}.pdf".format(out_prefix)
+    if not os.path.isfile(plot_file):
+        # notes: this plot shows pretty similar splits for distance for all histone
+        # marks
+        r_cmd = "~/git/ggr-project/R/plot.distance_to_tss.R {} {}".format(
+            out_prefix, " ".join(distance_files))
+        print r_cmd
+        os.system(r_cmd)
+
+    # make splits of dynamic gene TSS, stable gene TSS, not expressed TSS
+    
+    
+
+        
+    print "here"
+    quit()
+
+            
     return args
