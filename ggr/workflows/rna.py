@@ -397,7 +397,55 @@ def runall(args, prefix):
             
             # delete gene list
             os.system("rm {}".format(gene_list))
+
+    # make a TSS file for dynamic genes
+    dynamic_tss_file = "{}/ggr.rna.tss.dynamic.bed.gz".format(
+    args.outputs["data"]["dir"])
+    args.outputs["data"]["tss.dynamic"] = dynamic_tss_file
+    if not os.path.isfile(dynamic_tss_file):
+        convert_gene_list_to_tss(
+            args.outputs["data"][
+                "rna.counts.pc.expressed.timeseries_adj.pooled.rlog.dynamic.traj.mat"],
+            tss_file, dynamic_tss_file)
+
+    # make a TSS file for stably expressed genes
+    stable_tss_file = "{}/ggr.rna.tss.stable.bed.gz".format(
+        args.outputs["data"]["dir"])
+    args.outputs["data"]["tss.stable"] = stable_tss_file
+    if not os.path.isfile(stable_tss_file):
+
+        # get gene list
+        gene_list = "{}/{}.stable.genes.tmp.txt.gz".format(
+            data_dir, prefix)
+        gene_mat = pd.read_csv(
+            args.outputs["data"]["rna.counts.pc.expressed.mat"], sep="\t", index_col=0)
+        dynamic_genes = pd.read_csv(dynamic_tss_file, sep="\t", header=None)
+        gene_mat = gene_mat[~gene_mat.index.isin(dynamic_genes[3])].reset_index()
+        gene_mat["gene_id"].to_csv(
+            gene_list, header=False, index=False, compression="gzip")
+
+        # convert gene list to TSS
+        convert_gene_list_to_tss(
+            gene_list,
+            args.outputs["annotations"]["tss.pc.bed"],
+            stable_tss_file)
         
+        # delete gene list
+        os.system("rm {}".format(gene_list))
+
+    # make a TSS file for non-expressed genes
+    non_expr_tss_file = "{}/ggr.rna.tss.non_expr.bed.gz".format(
+        args.outputs["data"]["dir"])
+    args.outputs["data"]["tss.non_expr"] = non_expr_tss_file
+    if not os.path.isfile(non_expr_tss_file):
+        genes_all = pd.read_csv(
+            args.outputs["annotations"]["tss.pc.bed"], sep="\t", header=None)
+        expr_genes = pd.read_csv(
+            args.outputs["data"]["rna.counts.pc.expressed.mat"], sep="\t", index_col=0)
+        non_expr_genes = genes_all[~genes_all[3].isin(expr_genes.index)]
+        non_expr_genes.to_csv(
+            non_expr_tss_file, header=False, index=False, sep="\t", compression="gzip")
+            
     # ----------------------------------------------------
     # ANALYSIS - run GSEA on timepoint comparisons to get
     # enrichments across time

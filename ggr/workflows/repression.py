@@ -13,8 +13,90 @@ from ggr.util.utils import run_shell_cmd
 
 from ggr.analyses.bioinformatics import run_gprofiler
 from ggr.analyses.bioinformatics import run_homer
+from ggr.analyses.bioinformatics import make_deeptools_heatmap
+from ggr.analyses.bioinformatics import run_bioinformatics_on_bed
 from ggr.analyses.epigenome import get_distances_to_nearest_region
+from ggr.analyses.epigenome import get_promoter_atac
 from ggr.analyses.linking import regions_to_genes_w_correlation_filtering
+
+
+def _plot_profile_heatmaps_workflow(args, tss_file, plot_prefix):
+    """plot histone heatmaps for a specific set of tss regions (ordered
+    """
+    # make a subsample file if necessary
+    tss_data = pd.read_csv(tss_file, sep="\t")
+    if tss_data.shape[0] > 1000:
+        step_size = int(tss_data.shape[0] / 1000)
+        keep_indices = np.arange(0, tss_data.shape[0], step=step_size)
+        print tss_data.shape
+        tss_data = tss_data.iloc[keep_indices]
+        print tss_data.shape
+        subsample_file = "{}.subsample.tmp.bed.gz".format(plot_prefix)
+        tss_data.to_csv(subsample_file, sep="\t",
+                        header=False, index=False, compression="gzip")
+        tss_file = subsample_file
+
+    # TODO plot ATAC-seq
+    if not os.path.isfile("{}.heatmap.pdf".format(atac_prefix)):
+        r_cmd = "~/git/ggr-project/R/plot.tss.timeseries_heatmap.R {} {}".format(
+            matched_atac_mat_file, atac_prefix)
+        print r_cmd
+        #os.system(r_cmd)
+        
+
+    quit()
+    
+    # TODO plot the RNA-seq also
+    
+    
+    
+    # plot each histone mark
+    histones = ["H3K27ac", "H3K4me1", "H3K27me3"]    
+    histone_colors = args.inputs["chipseq"][args.cluster]["histones"]["ordered_deeptools_colors"]
+    histone_r_colors = args.inputs["chipseq"][args.cluster]["histones"]["ordered_r_colors"]
+    
+    for histone_idx in range(len(histones)):
+        histone = histones[histone_idx]
+        histone_color = histone_colors[histone_idx]
+        histone_r_color = histone_r_colors[histone_idx]
+        histone_bigwigs = sorted(
+            glob.glob("{}/{}".format(
+                args.inputs["chipseq"][args.cluster]["data_dir"],
+                args.inputs["chipseq"][args.cluster]["histones"][histone]["pooled_bigwig_glob"])))
+
+        out_prefix = "{}.{}_overlap".format(plot_prefix, histone)
+        plot_file = "{}.heatmap.profile.pdf".format(out_prefix)
+    
+        if not os.path.isfile(plot_file):
+            make_deeptools_heatmap(
+                tss_file,
+                histone_bigwigs,
+                out_prefix,
+                sort=False,
+                referencepoint="center",
+                color=histone_color)
+
+        # TODO consider if row seps necessary
+
+        # TODO make profile heatmap in R, with strand oriented TSS
+        row_sep_file = "{}.row_seps.txt".format(plot_prefix)
+        out_mat_file = "{}.point.mat.gz".format(out_prefix)
+        out_r_file = "{}.replot.pdf".format(plot_file.split(".pdf")[0])
+        if not os.path.isfile(out_r_file):
+            replot = (
+                "~/git/ggr-project/R/plot.profile_heatmaps.stranded.R {} {} {} {} {} "
+                "1,100 101,200 201,300").format(
+                    out_mat_file,
+                    histone, 
+                    row_sep_file,
+                    out_r_file,
+                    histone_r_color)
+            print replot
+            run_shell_cmd(replot)
+        
+        
+    return args
+
 
 
 
@@ -284,13 +366,114 @@ def runall(args, prefix):
         print r_cmd
         os.system(r_cmd)
 
-    # make splits of dynamic gene TSS, stable gene TSS, not expressed TSS
-    
-    
+    # dynamic genes - how many of them have H3K27me3 at the promoter?
+    dynamic_tss_w_H3K27me3 = "{}.tss.dynamic.H3K27me3_present.bed.gz".format(out_prefix)
+    #if not os.path.isfile(dynamic_tss_w_H3K27me3):
+    if True:
+        # slopbed on TSS file only downstream direction to capture downstream H3K27me3 signal
+        downstream_bp_ext = 1000
+        bedtools_cmd = (
+            "bedtools slop -s -i {0} -g {1} -l 0 -r {2} | " # increase DOWNSTREAM tss region
+            "bedtools intersect -u -a {0} -b {3} | " # intersect
+            "awk -F '\t' '{{ print $1\"\t\"$2\"\t\"$2+1\"\t\"$4\"\t\"$5\"\t\"$6 }}' | " # return to point
+            "gzip -c > {4}").format(
+                args.outputs["data"]["tss.dynamic"],
+                args.inputs["annot"][args.cluster]["chromsizes"],
+                downstream_bp_ext,
+                args.outputs["data"]["H3K27me3.master.bed"],
+                dynamic_tss_w_H3K27me3)
+        print bedtools_cmd
+        os.system(bedtools_cmd)
+
+        # now overlap with ATAC data so that we can have promoter info
+        # TODO this fn should also produce the reordered tss file
+        get_promoter_atac(
+            dynamic_tss_w_H3K27me3,
+            args.outputs["data"]["atac.master.bed"],
+            args.outputs["data"]["atac.counts.pooled.rlog.mat"],
+            dynamic_tss_w_H3K27me3.split(".bed")[0],
+            cluster_mat_file=args.outputs["results"]["rna"]["timeseries"]["dp_gp"][
+                "clusters.reproducible.hard.reordered.list"])
+
+        quit()
+
+        # debug: read in hgnc mapping
+        hgnc_file = "{}.hgnc_ids.mat.txt.gz".format(dynamic_tss_w_H3K27me3.split(".bed")[0])
+        mappings = pd.read_csv(args.outputs["annotations"]["geneids.mappings.mat"], sep="\t")
+        tss_data = tss_data.merge(mappings, left_on=3, right_on="ensembl_gene_id")
+        tss_data.to_csv(hgnc_file, sep="\t", compression="gzip", header=False, index=False)
 
         
+        # now done in the above code
+        if False:
+        
+            # organize by clusters
+            dynamic_clusters_file = args.outputs["results"]["rna"]["timeseries"]["dp_gp"][
+                "clusters.reproducible.hard.reordered.list"]
+            cluster_ids = pd.read_csv(dynamic_clusters_file, sep="\t")
+            tss_data = pd.read_csv(dynamic_tss_w_H3K27me3, sep="\t", header=None)
+            tss_data = tss_data.merge(cluster_ids, how="left", left_on=3, right_on="id")
+            tss_data = tss_data.sort_values("cluster")
+            
+            # save out reordered
+            # NOTE: this adjusts orig TSS file
+            tss_data = tss_data[range(6)]
+            tss_data.to_csv(dynamic_tss_w_H3K27me3,
+                            sep="\t", header=False, index=False, compression="gzip")
+
+
+    # plot data
+    args = _plot_profile_heatmaps_workflow(
+        args, dynamic_tss_w_H3K27me3, "{}.dynamic_genes".format(out_prefix))
+
+    quit()
+        
+    # functional enrichments
+    dynamic_genes_w_H3K27me3 = "{}.genes.dynamic.H3K27me3_at_tss.bed.gz".format(out_prefix)
+    if not os.path.isfile(dynamic_genes_w_H3K27me3):
+        tss_data = pd.read_csv(dynamic_tss_w_H3K27me3, sep="\t", header=None)
+        tss_data.to_csv(
+            dynamic_genes_w_H3K27me3, columns=[3], header=False, index=False, compression="gzip")
+    gprofiler_results = "{}.go_gprofiler.txt".format(dynamic_genes_w_H3K27me3)
+    if not os.path.isfile(gprofiler_results):
+        run_gprofiler(
+            dynamic_genes_w_H3K27me3,
+            args.outputs["data"]["rna.counts.pc.expressed.mat"],
+            work_dir, ordered=False, header=False)
+
+    
     print "here"
     quit()
+    
+    
+    # stable genes, subset to those with H3K27me3 (should be none??)
+    stable_tss_w_H3K27me3 = "{}.tss.stable.H3K27me3_present.bed.gz".format(out_prefix)
+    if not os.path.isfile(stable_tss_w_H3K27me3):
+        bedtools_cmd = "bedtools intersect -u -a {} -b {} | gzip -c > {}".format(
+            args.outputs["data"]["tss.stable"],
+            args.outputs["data"]["H3K27me3.master.bed"],
+            stable_tss_w_H3K27me3)
+        print bedtools_cmd
+        os.system(bedtools_cmd)
+        
+    args = _plot_profile_heatmaps_workflow(args, stable_tss_w_H3K27me3, "{}".format(out_prefix))
+
+    # for non-expressed, figure out how many have H3K27me3 repression on top
+    non_expr_tss_w_H3K27me3 = "{}.tss.non_expr.H3K27me3_present.bed.gz".format(out_prefix)
+    if not os.path.isfile(non_expr_tss_w_H3K27me3):
+        bedtools_cmd = "bedtools intersect -u -a {} -b {} | gzip -c > {}".format(
+            args.outputs["data"]["tss.non_expr"],
+            args.outputs["data"]["H3K27me3.master.bed"],
+            non_expr_tss_w_H3K27me3)
+        print bedtools_cmd
+        os.system(bedtools_cmd)
+
+    args = _plot_profile_heatmaps_workflow(args, non_expr_tss_w_H3K27me3, "{}".format(out_prefix))
+
+
+    quit()
+
+    # to consider: analysis on looping across H3K27me3 domains?
 
             
     return args

@@ -1,6 +1,7 @@
 # analyses related to epigenomic datasets
 
 import os
+import re
 import gzip
 
 import numpy as np
@@ -521,5 +522,68 @@ def get_distances_to_nearest_region(anchor_bed, other_bed, out_file):
         anchor_bed, other_bed, out_file)
     print bedtools_cmd
     os.system(bedtools_cmd)
+    
+    return
+
+
+def get_promoter_atac(
+        tss_file, atac_bed_file, atac_mat_file, out_prefix,
+        cluster_mat_file=None):
+    """given tss set, get promoter ATAC peaks and output matrix and bed file
+    """
+    # overlap the files
+    mapped_id_file = "{}.tss_to_atac_region.mat.txt.gz".format(out_prefix)
+    intersect_cmd = (
+        "bedtools intersect -wao -a {} -b {} | "
+        "awk -F '\t' '{{ print $1\"\t\"$2\"\t\"$3\"\t\"$4\"\t\"$5\"\t\"$6\"\t\"$7\":\"$8\"-\"$9 }}' | "
+        "gzip -c > {}").format(
+            tss_file, atac_bed_file, mapped_id_file)
+    print intersect_cmd
+    os.system(intersect_cmd)
+
+    # now grab that subset from atac matrix
+    mapping = pd.read_csv(
+        mapped_id_file, sep="\t", header=None,
+        names=["chrom", "start", "stop", "gene_id", "score", "strand", "atac_region_id"])
+    atac_mat = pd.read_csv(atac_mat_file, sep="\t")
+    promoter_atac = mapping.merge(
+        atac_mat, how="left", left_on="atac_region_id", right_index=True)
+
+    # clean up
+    promoter_atac = promoter_atac.fillna(0)
+    
+    # if cluster file given, sort on clusters
+    if cluster_mat_file is not None:
+        cluster_mat = pd.read_csv(cluster_mat_file, sep="\t")
+        promoter_atac = promoter_atac.merge(
+            cluster_mat, how="left", left_on="gene_id", right_on="id")
+        promoter_atac = promoter_atac.drop("id", axis=1)
+        headers = promoter_atac.columns[:-1].values.tolist()
+        headers.insert(6, "cluster")
+        promoter_atac = promoter_atac[headers]
+
+        # sort by cluster
+        signal_pattern = re.compile("^d")
+        signal_headers = [header for header in headers if signal_pattern.search(header)]
+        promoter_atac["atac_not_present"] = np.any(
+            promoter_atac[signal_headers].values == 0, axis=1).astype(int)
+        promoter_atac = promoter_atac.sort_values(["cluster", "atac_not_present"], ascending=True)
+        promoter_atac = promoter_atac.drop("atac_not_present", axis=1)
+        print promoter_atac
+
+        quit()
+        
+    # save out
+    out_mat_file = "{}.tss_to_atac_signal.mat.txt.gz".format(out_prefix)
+    promoter_atac.to_csv(out_mat_file, sep="\t", compression="gzip", header=True, index=False)
+
+    # and also save out new sorted tss file
+    out_tss_file = "{}.atac_sorted.bed.gz".format(out_prefix)
+    promoter_atac.to_csv(
+        out_tss_file,
+        columns=["chrom", "start", "stop", "gene_id", "score", "strand"],
+        sep="\t", compression="gzip", header=False, index=False)
+
+    # should I save out rowseps?
     
     return
