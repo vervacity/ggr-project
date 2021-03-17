@@ -527,11 +527,16 @@ def get_distances_to_nearest_region(anchor_bed, other_bed, out_file):
 
 
 def get_promoter_atac(
-        tss_file, atac_bed_file, atac_mat_file, out_prefix,
-        cluster_mat_file=None):
+        tss_file,
+        atac_bed_file,
+        out_prefix,
+        rna_mat_file=None,
+        rna_cluster_file=None,
+        atac_mat_file=None,
+        atac_cluster_file=None):
     """given tss set, get promoter ATAC peaks and output matrix and bed file
     """
-    # overlap the files
+    # overlap tss with atac regions
     mapped_id_file = "{}.tss_to_atac_region.mat.txt.gz".format(out_prefix)
     intersect_cmd = (
         "bedtools intersect -wao -a {} -b {} | "
@@ -541,49 +546,92 @@ def get_promoter_atac(
     print intersect_cmd
     os.system(intersect_cmd)
 
-    # now grab that subset from atac matrix
-    mapping = pd.read_csv(
+    # read in mapping
+    promoter_data = pd.read_csv(
         mapped_id_file, sep="\t", header=None,
         names=["chrom", "start", "stop", "gene_id", "score", "strand", "atac_region_id"])
-    atac_mat = pd.read_csv(atac_mat_file, sep="\t")
-    promoter_atac = mapping.merge(
-        atac_mat, how="left", left_on="atac_region_id", right_index=True)
 
-    # clean up
-    promoter_atac = promoter_atac.fillna(0)
+    # keep track of which headers to sort on at end
+    sort_headers = []
     
-    # if cluster file given, sort on clusters
-    if cluster_mat_file is not None:
-        cluster_mat = pd.read_csv(cluster_mat_file, sep="\t")
-        promoter_atac = promoter_atac.merge(
+    # if rna cluster file given, read in and merge
+    if rna_cluster_file is not None:
+        cluster_mat = pd.read_csv(rna_cluster_file, sep="\t")
+        promoter_data = promoter_data.merge(
             cluster_mat, how="left", left_on="gene_id", right_on="id")
-        promoter_atac = promoter_atac.drop("id", axis=1)
-        headers = promoter_atac.columns[:-1].values.tolist()
-        headers.insert(6, "cluster")
-        promoter_atac = promoter_atac[headers]
+        promoter_data = promoter_data.drop("id", axis=1)
+        promoter_data = promoter_data.rename(columns={"cluster": "rna.cluster"})
+        promoter_data = promoter_data.fillna(12)
+        sort_headers.append("rna.cluster")
 
-        # sort by cluster
+    # if atac mat file given, read in and merge
+    if atac_mat_file is not None:
+        atac_mat = pd.read_csv(atac_mat_file, sep="\t")
+        promoter_data = promoter_data.merge(
+            atac_mat, how="left", left_on="atac_region_id", right_index=True)
+        promoter_data = promoter_data.fillna(0)
+
+        # set up a column to sort by atac present or not
         signal_pattern = re.compile("^d")
-        signal_headers = [header for header in headers if signal_pattern.search(header)]
-        promoter_atac["atac_not_present"] = np.any(
-            promoter_atac[signal_headers].values == 0, axis=1).astype(int)
-        promoter_atac = promoter_atac.sort_values(["cluster", "atac_not_present"], ascending=True)
-        promoter_atac = promoter_atac.drop("atac_not_present", axis=1)
-        print promoter_atac
+        signal_headers = [header for header in promoter_data.columns if signal_pattern.search(header)]
+        promoter_data["atac_not_present"] = np.any(
+            promoter_data[signal_headers].values == 0, axis=1).astype(int)
+        sort_headers.append("atac_not_present")
 
-        quit()
+        # also adjust signal headers
+        #new_signal_headers = ["atac.{}".format(header) for header in signal_headers]
+        #promoter_data = promoter_data.rename(
+        #    columns=dict(zip(signal_headers, new_signal_headers)))
         
-    # save out
-    out_mat_file = "{}.tss_to_atac_signal.mat.txt.gz".format(out_prefix)
-    promoter_atac.to_csv(out_mat_file, sep="\t", compression="gzip", header=True, index=False)
+    # if atac cluster file given, read in and merge
+    if atac_cluster_file is not None:
+        cluster_mat = pd.read_csv(atac_cluster_file, sep="\t")
+        promoter_data = promoter_data.merge(
+            cluster_mat, how="left", left_on="atac_region_id", right_on="id")
+        promoter_data = promoter_data.drop("id", axis=1)
+        promoter_data = promoter_data.rename(columns={"cluster": "atac.cluster"})
+        promoter_data = promoter_data.fillna(16)
+        sort_headers.append("atac.cluster")
+
+    # sort based on sort headers
+    promoter_data = promoter_data.sort_values(sort_headers, ascending=True)
+        
+    # save out all this data
+    out_mat_file = "{}.promoter_data.mat.txt.gz".format(out_prefix)
+    promoter_data.to_csv(out_mat_file, sep="\t", compression="gzip", header=True, index=False)
 
     # and also save out new sorted tss file
-    out_tss_file = "{}.atac_sorted.bed.gz".format(out_prefix)
-    promoter_atac.to_csv(
+    out_tss_file = "{}.feature_sorted.bed.gz".format(out_prefix)
+    promoter_data.to_csv(
         out_tss_file,
         columns=["chrom", "start", "stop", "gene_id", "score", "strand"],
         sep="\t", compression="gzip", header=False, index=False)
 
-    # should I save out rowseps?
+    # if rna mat file given, remove atac data and merge in (helps downstream for easy plotting)
+    # and save
+    if rna_mat_file is not None:
+        signal_pattern = re.compile("^d")
+        signal_headers = [
+            header for header in promoter_data.columns if signal_pattern.search(header)]
+        rna_mat = pd.read_csv(rna_mat_file, sep="\t")
+        rna_data = promoter_data.drop(signal_headers, axis=1)
+        rna_data = rna_data.merge(
+            rna_mat, how="inner", left_on="gene_id", right_index=True)
+        out_rna_file = "{}.promoter_rna_data.mat.txt.gz".format(out_prefix)
+        rna_data.to_csv(out_rna_file, sep="\t", compression="gzip", header=True, index=False)
+
+    # save out rowseps for primary sort column
+    primary_sort_header = sort_headers[0]
+    row_seps = []
+    current_row_val = -1
+    for row_i in range(promoter_data.shape[0]):
+        new_row_val = promoter_data[primary_sort_header].iloc[row_i]
+        if new_row_val != current_row_val:
+            row_seps.append(row_i)
+            current_row_val = new_row_val
+    row_seps.append(row_i + 1)
+    row_seps_file = "{}.row_seps.txt.gz".format(out_prefix)
+    pd.DataFrame({"row_seps": row_seps}).to_csv(
+        row_seps_file, compression="gzip", header=False, index=False)
     
     return

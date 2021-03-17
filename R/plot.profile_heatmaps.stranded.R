@@ -30,8 +30,7 @@ mad_factor <- 200
 color_granularity <- 50
 
 # figure out row sep
-#rowsep <- read.table(row_sep_file, header=FALSE)$V1
-rowsep <- c(0, dim(data)[1])
+rowsep <- read.table(row_sep_file, header=FALSE)$V1
 
 # keep strands to reorient
 strands <- data$V6

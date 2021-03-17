@@ -36,19 +36,26 @@ def _plot_profile_heatmaps_workflow(args, tss_file, plot_prefix):
                         header=False, index=False, compression="gzip")
         tss_file = subsample_file
 
-    # TODO plot ATAC-seq
-    if not os.path.isfile("{}.heatmap.pdf".format(atac_prefix)):
-        r_cmd = "~/git/ggr-project/R/plot.tss.timeseries_heatmap.R {} {}".format(
-            matched_atac_mat_file, atac_prefix)
-        print r_cmd
-        #os.system(r_cmd)
+        # NOTE rowseps won't match if subsampling!!
+        print "NOTE rowseps not adjusted!!"
         
-
-    quit()
+    # plot ATAC-seq
+    if not os.path.isfile("{}.atac.heatmap.pdf".format(plot_prefix)):
+        r_cmd = "~/git/ggr-project/R/plot.tss.timeseries_heatmap.R {} {} {}.atac ATAC-seq".format(
+            "{}.promoter_data.mat.txt.gz".format(plot_prefix),
+            "{}.row_seps.txt.gz".format(plot_prefix),
+            plot_prefix)
+        print r_cmd
+        os.system(r_cmd)
     
-    # TODO plot the RNA-seq also
-    
-    
+    # plot RNA-seq
+    if not os.path.isfile("{}.rna.heatmap.pdf".format(plot_prefix)):
+        r_cmd = "~/git/ggr-project/R/plot.tss.timeseries_heatmap.R {} {} {}.rna PAS-seq".format(
+            "{}.promoter_rna_data.mat.txt.gz".format(plot_prefix),
+            "{}.row_seps.txt.gz".format(plot_prefix),
+            plot_prefix)
+        print r_cmd
+        os.system(r_cmd)
     
     # plot each histone mark
     histones = ["H3K27ac", "H3K4me1", "H3K27me3"]    
@@ -76,10 +83,8 @@ def _plot_profile_heatmaps_workflow(args, tss_file, plot_prefix):
                 referencepoint="center",
                 color=histone_color)
 
-        # TODO consider if row seps necessary
-
-        # TODO make profile heatmap in R, with strand oriented TSS
-        row_sep_file = "{}.row_seps.txt".format(plot_prefix)
+        # make profile heatmap in R, with strand oriented TSS
+        row_sep_file = "{}.row_seps.txt.gz".format(plot_prefix)
         out_mat_file = "{}.point.mat.gz".format(out_prefix)
         out_r_file = "{}.replot.pdf".format(plot_file.split(".pdf")[0])
         if not os.path.isfile(out_r_file):
@@ -367,10 +372,13 @@ def runall(args, prefix):
         os.system(r_cmd)
 
     # dynamic genes - how many of them have H3K27me3 at the promoter?
-    dynamic_tss_w_H3K27me3 = "{}.tss.dynamic.H3K27me3_present.bed.gz".format(out_prefix)
-    #if not os.path.isfile(dynamic_tss_w_H3K27me3):
+    dynamic_tss_w_H3K27me3_prefix = "{}.tss.dynamic.H3K27me3_present".format(out_prefix)
+    dynamic_tss_w_H3K27me3_sorted = "{}.feature_sorted.bed.gz".format(
+        dynamic_tss_w_H3K27me3_prefix)
+    #if not os.path.isfile(dynamic_tss_w_H3K27me3_sorted):
     if True:
         # slopbed on TSS file only downstream direction to capture downstream H3K27me3 signal
+        dynamic_tss_w_H3K27me3_bed = "{}.bed.gz".format(dynamic_tss_w_H3K27me3_prefix)
         downstream_bp_ext = 1000
         bedtools_cmd = (
             "bedtools slop -s -i {0} -g {1} -l 0 -r {2} | " # increase DOWNSTREAM tss region
@@ -381,52 +389,33 @@ def runall(args, prefix):
                 args.inputs["annot"][args.cluster]["chromsizes"],
                 downstream_bp_ext,
                 args.outputs["data"]["H3K27me3.master.bed"],
-                dynamic_tss_w_H3K27me3)
+                dynamic_tss_w_H3K27me3_bed)
         print bedtools_cmd
         os.system(bedtools_cmd)
 
         # now overlap with ATAC data so that we can have promoter info
-        # TODO this fn should also produce the reordered tss file
         get_promoter_atac(
-            dynamic_tss_w_H3K27me3,
+            dynamic_tss_w_H3K27me3_bed,
             args.outputs["data"]["atac.master.bed"],
-            args.outputs["data"]["atac.counts.pooled.rlog.mat"],
-            dynamic_tss_w_H3K27me3.split(".bed")[0],
-            cluster_mat_file=args.outputs["results"]["rna"]["timeseries"]["dp_gp"][
+            dynamic_tss_w_H3K27me3_prefix,
+            rna_mat_file=args.outputs["data"][
+                "rna.counts.pc.expressed.timeseries_adj.pooled.rlog.mat"],
+            rna_cluster_file=args.outputs["results"]["rna"]["timeseries"]["dp_gp"][
+                "clusters.reproducible.hard.reordered.list"],
+            atac_mat_file=args.outputs["data"]["atac.counts.pooled.rlog.mat"],
+            atac_cluster_file=args.outputs["results"]["atac"]["timeseries"]["dp_gp"][
                 "clusters.reproducible.hard.reordered.list"])
 
-        quit()
-
         # debug: read in hgnc mapping
-        hgnc_file = "{}.hgnc_ids.mat.txt.gz".format(dynamic_tss_w_H3K27me3.split(".bed")[0])
-        mappings = pd.read_csv(args.outputs["annotations"]["geneids.mappings.mat"], sep="\t")
-        tss_data = tss_data.merge(mappings, left_on=3, right_on="ensembl_gene_id")
-        tss_data.to_csv(hgnc_file, sep="\t", compression="gzip", header=False, index=False)
-
-        
-        # now done in the above code
         if False:
-        
-            # organize by clusters
-            dynamic_clusters_file = args.outputs["results"]["rna"]["timeseries"]["dp_gp"][
-                "clusters.reproducible.hard.reordered.list"]
-            cluster_ids = pd.read_csv(dynamic_clusters_file, sep="\t")
-            tss_data = pd.read_csv(dynamic_tss_w_H3K27me3, sep="\t", header=None)
-            tss_data = tss_data.merge(cluster_ids, how="left", left_on=3, right_on="id")
-            tss_data = tss_data.sort_values("cluster")
-            
-            # save out reordered
-            # NOTE: this adjusts orig TSS file
-            tss_data = tss_data[range(6)]
-            tss_data.to_csv(dynamic_tss_w_H3K27me3,
-                            sep="\t", header=False, index=False, compression="gzip")
-
+            hgnc_file = "{}.hgnc_ids.mat.txt.gz".format(dynamic_tss_w_H3K27me3.split(".bed")[0])
+            mappings = pd.read_csv(args.outputs["annotations"]["geneids.mappings.mat"], sep="\t")
+            tss_data = tss_data.merge(mappings, left_on=3, right_on="ensembl_gene_id")
+            tss_data.to_csv(hgnc_file, sep="\t", compression="gzip", header=False, index=False)
 
     # plot data
     args = _plot_profile_heatmaps_workflow(
-        args, dynamic_tss_w_H3K27me3, "{}.dynamic_genes".format(out_prefix))
-
-    quit()
+        args, dynamic_tss_w_H3K27me3_sorted, dynamic_tss_w_H3K27me3_prefix)
         
     # functional enrichments
     dynamic_genes_w_H3K27me3 = "{}.genes.dynamic.H3K27me3_at_tss.bed.gz".format(out_prefix)
@@ -441,12 +430,10 @@ def runall(args, prefix):
             args.outputs["data"]["rna.counts.pc.expressed.mat"],
             work_dir, ordered=False, header=False)
 
-    
-    print "here"
+
     quit()
     
-    
-    # stable genes, subset to those with H3K27me3 (should be none??)
+    # stable genes, subset to those with H3K27me3
     stable_tss_w_H3K27me3 = "{}.tss.stable.H3K27me3_present.bed.gz".format(out_prefix)
     if not os.path.isfile(stable_tss_w_H3K27me3):
         bedtools_cmd = "bedtools intersect -u -a {} -b {} | gzip -c > {}".format(
