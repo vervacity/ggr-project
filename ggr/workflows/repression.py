@@ -382,7 +382,7 @@ def runall(args, prefix):
         downstream_bp_ext = 1000
         bedtools_cmd = (
             "bedtools slop -s -i {0} -g {1} -l 0 -r {2} | " # increase DOWNSTREAM tss region
-            "bedtools intersect -u -a {0} -b {3} | " # intersect
+            "bedtools intersect -u -a stdin -b {3} | " # intersect
             "awk -F '\t' '{{ print $1\"\t\"$2\"\t\"$2+1\"\t\"$4\"\t\"$5\"\t\"$6 }}' | " # return to point
             "gzip -c > {4}").format(
                 args.outputs["data"]["tss.dynamic"],
