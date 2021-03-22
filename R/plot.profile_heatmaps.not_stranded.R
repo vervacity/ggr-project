@@ -30,7 +30,8 @@ mad_factor <- 200
 color_granularity <- 50
 
 # figure out row sep
-rowsep <- read.table(row_sep_file, header=FALSE)$V1
+#rowsep <- read.table(row_sep_file, header=FALSE)$V1
+rowsep <- c(0, dim(data)[1])
 
 # keep strands to reorient
 strands <- data$V6
@@ -44,6 +45,7 @@ data$V5 <- NULL
 data$V6 <- NULL
 data$id <- NULL
 
+if (FALSE) {
 # reorient negative strand
 for (row_i in 1:dim(data)[1]) {
     if (strands[row_i] == "-") {
@@ -58,6 +60,7 @@ for (row_i in 1:dim(data)[1]) {
             data[row_i,start:end] <- rev(data[row_i,start:end])
         }
     }
+}
 }
 
 # since using pval, convert to log10(pval)
@@ -153,7 +156,7 @@ plot_profile_heatmap <- function(plot_data, i, plot_key) {
         col=my_palette,
         breaks=my_breaks,
         #add.expr=add_borders(i),
-        useRaster=TRUE,
+        useRaster=FALSE, # CHANGE BACK IF NEEDED
         par(xpd=FALSE)) # xpd - where plotting shows up
 
     if (plot_key) {

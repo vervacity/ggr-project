@@ -47,7 +47,45 @@ def _plot_profile_heatmaps_workflow(args, tss_file, plot_prefix):
             plot_prefix)
         print r_cmd
         os.system(r_cmd)
+
+    # plot profile atac
+    atac_bigwigs = sorted(
+        glob.glob("{}/{}".format(
+            args.inputs["atac"][args.cluster]["data_dir"],
+            args.inputs["atac"][args.cluster]["bigwig_pooled_glob"])))
+    atac_bigwigs = [atac_bigwigs[0], atac_bigwigs[6], atac_bigwigs[12]]
+
+    out_prefix = "{}.ATAC".format(plot_prefix)
+    plot_file = "{}.heatmap.profile.pdf".format(out_prefix)
     
+    if not os.path.isfile(plot_file):
+        make_deeptools_heatmap(
+            tss_file,
+            atac_bigwigs,
+            out_prefix,
+            sort=False,
+            referencepoint="center",
+            extend_dist=5000,
+            bin_total=100, # note: do not adjust
+            color="Blues")
+        
+    # make profile heatmap in R, with strand oriented TSS
+    row_sep_file = "{}.row_seps.txt.gz".format(plot_prefix)
+    out_mat_file = "{}.point.mat.gz".format(out_prefix)
+    out_r_file = "{}.replot.pdf".format(plot_file.split(".pdf")[0])
+    if not os.path.isfile(out_r_file):
+        # TODO - note - strands already adjusted
+        replot = (
+            "~/git/ggr-project/R/plot.profile_heatmaps.stranded.R {} {} {} {} {} "
+            "1,100 101,200 201,300").format(
+                out_mat_file,
+                "ATAC", 
+                row_sep_file,
+                out_r_file,
+                "Blues")
+        print replot
+        run_shell_cmd(replot)
+        
     # plot RNA-seq
     if not os.path.isfile("{}.rna.heatmap.pdf".format(plot_prefix)):
         r_cmd = "~/git/ggr-project/R/plot.tss.timeseries_heatmap.R {} {} {}.rna PAS-seq".format(
@@ -80,6 +118,8 @@ def _plot_profile_heatmaps_workflow(args, tss_file, plot_prefix):
                 histone_bigwigs,
                 out_prefix,
                 sort=False,
+                extend_dist=5000,
+                bin_total=100, # do not adjust this
                 referencepoint="center",
                 color=histone_color)
 
@@ -394,33 +434,29 @@ def runall(args, prefix):
         os.system(bedtools_cmd)
 
         # now overlap with ATAC data so that we can have promoter info
+        # TODO may need to adjust TSS if there is ATAC peak?
         get_promoter_atac(
             dynamic_tss_w_H3K27me3_bed,
             args.outputs["data"]["atac.master.bed"],
             dynamic_tss_w_H3K27me3_prefix,
+            #args.inputs["annot"][args.cluster]["chromsizes"],
             rna_mat_file=args.outputs["data"][
                 "rna.counts.pc.expressed.timeseries_adj.pooled.rlog.mat"],
             rna_cluster_file=args.outputs["results"]["rna"]["timeseries"]["dp_gp"][
                 "clusters.reproducible.hard.reordered.list"],
             atac_mat_file=args.outputs["data"]["atac.counts.pooled.rlog.mat"],
             atac_cluster_file=args.outputs["results"]["atac"]["timeseries"]["dp_gp"][
-                "clusters.reproducible.hard.reordered.list"])
-
-        # debug: read in hgnc mapping
-        if False:
-            hgnc_file = "{}.hgnc_ids.mat.txt.gz".format(dynamic_tss_w_H3K27me3.split(".bed")[0])
-            mappings = pd.read_csv(args.outputs["annotations"]["geneids.mappings.mat"], sep="\t")
-            tss_data = tss_data.merge(mappings, left_on=3, right_on="ensembl_gene_id")
-            tss_data.to_csv(hgnc_file, sep="\t", compression="gzip", header=False, index=False)
+                "clusters.reproducible.hard.reordered.list"],
+            hgnc_mapping_file=args.outputs["annotations"]["geneids.mappings.mat"])
 
     # plot data
     args = _plot_profile_heatmaps_workflow(
         args, dynamic_tss_w_H3K27me3_sorted, dynamic_tss_w_H3K27me3_prefix)
-        
+
     # functional enrichments
     dynamic_genes_w_H3K27me3 = "{}.genes.dynamic.H3K27me3_at_tss.bed.gz".format(out_prefix)
     if not os.path.isfile(dynamic_genes_w_H3K27me3):
-        tss_data = pd.read_csv(dynamic_tss_w_H3K27me3, sep="\t", header=None)
+        tss_data = pd.read_csv(dynamic_tss_w_H3K27me3_sorted, sep="\t", header=None)
         tss_data.to_csv(
             dynamic_genes_w_H3K27me3, columns=[3], header=False, index=False, compression="gzip")
     gprofiler_results = "{}.go_gprofiler.txt".format(dynamic_genes_w_H3K27me3)
@@ -429,6 +465,8 @@ def runall(args, prefix):
             dynamic_genes_w_H3K27me3,
             args.outputs["data"]["rna.counts.pc.expressed.mat"],
             work_dir, ordered=False, header=False)
+
+    # motif enrichments
 
 
     quit()

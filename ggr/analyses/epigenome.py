@@ -530,27 +530,40 @@ def get_promoter_atac(
         tss_file,
         atac_bed_file,
         out_prefix,
+        #chromsizes,
         rna_mat_file=None,
         rna_cluster_file=None,
         atac_mat_file=None,
-        atac_cluster_file=None):
+        atac_cluster_file=None,
+        tss_search_dist=500,
+        hgnc_mapping_file=None):
     """given tss set, get promoter ATAC peaks and output matrix and bed file
     """
     # overlap tss with atac regions
     mapped_id_file = "{}.tss_to_atac_region.mat.txt.gz".format(out_prefix)
+    
     intersect_cmd = (
-        "bedtools intersect -wao -a {} -b {} | "
-        "awk -F '\t' '{{ print $1\"\t\"$2\"\t\"$3\"\t\"$4\"\t\"$5\"\t\"$6\"\t\"$7\":\"$8\"-\"$9 }}' | "
-        "gzip -c > {}").format(
-            tss_file, atac_bed_file, mapped_id_file)
+        "zcat {0} | sort -k1,1 -k2,2n | "
+        "bedtools closest -d -a stdin -b {1} | "
+        "awk -F '\t' '{{ print $1\"\t\"$2\"\t\"$3\"\t\"$4\"\t\"$5\"\t\"$6\"\t\"$7\":\"$8\"-\"$9\"\t\"$10 }}' | "
+        "gzip -c > {2}").format(
+            tss_file,
+            atac_bed_file,
+            mapped_id_file)
     print intersect_cmd
     os.system(intersect_cmd)
 
     # read in mapping
     promoter_data = pd.read_csv(
         mapped_id_file, sep="\t", header=None,
-        names=["chrom", "start", "stop", "gene_id", "score", "strand", "atac_region_id"])
+        names=["chrom", "start", "stop", "gene_id", "score", "strand", "atac_region_id", "dist_to_atac"])
 
+    # filter if dist is too large
+    for row_index in promoter_data.index:
+        if promoter_data["dist_to_atac"][row_index] > tss_search_dist:
+            promoter_data.at[row_index, "atac_region_id"] = ".:-1--1"
+    promoter_data = promoter_data.drop("dist_to_atac", axis=1)
+    
     # keep track of which headers to sort on at end
     sort_headers = []
     
@@ -578,6 +591,26 @@ def get_promoter_atac(
             promoter_data[signal_headers].values == 0, axis=1).astype(int)
         sort_headers.append("atac_not_present")
 
+        # get atac region info, use to replace TSS if present
+        atac_regions = promoter_data["atac_region_id"].str.split(":", n=2, expand=True)
+        atac_regions = atac_regions.replace("-1--1", "0-0")
+        atac_regions[["start", "stop"]] = atac_regions[1].str.split("-", n=2, expand=True)
+        for row_i in range(promoter_data.shape[0]):
+            if atac_regions[1].iloc[row_i] != "0-0":
+                row_index = promoter_data.index[row_i]
+                start_val = int(atac_regions["start"].iloc[row_i])
+                stop_val = int(atac_regions["stop"].iloc[row_i])
+                atac_midpoint = start_val + ((stop_val - start_val) / 2)
+
+                #print promoter_data.loc[row_index]
+        
+                
+                promoter_data.at[row_index, "start"] = atac_midpoint
+                promoter_data.at[row_index, "stop"] = atac_midpoint + 1
+
+                #print promoter_data.loc[row_index]
+                #quit()
+                
         # also adjust signal headers
         #new_signal_headers = ["atac.{}".format(header) for header in signal_headers]
         #promoter_data = promoter_data.rename(
@@ -633,5 +666,12 @@ def get_promoter_atac(
     row_seps_file = "{}.row_seps.txt.gz".format(out_prefix)
     pd.DataFrame({"row_seps": row_seps}).to_csv(
         row_seps_file, compression="gzip", header=False, index=False)
-    
+
+    # if given hgnc mappings, read in and output a file for easy readability
+    if hgnc_mapping_file is not None:
+        hgnc_out_file = "{}.hgnc_ids.txt.gz".format(out_prefix)
+        mappings = pd.read_csv(hgnc_mapping_file, sep="\t")
+        promoter_data = promoter_data.merge(mappings, left_on="gene_id", right_on="ensembl_gene_id") 
+        promoter_data.to_csv(hgnc_out_file, sep="\t", compression="gzip", header=False, index=False)
+        
     return

@@ -1340,14 +1340,53 @@ def plot_profile_heatmaps_workflow(args, tss_file, plot_prefix):
         print "NOTE rowseps not adjusted!!"
         
     # plot ATAC-seq
-    if not os.path.isfile("{}.atac.heatmap.pdf".format(plot_prefix)):
+    #if not os.path.isfile("{}.atac.heatmap.pdf".format(plot_prefix)):
+    if False:
         r_cmd = "~/git/ggr-project/R/plot.tss.timeseries_heatmap.R {} {} {}.atac ATAC-seq".format(
             "{}.promoter_data.mat.txt.gz".format(plot_prefix),
             "{}.row_seps.txt.gz".format(plot_prefix),
             plot_prefix)
         print r_cmd
         os.system(r_cmd)
+
+    # TODO plot ATAC seq as profile map (to show small changes but sig H3K27ac movement)
+    atac_bigwigs = sorted(
+        glob.glob("{}/{}".format(
+            args.inputs["atac"][args.cluster]["data_dir"],
+            args.inputs["atac"][args.cluster]["bigwig_pooled_glob"])))
+    atac_bigwigs = [atac_bigwigs[0], atac_bigwigs[6], atac_bigwigs[12]]
+
+    out_prefix = "{}.ATAC".format(plot_prefix)
+    plot_file = "{}.heatmap.profile.pdf".format(out_prefix)
     
+    if not os.path.isfile(plot_file):
+        make_deeptools_heatmap(
+            tss_file,
+            atac_bigwigs,
+            out_prefix,
+            sort=False,
+            referencepoint="center",
+            extend_dist=10000,
+            bin_total=100, # note: do not adjust
+            color="Blues")
+        
+    # make profile heatmap in R, with strand oriented TSS
+    row_sep_file = "{}.row_seps.txt.gz".format(plot_prefix)
+    out_mat_file = "{}.point.mat.gz".format(out_prefix)
+    out_r_file = "{}.replot.pdf".format(plot_file.split(".pdf")[0])
+    if not os.path.isfile(out_r_file):
+        # TODO - note - strands already adjusted
+        replot = (
+            "~/git/ggr-project/R/plot.profile_heatmaps.not_stranded.R {} {} {} {} {} "
+            "1,100 101,200 201,300").format(
+                out_mat_file,
+                "ATAC", 
+                row_sep_file,
+                out_r_file,
+                "Blues")
+        print replot
+        run_shell_cmd(replot)
+        
     # plot RNA-seq
     if not os.path.isfile("{}.rna.heatmap.pdf".format(plot_prefix)):
         r_cmd = "~/git/ggr-project/R/plot.tss.timeseries_heatmap.R {} {} {}.rna PAS-seq".format(
@@ -1381,8 +1420,8 @@ def plot_profile_heatmaps_workflow(args, tss_file, plot_prefix):
                 out_prefix,
                 sort=False,
                 referencepoint="center",
-                extend_dist=15000,
-                bin_total=100,
+                extend_dist=10000, #15000,
+                bin_total=100, # if change this, need to change R plot params below
                 color=histone_color)
 
         # make profile heatmap in R, with strand oriented TSS
@@ -1392,7 +1431,7 @@ def plot_profile_heatmaps_workflow(args, tss_file, plot_prefix):
         if not os.path.isfile(out_r_file):
             # TODO - note - strands already adjusted
             replot = (
-                "~/git/ggr-project/R/plot.profile_heatmaps.stranded.R {} {} {} {} {} "
+                "~/git/ggr-project/R/plot.profile_heatmaps.not_stranded.R {} {} {} {} {} "
                 "1,100 101,200 201,300").format(
                     out_mat_file,
                     histone, 
@@ -1412,7 +1451,8 @@ def _run_spreading_workflow_unidirectional(
     """keep code for each direction here, to make it easy to keep standardized
     """
     # params
-    spread_thresh = 5*spread_bp # TODO there's gotta be a better heuristic? maybe go by histone lengths?
+    #spread_thresh = 5*spread_bp # TODO there's gotta be a better heuristic? maybe go by histone lengths?
+    spread_thresh = 10*spread_bp # TODO there's gotta be a better heuristic? maybe go by histone lengths?
     
     # generate a day spread file (make day specific domain so that
     # when intersecting, won't capture smaller peaks multiple times)
@@ -1479,8 +1519,11 @@ def _run_spreading_workflow_unidirectional(
     # filter for domains with dynamic recipient peaks only
     filt_file = "{}_filt.bed.gz".format(intersected_dynamics_file.split(".bed")[0])
     data = pd.read_csv(intersected_dynamics_file, sep="\t", header=None)
-    data = data[data[7] != "."]
-    data[7] = data[7].astype(int)
+    try:
+        data = data[data[7] != "."]
+        data[7] = data[7].astype(int)
+    except TypeError:
+        pass
     data["domain"] = "domain=" + data[0] + ":" + data[1].map(str) + "-" + data[2].map(str)
     data["recip_region"] = "recip_region=" + data[4] + ":" + data[5].map(str) + "-" + data[6].map(str)
     # filter for correct DIRECTION of spread
@@ -1561,7 +1604,7 @@ def _run_spreading_workflow_unidirectional(
             data.at[index_val, "init_to_tss"] = -1 * data["init_to_tss"][index_val]
     data = data.sort_values("init_to_tss", ascending=False)
     # also ignore those that are too close?
-    data = data[data["init_to_tss"].abs() > 1000] # TODO think about this
+    #data = data[data["init_to_tss"].abs() > 1000] # TODO think about this
     print "after removing nearby, {} tss".format(data.shape[0])
     data.to_csv(
         tss_file, columns=[0,1,2,3,4,5],
@@ -1603,6 +1646,18 @@ def _run_spreading_workflow_unidirectional(
     plot_prefix = "{}/{}.{}.{}".format(
         results_dir, prefix, histone, direction)
 
+    # TODO overlap PAS-seq
+    pas_data = pd.read_csv(
+        args.outputs["data"]["rna.counts.pc.expressed.timeseries_adj.pooled.rlog.mat"],
+        sep="\t")
+    data = data.merge(pas_data, left_on=3, right_index=True)
+
+    out_file = "{}.promoter_rna_data.mat.txt.gz".format(plot_prefix)
+    data.to_csv(out_file, sep="\t", compression="gzip", index=False)
+    #print data
+    
+    # TODO make a rowseps file
+    
     plot_profile_heatmaps_workflow(args, tss_file, plot_prefix)
 
     # TODO gene set enrichment
@@ -1699,19 +1754,16 @@ def run_histone_spreading_workflow(args, prefix):
 
     # now look for domains that INCREASED in spread over time
     # extend regions in d0 to match domains file - this file is the baseline for SPREAD
-    args = _run_spreading_workflow_unidirectional(
-        args, results_dir, prefix, histone, domain_file, peak_files[0],
-        spread_bp=spread_bp, direction="increase")
+    if False:
+        args = _run_spreading_workflow_unidirectional(
+            args, results_dir, prefix, histone, domain_file, peak_files[0],
+            spread_bp=spread_bp, direction="increase")
 
-    args = _run_spreading_workflow_unidirectional(
-        args, results_dir, prefix, histone, domain_file, peak_files[2],
-        spread_bp=spread_bp, direction="decrease")
+        args = _run_spreading_workflow_unidirectional(
+            args, results_dir, prefix, histone, domain_file, peak_files[2],
+            spread_bp=spread_bp, direction="decrease")
 
-    
-    quit()
-    
-
-    # also looped regions with HiChIP support?
+    # TODO maybe also looped regions with HiChIP support?
 
     return args
 
@@ -1861,7 +1913,5 @@ def runall(args, prefix):
     # -----------------------------------------
     args = run_histone_spreading_workflow(
         args, "{}.histone_spread".format(prefix))
-    
-    quit()
     
     return args

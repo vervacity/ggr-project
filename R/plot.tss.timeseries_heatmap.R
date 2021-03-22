@@ -21,8 +21,9 @@ plot_prefix <- args[3]
 plot_title <- args[4]
 
 # read in data
-data <- read.table(mat_file, header=TRUE)
-row_seps <- read.table(row_seps_file, header=FALSE)$V1
+data <- read.table(mat_file, sep="\t", header=TRUE)
+#row_seps <- read.table(row_seps_file, header=FALSE)$V1
+row_seps <- c(0, dim(data)[1])
 
 # subset to just timepoints
 signal_headers <- colnames(data)[grepl("^d", colnames(data))]
@@ -33,11 +34,12 @@ data_vals <- data[,signal_headers]
     data_z <- data_vals - data_vals[,1]
 
 # percentile clip
-if (grepl("epigenome", plot_prefix)) {
-    thresholds <- quantile(melt(data_z)$value, c(0.01, 0.99))
-} else {
-    thresholds <- quantile(melt(data_z)$value, c(0.10, 0.90))
-}
+thresholds <- quantile(melt(data_z)$value, c(0.01, 0.99))
+#if (grepl("epigenome", plot_prefix)) {
+#    thresholds <- quantile(melt(data_z)$value, c(0.01, 0.99))
+#} else {
+#    thresholds <- quantile(melt(data_z)$value, c(0.10, 0.90))
+#}
 data_z[data_z < thresholds[1]] <- thresholds[1]
 data_z[data_z > thresholds[2]] <- thresholds[2]
 
@@ -75,6 +77,7 @@ mylmat = rbind(c(0,0,3,0),c(4,1,2,0),c(0,0,5,0))
 mylwid = c(0.05,0.1,0.6,0.4)
 mylhei = c(0.1,2,0.27)
 
+#pdf(plot_file, height=3, width=1.25, family="ArialMT")
 pdf(plot_file, height=3, width=1.25, family="ArialMT")
 heatmap.2(
     as.matrix(data_z),
