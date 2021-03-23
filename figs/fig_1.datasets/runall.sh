@@ -13,7 +13,7 @@ GGR_DIR=/mnt/lab_data/kundaje/users/dskim89/ggr/integrative/v1.0.0a
 # --------------------
 
 # dataset matrix
-$SCRIPT_DIR/plot.dataset_matrix.R $GIT_DIR/ggr/data/ggr_datasets.txt
+#$SCRIPT_DIR/plot.dataset_matrix.R $GIT_DIR/ggr/data/ggr_datasets.txt
 
 # PCA plots
 atac_rep1_mat_file=$GGR_DIR/results/atac/timeseries/plots/ggr.atac.ends.counts.rep1.rlog.dynamic.filt.mat.txt.gz
@@ -38,6 +38,13 @@ rna_rep2_mat_file=$GGR_DIR/results/rna/timeseries/matrices/ggr.rna.counts.pc.exp
 
 # linking plots
 #$SCRIPT_DIR/plot_linking.py $GGR_DIR
+
+
+# more vignette bars
+$SCRIPT_DIR/plot.rna_bar.R $GGR_DIR/results/rna/timeseries/matrices/ggr.rna.counts.pc.expressed.timeseries_adj.pooled.rlog.mat.txt.gz ENSG00000171223 gene_vals.JUNB.pdf
+$SCRIPT_DIR/plot.rna_bar.R $GGR_DIR/results/rna/timeseries/matrices/ggr.rna.counts.pc.expressed.timeseries_adj.pooled.rlog.mat.txt.gz ENSG00000204103 gene_vals.MAFB.pdf
+$SCRIPT_DIR/plot.rna_bar.R $GGR_DIR/results/rna/timeseries/matrices/ggr.rna.counts.pc.expressed.timeseries_adj.pooled.rlog.mat.txt.gz ENSG00000203782 gene_vals.LOR.pdf
+$SCRIPT_DIR/plot.rna_bar.R $GGR_DIR/results/rna/timeseries/matrices/ggr.rna.counts.pc.expressed.timeseries_adj.pooled.rlog.mat.txt.gz ENSG00000172818 gene_vals.OVOL1.pdf
 
 
 # --------------------
