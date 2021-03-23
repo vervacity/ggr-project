@@ -23,12 +23,15 @@ data <- read.table(gzfile(counts_file), header=TRUE, sep="\t")
 #print(data)
 
 # assay adjustments
-plot_width <- 1.5
+plot_width <- 1.25
+plot_height <- 1.5
+divide_count <- 100
+num_type <- "regions"
+
 if (grepl("atac", plot_file, fixed=TRUE)) {
     color <- get_ggr_assay_palette("Blues", 50)
     title <- "ATAC-seq"
     plot_width <- 1.75
-    num_type <- "regions"
     y_static_lim <- 160
     y_dynamic_lim <- 15
 } else if (grepl("H3K27ac", plot_file, fixed=TRUE)) {
@@ -40,6 +43,9 @@ if (grepl("atac", plot_file, fixed=TRUE)) {
 } else if (grepl("H3K27me3", plot_file, fixed=TRUE)) {
     color <- get_ggr_assay_palette("Greens", 50)
     title <- "H3K27me3 ChIP-seq"
+    y_dynamic_lim_neg <- -12
+    y_dynamic_lim_pos <- 2
+    plot_height <- 1.25
 } else if (grepl("hichip", plot_file, fixed=TRUE)) {
     color <- get_ggr_assay_palette("Purples", 50)
     title <- "HiChIP"
@@ -63,8 +69,8 @@ if (count_type == "static") {
     y_lims <- c(0, y_static_lim)
     data$count <- data$count / 1000.
 } else if (count_type == "dynamic") {
-    y <- paste("Number of changing\n", num_type, " (1000s)", sep="")
-    y_lims <- c(-y_dynamic_lim, y_dynamic_lim)
+    y <- paste("Number of changing\n", num_type, " (100s)", sep="")
+    y_lims <- c(y_dynamic_lim_neg, y_dynamic_lim_pos)
     colnames(data) <- c("timepoint", "up", "down", "color")
     # adjust data here
     data$down <- -data$down
@@ -83,7 +89,7 @@ if (count_type == "static") {
     data$value <- as.numeric(data$value)
 
     # get count fract
-    data$count <- data$value / 1000.
+    data$count <- data$value / divide_count
     
 }
 
@@ -102,6 +108,7 @@ ggplot(data, aes(x=timepoint, y=count, fill=color, colour=color)) +
         size=0.115,
         #aes(fill=color, colour=color),
         show.legend=FALSE) +
+    geom_hline(yintercept=0, size=0.115) +
     labs(x="Timepoint (day)", y=y, title=title) +
     theme_bw() +
     theme(
@@ -120,4 +127,4 @@ ggplot(data, aes(x=timepoint, y=count, fill=color, colour=color)) +
     scale_fill_manual(values=levels(data$color)) +
     scale_colour_manual(values=levels(data$color))
 
-ggsave(plot_file, height=1.5, width=plot_width, useDingbats=FALSE) # height 1.25
+ggsave(plot_file, height=plot_height, width=plot_width, useDingbats=FALSE) # height 1.25
