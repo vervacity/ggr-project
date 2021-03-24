@@ -415,8 +415,7 @@ def runall(args, prefix):
     dynamic_tss_w_H3K27me3_prefix = "{}.tss.dynamic.H3K27me3_present".format(out_prefix)
     dynamic_tss_w_H3K27me3_sorted = "{}.feature_sorted.bed.gz".format(
         dynamic_tss_w_H3K27me3_prefix)
-    #if not os.path.isfile(dynamic_tss_w_H3K27me3_sorted):
-    if True:
+    if not os.path.isfile(dynamic_tss_w_H3K27me3_sorted):
         # slopbed on TSS file only downstream direction to capture downstream H3K27me3 signal
         dynamic_tss_w_H3K27me3_bed = "{}.bed.gz".format(dynamic_tss_w_H3K27me3_prefix)
         downstream_bp_ext = 1000
@@ -439,7 +438,6 @@ def runall(args, prefix):
             dynamic_tss_w_H3K27me3_bed,
             args.outputs["data"]["atac.master.bed"],
             dynamic_tss_w_H3K27me3_prefix,
-            #args.inputs["annot"][args.cluster]["chromsizes"],
             rna_mat_file=args.outputs["data"][
                 "rna.counts.pc.expressed.timeseries_adj.pooled.rlog.mat"],
             rna_cluster_file=args.outputs["results"]["rna"]["timeseries"]["dp_gp"][
@@ -468,35 +466,70 @@ def runall(args, prefix):
 
     # motif enrichments
 
-
-    quit()
     
     # stable genes, subset to those with H3K27me3
-    stable_tss_w_H3K27me3 = "{}.tss.stable.H3K27me3_present.bed.gz".format(out_prefix)
-    if not os.path.isfile(stable_tss_w_H3K27me3):
-        bedtools_cmd = "bedtools intersect -u -a {} -b {} | gzip -c > {}".format(
-            args.outputs["data"]["tss.stable"],
-            args.outputs["data"]["H3K27me3.master.bed"],
-            stable_tss_w_H3K27me3)
+    stable_tss_w_H3K27me3_prefix = "{}.tss.stable.H3K27me3_present".format(out_prefix)
+    stable_tss_w_H3K27me3_sorted = "{}.feature_sorted.bed.gz".format(
+        stable_tss_w_H3K27me3_prefix)
+    if not os.path.isfile(stable_tss_w_H3K27me3_sorted):
+        stable_tss_w_H3K27me3_bed = "{}.bed.gz".format(stable_tss_w_H3K27me3_prefix)
+        downstream_bp_ext = 1000
+        bedtools_cmd = (
+            "bedtools slop -s -i {0} -g {1} -l 0 -r {2} | " # increase DOWNSTREAM tss region
+            "bedtools intersect -u -a stdin -b {3} | " # intersect
+            "awk -F '\t' '{{ print $1\"\t\"$2\"\t\"$2+1\"\t\"$4\"\t\"$5\"\t\"$6 }}' | " # return to point
+            "gzip -c > {4}").format(
+                args.outputs["data"]["tss.stable"],
+                args.inputs["annot"][args.cluster]["chromsizes"],
+                downstream_bp_ext,
+                args.outputs["data"]["H3K27me3.master.bed"],
+                stable_tss_w_H3K27me3_bed)
         print bedtools_cmd
         os.system(bedtools_cmd)
+
+        get_promoter_atac(
+            stable_tss_w_H3K27me3_bed,
+            args.outputs["data"]["atac.master.bed"],
+            stable_tss_w_H3K27me3_prefix,
+            rna_mat_file=args.outputs["data"][
+                "rna.counts.pc.expressed.timeseries_adj.pooled.rlog.mat"],
+            atac_mat_file=args.outputs["data"]["atac.counts.pooled.rlog.mat"],
+            atac_cluster_file=args.outputs["results"]["atac"]["timeseries"]["dp_gp"][
+                "clusters.reproducible.hard.reordered.list"],
+            hgnc_mapping_file=args.outputs["annotations"]["geneids.mappings.mat"])
         
-    args = _plot_profile_heatmaps_workflow(args, stable_tss_w_H3K27me3, "{}".format(out_prefix))
+        args = _plot_profile_heatmaps_workflow(args, stable_tss_w_H3K27me3_sorted, stable_tss_w_H3K27me3_prefix)
 
     # for non-expressed, figure out how many have H3K27me3 repression on top
-    non_expr_tss_w_H3K27me3 = "{}.tss.non_expr.H3K27me3_present.bed.gz".format(out_prefix)
-    if not os.path.isfile(non_expr_tss_w_H3K27me3):
-        bedtools_cmd = "bedtools intersect -u -a {} -b {} | gzip -c > {}".format(
-            args.outputs["data"]["tss.non_expr"],
-            args.outputs["data"]["H3K27me3.master.bed"],
-            non_expr_tss_w_H3K27me3)
+    nonexpr_tss_w_H3K27me3_prefix = "{}.tss.non_expr.H3K27me3_present".format(out_prefix)
+    nonexpr_tss_w_H3K27me3_sorted = "{}.feature_sorted.bed.gz".format(
+        nonexpr_tss_w_H3K27me3_prefix)
+    if not os.path.isfile(nonexpr_tss_w_H3K27me3_sorted):
+        nonexpr_tss_w_H3K27me3_bed = "{}.bed.gz".format(nonexpr_tss_w_H3K27me3_prefix)
+        downstream_bp_ext = 1000
+        bedtools_cmd = (
+            "bedtools slop -s -i {0} -g {1} -l 0 -r {2} | " # increase DOWNSTREAM tss region
+            "bedtools intersect -u -a stdin -b {3} | " # intersect
+            "awk -F '\t' '{{ print $1\"\t\"$2\"\t\"$2+1\"\t\"$4\"\t\"$5\"\t\"$6 }}' | " # return to point
+            "gzip -c > {4}").format(
+                args.outputs["data"]["tss.non_expr"],
+                args.inputs["annot"][args.cluster]["chromsizes"],
+                downstream_bp_ext,
+                args.outputs["data"]["H3K27me3.master.bed"],
+                nonexpr_tss_w_H3K27me3_bed)
         print bedtools_cmd
         os.system(bedtools_cmd)
 
-    args = _plot_profile_heatmaps_workflow(args, non_expr_tss_w_H3K27me3, "{}".format(out_prefix))
-
-
-    quit()
+        get_promoter_atac(
+            nonexpr_tss_w_H3K27me3_bed,
+            args.outputs["data"]["atac.master.bed"],
+            nonexpr_tss_w_H3K27me3_prefix,
+            atac_mat_file=args.outputs["data"]["atac.counts.pooled.rlog.mat"],
+            atac_cluster_file=args.outputs["results"]["atac"]["timeseries"]["dp_gp"][
+                "clusters.reproducible.hard.reordered.list"],
+            hgnc_mapping_file=args.outputs["annotations"]["geneids.mappings.mat"])
+        
+        args = _plot_profile_heatmaps_workflow(args, nonexpr_tss_w_H3K27me3_sorted, nonexpr_tss_w_H3K27me3_prefix)
 
     # to consider: analysis on looping across H3K27me3 domains?
 
