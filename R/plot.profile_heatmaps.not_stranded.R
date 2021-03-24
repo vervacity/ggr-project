@@ -32,7 +32,7 @@ color_granularity <- 50
 # figure out row sep
 #rowsep <- read.table(row_sep_file, header=FALSE)$V1
 rowsep <- c(0, dim(data)[1])
-
+print(rowsep)
 # keep strands to reorient
 strands <- data$V6
 
@@ -73,6 +73,12 @@ my_breaks <- seq(
     quantile(data_melted$value, 0),
     quantile(data_melted$value, 0.98),
     length.out=color_granularity)
+if (sum(my_breaks) == 0) {
+    my_breaks <- seq(
+        quantile(data_melted$value, 0),
+        quantile(data_melted$value, 1),
+        length.out=color_granularity)
+}
 
 # colors
 my_palette <- get_ggr_assay_palette(rcolorbrewer_palette, color_granularity)

@@ -1323,21 +1323,23 @@ def run_chromatin_states_workflow(args, prefix):
 def plot_profile_heatmaps_workflow(args, tss_file, plot_prefix):
     """plot histone heatmaps for a specific set of tss regions (ordered
     """
-    # make a subsample file if necessary
-    tss_data = pd.read_csv(tss_file, sep="\t")
-    if tss_data.shape[0] > 1000:
-        step_size = int(tss_data.shape[0] / 1000)
-        keep_indices = np.arange(0, tss_data.shape[0], step=step_size)
-        print tss_data.shape
-        tss_data = tss_data.iloc[keep_indices]
-        print tss_data.shape
-        subsample_file = "{}.subsample.tmp.bed.gz".format(plot_prefix)
-        tss_data.to_csv(subsample_file, sep="\t",
-                        header=False, index=False, compression="gzip")
-        tss_file = subsample_file
+    atac_plot_file = "{}.ATAC.heatmap.profile.pdf".format(plot_prefix)
+    if not os.path.isfile(atac_plot_file):
+        # make a subsample file if necessary
+        tss_data = pd.read_csv(tss_file, sep="\t")
+        if tss_data.shape[0] > 1000:
+            step_size = int(tss_data.shape[0] / 1000)
+            keep_indices = np.arange(0, tss_data.shape[0], step=step_size)
+            print tss_data.shape
+            tss_data = tss_data.iloc[keep_indices]
+            print tss_data.shape
+            subsample_file = "{}.subsample.tmp.bed.gz".format(plot_prefix)
+            tss_data.to_csv(subsample_file, sep="\t",
+                            header=False, index=False, compression="gzip")
+            tss_file = subsample_file
 
-        # NOTE rowseps won't match if subsampling!!
-        print "NOTE rowseps not adjusted!!"
+            # NOTE rowseps won't match if subsampling!!
+            print "NOTE rowseps not adjusted!!"
         
     # plot ATAC-seq
     #if not os.path.isfile("{}.atac.heatmap.pdf".format(plot_prefix)):
@@ -1458,7 +1460,7 @@ def _run_spreading_workflow_unidirectional(
     # when intersecting, won't capture smaller peaks multiple times)
     day_spread_regions_file = "{}/{}.{}.{}.day_spread_merge_1kb.bed.gz".format(
         results_dir, prefix, histone, direction)
-    if False:
+    if not os.path.isfile(day_spread_regions_file):
         merge_cmd = (
             "zcat {0} | sort -k1,1 -k2,2n | "
             "bedtools slop -i stdin -g {1} -b {2} | "
@@ -1475,147 +1477,129 @@ def _run_spreading_workflow_unidirectional(
     # intersect for SPREAD: the domain increased (from the initiating region)
     intersected_spread_file = "{}.intersect_spread.bed.gz".format(
         day_spread_regions_file.split(".bed")[0])
-    get_dynamic_spread_cmd = (
-        "bedtools intersect -wao -a {} -b {} | " # intersect while keeping all data
-        "gzip -c > {}").format(
-            spread_regions_file,
-            peak_file, #day_spread_regions_file,
-            intersected_spread_file)
-    print get_dynamic_spread_cmd
-    os.system(get_dynamic_spread_cmd)
+    if not os.path.isfile(intersected_spread_file):
+        get_dynamic_spread_cmd = (
+            "bedtools intersect -wao -a {} -b {} | " # intersect while keeping all data
+            "gzip -c > {}").format(
+                spread_regions_file,
+                peak_file, #day_spread_regions_file,
+                intersected_spread_file)
+        print get_dynamic_spread_cmd
+        os.system(get_dynamic_spread_cmd)
 
     # read in and filter for significant spread
     # TO consider: build a distribution and then take outliers? or some actual stat test?
     filt_file = "{}_filt.bed.gz".format(
         intersected_spread_file.split(".bed")[0])
-    data = pd.read_csv(intersected_spread_file, sep="\t", header=None)
-    data = data[data[3] != "."]
-    data["domain"] = "domain=" + data[0] + ":" + data[1].map(str) + "-" + data[2].map(str)
-    data["init_region"] = "init_region=" + data[3] + ":" + data[
-        4].map(str) + "-" + data[5].map(str) + ";score=" + data[9].map(str)
-    data["start_diff"] = data[4] - data[1]
-    data["stop_diff"] = data[2] - data[5]
-    data["total_diff"] = data["start_diff"] + data["stop_diff"]
-    data = data[data["total_diff"] > spread_thresh]
-    print "after spread filters, {} domains".format(len(set(data["domain"].values.tolist())))
-    data.to_csv(
-        filt_file,
-        columns=[0, 1, 2, "init_region"],
-        sep="\t", compression="gzip", header=None, index=None)
+    if not os.path.isfile(filt_file):
+        data = pd.read_csv(intersected_spread_file, sep="\t", header=None)
+        data = data[data[3] != "."]
+        data["domain"] = "domain=" + data[0] + ":" + data[1].map(str) + "-" + data[2].map(str)
+        data["init_region"] = "init_region=" + data[3] + ":" + data[
+            4].map(str) + "-" + data[5].map(str) + ";score=" + data[9].map(str)
+        data["start_diff"] = data[4] - data[1]
+        data["stop_diff"] = data[2] - data[5]
+        data["total_diff"] = data["start_diff"] + data["stop_diff"]
+        data = data[data["total_diff"] > spread_thresh]
+        print "after spread filters, {} domains".format(len(set(data["domain"].values.tolist())))
+        data.to_csv(
+            filt_file,
+            columns=[0, 1, 2, "init_region"],
+            sep="\t", compression="gzip", header=None, index=None)
 
     # intersect for DYNAMICS: the receiving region
     intersected_dynamics_file = "{}.intersect_dynamics.bed.gz".format(
         filt_file.split(".bed")[0])
-    get_dynamics_cmd = (
-        "bedtools intersect -wao -a {} -b {} | " # intersect while keeping all data
-        "gzip -c > {}").format(
-            filt_file,
-            args.outputs["results"]["histones"][histone]["timeseries"][
-                "ggr.histone.{}.enumerated.bed".format(histone)],
-            intersected_dynamics_file)
-    print get_dynamics_cmd
-    os.system(get_dynamics_cmd)
+    if not os.path.isfile(intersected_dynamics_file):
+        get_dynamics_cmd = (
+            "bedtools intersect -wao -a {} -b {} | " # intersect while keeping all data
+            "gzip -c > {}").format(
+                filt_file,
+                args.outputs["results"]["histones"][histone]["timeseries"][
+                    "ggr.histone.{}.enumerated.bed".format(histone)],
+                intersected_dynamics_file)
+        print get_dynamics_cmd
+        os.system(get_dynamics_cmd)
 
     # filter for domains with dynamic recipient peaks only
     filt_file = "{}_filt.bed.gz".format(intersected_dynamics_file.split(".bed")[0])
-    data = pd.read_csv(intersected_dynamics_file, sep="\t", header=None)
-    try:
-        data = data[data[7] != "."]
-        data[7] = data[7].astype(int)
-    except TypeError:
-        pass
-    data["domain"] = "domain=" + data[0] + ":" + data[1].map(str) + "-" + data[2].map(str)
-    data["recip_region"] = "recip_region=" + data[4] + ":" + data[5].map(str) + "-" + data[6].map(str)
-    # filter for correct DIRECTION of spread
-    if direction == "increase" :
-        data = data[data[7] < 4]
-    elif direction == "decrease":
-        data = data[data[7] > 4]
-    else:
-        raise ValueError, "direction not recognized!!"
-    data = data.sort_values([7, "domain", "recip_region", 3])
-    data["metadata"] = data["domain"] + ";" + data[
-        3] + ";" + data["recip_region"] + ";cluster=" + data[7].map(str)
-    data.to_csv(
-        filt_file,
-        columns=[4, 5, 6, "metadata"],
-        sep="\t", compression="gzip", header=False, index=False)
-    print "after filter for dynamic recipient regions, {} domains".format(
-        len(set(data["domain"].values.tolist())))
+    if not os.path.isfile(filt_file):
+        data = pd.read_csv(intersected_dynamics_file, sep="\t", header=None)
+        try:
+            data = data[data[7] != "."]
+            data[7] = data[7].astype(int)
+        except TypeError:
+            pass
+        data["domain"] = "domain=" + data[0] + ":" + data[1].map(str) + "-" + data[2].map(str)
+        data["recip_region"] = "recip_region=" + data[4] + ":" + data[5].map(str) + "-" + data[6].map(str)
+        # filter for correct DIRECTION of spread
+        if direction == "increase" :
+            data = data[data[7] < 4]
+        elif direction == "decrease":
+            data = data[data[7] > 4]
+        else:
+            raise ValueError, "direction not recognized!!"
+        data = data.sort_values([7, "domain", "recip_region", 3])
+        data["metadata"] = data["domain"] + ";" + data[
+            3] + ";" + data["recip_region"] + ";cluster=" + data[7].map(str)
+        data.to_csv(
+            filt_file,
+            columns=[4, 5, 6, "metadata"],
+            sep="\t", compression="gzip", header=False, index=False)
+        print "after filter for dynamic recipient regions, {} domains".format(
+            len(set(data["domain"].values.tolist())))
 
     # overlap with TSS
     tss_file = args.outputs["data"]["tss.dynamic"]
     tss_overlap_file = "{}.tss_filt.bed.gz".format(filt_file.split(".bed")[0])
-    bedtools_cmd = (
-        "bedtools slop -s -i {0} -g {1} -b {2} | " # increase histone range
-        "bedtools intersect -wo -a {3} -b stdin | " # intersect
-        "gzip -c > {4}").format(
-            filt_file,
-            args.inputs["annot"][args.cluster]["chromsizes"],
-            spread_bp,
-            args.outputs["data"]["tss.dynamic"],
-            tss_overlap_file)
-    print bedtools_cmd
-    os.system(bedtools_cmd)
-    
-    # read in to generate other output files
-    data = pd.read_csv(tss_overlap_file, sep="\t", header=None)
-    
-    # filter for gene trajectories
-    rna_clusters = pd.read_csv(args.outputs["results"]["rna"]["timeseries"]["dp_gp"][
-        "clusters.reproducible.hard.reordered.list"], sep="\t")
-    data = data.merge(rna_clusters, left_on=3, right_on="id")
-    data = data.drop("id", axis=1)
-    if True:
-        if direction == "increase":
-            data = data[data["cluster"] > 7].sort_values("cluster")
-        elif direction == "decrease":
-            data = data[data["cluster"] < 4].sort_values("cluster")
-        else:
-            raise ValueError, "unknown direction!"
-                
-    # add in hgnc ids
-    mappings = pd.read_csv(args.outputs["annotations"]["geneids.mappings.mat"], sep="\t")
-    data = data.merge(mappings, left_on=3, right_on="ensembl_gene_id")
-    data = data.drop(["ensembl_gene_id", "entrezgene"], axis=1)
-
-    # get an ordered TSS file (must simplify down to one gene per line for this)
-    # TODO use score to select
-    # sort by: distance, atac
+    if not os.path.isfile(tss_overlap_file):
+        bedtools_cmd = (
+            "bedtools slop -s -i {0} -g {1} -b {2} | " # increase histone range
+            "bedtools intersect -wo -a {3} -b stdin | " # intersect
+            "gzip -c > {4}").format(
+                filt_file,
+                args.inputs["annot"][args.cluster]["chromsizes"],
+                spread_bp,
+                args.outputs["data"]["tss.dynamic"],
+                tss_overlap_file)
+        print bedtools_cmd
+        os.system(bedtools_cmd)
+        
+    # generate other output files
+    plot_prefix = "{}/{}.{}.{}".format(
+        results_dir, prefix, histone, direction)
+    out_file = "{}.promoter_rna_data.mat.txt.gz".format(plot_prefix)
     tss_file = "{}.sorted.bed.gz".format(tss_overlap_file.split(".bed")[0])
-    
-    metadata = data[9].str.split(";", n=4, expand=True)
-    metadata["score"] = metadata[2].str.split("=", n=2, expand=True)[1].astype(float)
-    metadata["gene_id"] = data[3]
-    # use score to reduce
-    #metadata = metadata.loc[metadata.groupby([0])["score"].idxmax()] # this is an example/debug
-    data = data.loc[metadata.groupby(["gene_id"])["score"].idxmax()]
-    print "after grouping, {} tss".format(data.shape[0])
-    # now sort by the init region distance from TSS
-    metadata = metadata[1].str.split("=", n=2, expand=True)
-    metadata[["chrom", "start-stop"]] = metadata[1].str.split(":", n=2, expand=True)
-    metadata[["start", "stop"]] = metadata["start-stop"].str.split("-", n=2, expand=True)
-    data["init_midpoint"] = metadata["start"].astype(int) + (metadata["stop"].astype(int) - metadata["start"].astype(int)) / 2
-    data["init_to_tss"] = data[1] - data["init_midpoint"] # positive means upstream
-    # reorient based on strand
-    for row_i in range(data.shape[0]):
-        index_val = data.index[row_i]
-        if data[5].iloc[row_i] == "-":
-            data.at[index_val, "init_to_tss"] = -1 * data["init_to_tss"][index_val]
-    data = data.sort_values("init_to_tss", ascending=False)
-    # also ignore those that are too close?
-    #data = data[data["init_to_tss"].abs() > 1000] # TODO think about this
-    print "after removing nearby, {} tss".format(data.shape[0])
-    data.to_csv(
-        tss_file, columns=[0,1,2,3,4,5],
-        sep="\t", compression="gzip", header=False, index=False)
+    if not os.path.isfile(out_file):
+        data = pd.read_csv(tss_overlap_file, sep="\t", header=None)
 
-    if True:
-        pd.set_option('display.max_rows', data.shape[0])
-        print data
-        print "total genes:", len(set(data[3].values.tolist()))
+        # filter for gene trajectories
+        rna_clusters = pd.read_csv(args.outputs["results"]["rna"]["timeseries"]["dp_gp"][
+            "clusters.reproducible.hard.reordered.list"], sep="\t")
+        data = data.merge(rna_clusters, left_on=3, right_on="id")
+        data = data.drop("id", axis=1)
+        if True:
+            if direction == "increase":
+                data = data[data["cluster"] > 7].sort_values("cluster")
+            elif direction == "decrease":
+                data = data[data["cluster"] < 4].sort_values("cluster")
+            else:
+                raise ValueError, "unknown direction!"
 
-    if False:
+        # add in hgnc ids
+        mappings = pd.read_csv(args.outputs["annotations"]["geneids.mappings.mat"], sep="\t")
+        data = data.merge(mappings, left_on=3, right_on="ensembl_gene_id")
+        data = data.drop(["ensembl_gene_id", "entrezgene"], axis=1)
+
+        # get an ordered TSS file (must simplify down to one gene per line for this)
+        metadata = data[9].str.split(";", n=4, expand=True)
+        metadata["score"] = metadata[2].str.split("=", n=2, expand=True)[1].astype(float)
+        metadata["gene_id"] = data[3]
+        # use score to reduce
+        #metadata = metadata.loc[metadata.groupby([0])["score"].idxmax()] # this is an example/debug
+        data = data.loc[metadata.groupby(["gene_id"])["score"].idxmax()]
+        print "after grouping, {} tss".format(data.shape[0])
+        # now sort by the init region distance from TSS
         metadata = metadata[1].str.split("=", n=2, expand=True)
         metadata[["chrom", "start-stop"]] = metadata[1].str.split(":", n=2, expand=True)
         metadata[["start", "stop"]] = metadata["start-stop"].str.split("-", n=2, expand=True)
@@ -1626,38 +1610,23 @@ def _run_spreading_workflow_unidirectional(
             index_val = data.index[row_i]
             if data[5].iloc[row_i] == "-":
                 data.at[index_val, "init_to_tss"] = -1 * data["init_to_tss"][index_val]
-        # keep a reference for distances to put back in after grouping
-        data["dist_idx"] = data.index.values
-        dist_ref = data[["dist_idx", "init_to_tss"]]
-        data["init_dist"] = data["init_to_tss"].abs()
-        keep_headers = [0, 1, 2, 3, 4, 5, "dist_idx", "init_dist"]
-        # group with min idx
-        tss_data = data[keep_headers].reset_index()
-        tss_data = tss_data.loc[tss_data.groupby(keep_headers[:-2])["init_dist"].idxmin()]
-        tss_data = tss_data.merge(dist_ref, left_on="dist_idx", right_on="dist_idx")
-        tss_data = tss_data[[0, 1, 2, 3, 4, 5, "init_to_tss"]]
-        tss_data = tss_data.sort_values("init_to_tss", ascending=False)
-        print "after grouping, {} tss".format(len(set(tss_data[3].values.tolist())))
-        tss_data.to_csv(
+        data = data.sort_values("init_to_tss", ascending=False)
+        # also ignore those that are too close?
+        #data = data[data["init_to_tss"].abs() > 1000] # TODO think about this
+        print "after removing nearby, {} tss".format(data.shape[0])
+        data.to_csv(
             tss_file, columns=[0,1,2,3,4,5],
             sep="\t", compression="gzip", header=False, index=False)
-
-    # plot with TSS file
-    plot_prefix = "{}/{}.{}.{}".format(
-        results_dir, prefix, histone, direction)
-
-    # TODO overlap PAS-seq
-    pas_data = pd.read_csv(
-        args.outputs["data"]["rna.counts.pc.expressed.timeseries_adj.pooled.rlog.mat"],
-        sep="\t")
-    data = data.merge(pas_data, left_on=3, right_index=True)
-
-    out_file = "{}.promoter_rna_data.mat.txt.gz".format(plot_prefix)
-    data.to_csv(out_file, sep="\t", compression="gzip", index=False)
-    #print data
+        
+        # overlap PAS-seq
+        pas_data = pd.read_csv(
+            args.outputs["data"]["rna.counts.pc.expressed.timeseries_adj.pooled.rlog.mat"],
+            sep="\t")
+        data = data.merge(pas_data, left_on=3, right_index=True)
+        out_file = "{}.promoter_rna_data.mat.txt.gz".format(plot_prefix)
+        data.to_csv(out_file, sep="\t", compression="gzip", index=False)
     
-    # TODO make a rowseps file
-    
+    # TODO make a rowseps file?
     plot_profile_heatmaps_workflow(args, tss_file, plot_prefix)
 
     # TODO gene set enrichment
@@ -1696,8 +1665,7 @@ def run_histone_spreading_workflow(args, prefix):
     spread_regions_file = "{}.spread_1kb_merge.bed.gz".format(
         master_bed_file.split(".bed")[0])
     spread_bp = 1000 # this is approx 6 histones if wrapped?
-    #if not os.path.isfile(spread_regions_file):
-    if True:
+    if not os.path.isfile(spread_regions_file):
         merge_cmd = (
             "bedtools slop -i {0} -g {1} -b {2} | "
             "bedtools merge -i stdin | "
@@ -1713,20 +1681,21 @@ def run_histone_spreading_workflow(args, prefix):
     # filter: only keep the domains that have multiple peaks
     intersected_spread_file = "{}.multi_peak.bed.gz".format(
         spread_regions_file.split(".bed")[0])
-    get_dynamic_spread_cmd = (
-        "bedtools intersect -wao -a {} -b {} | " # intersect while keeping all data
-        "gzip -c > {}").format(
-            spread_regions_file,
-            master_bed_file,
-            intersected_spread_file)
-    print get_dynamic_spread_cmd
-    os.system(get_dynamic_spread_cmd)
+    if not os.path.isfile(intersected_spread_file):
+        get_dynamic_spread_cmd = (
+            "bedtools intersect -wao -a {} -b {} | " # intersect while keeping all data
+            "gzip -c > {}").format(
+                spread_regions_file,
+                master_bed_file,
+                intersected_spread_file)
+        print get_dynamic_spread_cmd
+        os.system(get_dynamic_spread_cmd)
 
     # read in to filter for the multiple peaks
     peak_num_thresh = 3
     domain_file = "{}.multi_peak_only.bed.gz".format(
         spread_regions_file.split(".bed")[0])
-    if True:
+    if not os.path.isfile(domain_file):
         data = pd.read_csv(intersected_spread_file, sep="\t", header=None)
         data["domain"] = "domain=" + data[0] + ":" + data[1].map(str) + "-" + data[2].map(str)
         data["indiv_region"] = "indiv_region=" + data[3] + ":" + data[4].map(str) + "-" + data[5].map(str)
@@ -1754,14 +1723,12 @@ def run_histone_spreading_workflow(args, prefix):
 
     # now look for domains that INCREASED in spread over time
     # extend regions in d0 to match domains file - this file is the baseline for SPREAD
-    if False:
-        args = _run_spreading_workflow_unidirectional(
-            args, results_dir, prefix, histone, domain_file, peak_files[0],
-            spread_bp=spread_bp, direction="increase")
-
-        args = _run_spreading_workflow_unidirectional(
-            args, results_dir, prefix, histone, domain_file, peak_files[2],
-            spread_bp=spread_bp, direction="decrease")
+    args = _run_spreading_workflow_unidirectional(
+        args, results_dir, prefix, histone, domain_file, peak_files[0],
+        spread_bp=spread_bp, direction="increase")
+    args = _run_spreading_workflow_unidirectional(
+        args, results_dir, prefix, histone, domain_file, peak_files[2],
+        spread_bp=spread_bp, direction="decrease")
 
     # TODO maybe also looped regions with HiChIP support?
 
