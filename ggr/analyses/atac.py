@@ -2,12 +2,15 @@
 """
 
 import os
+import re
 
 import numpy as np
 import pandas as pd
 
+from ggr.analyses.counting import make_count_matrix
 
-def compare_to_scATAC(atac_counts, sc_atac_counts, out_dir):
+
+def compare_to_scATAC_OLD(atac_counts, sc_atac_counts, out_dir):
     """compare results
     """
     # read in data
@@ -93,5 +96,73 @@ def compare_to_scATAC(atac_counts, sc_atac_counts, out_dir):
     
     quit()
 
+    
+    return
+
+
+def compare_to_scATAC(sc_atac_counts, bulk_read_files, out_dir, threads=12):
+    """compare results
+    """
+    # read in data
+    sc_atac = pd.read_csv(sc_atac_counts, sep="\t", index_col=0)
+    days = ["d0", "d3", "d6"]
+
+    # make a bed file from sc atac data
+    sc_bed_file = "{}/sc.regions.bed.gz".format(out_dir)
+    sc_regions = sc_atac.reset_index()["Peak_position"].str.split("_", n=3, expand=True)
+    sc_regions.to_csv(
+        sc_bed_file, columns=[0, 1, 2],
+        compression="gzip", sep="\t", header=False, index=False)
+    sc_bed_sorted_file = "{}.sorted.bed.gz".format(sc_bed_file.split(".bed")[0])
+    sort_cmd = "zcat {} | sort -k1,1 -k2,2n | gzip -c > {}".format(
+        sc_bed_file, sc_bed_sorted_file)
+    os.system(sort_cmd)
+    
+    # make a counts matrix
+    bulk_counts_mat_file = "{}/bulk.counts_in_sc_regions.mat.txt.gz".format(out_dir)
+    if not os.path.isfile(bulk_counts_mat_file):
+        make_count_matrix(
+            sc_bed_sorted_file,
+            bulk_read_files,
+            bulk_counts_mat_file,
+            "ATAC",
+            adjustment="ends",
+            tmp_dir=out_dir,
+            parallel=threads)
+
+    # merge it into the sc atac data
+    sc_v_bulk_mat_file = "{}/sc_and_bulk.counts.mat.txt.gz".format(out_dir)
+    if not os.path.isfile(sc_v_bulk_mat_file):
+        bulk_atac = pd.read_csv(bulk_counts_mat_file, sep="\t")
+        # fix bulk region ids to merge correctly with sc atac
+        bulk_atac.index = bulk_atac.index.str.replace(":", "_")
+        bulk_atac.index = bulk_atac.index.str.replace("-", "_")
+        # rename sc headers
+        sc_headers = sc_atac.columns
+        sc_headers = [re.sub("^.+scATAC-D", "sc.d", header) for header in sc_headers]
+        sc_headers = [re.sub(".st.rmdup.flt.bam", "", header) for header in sc_headers]
+        sc_headers = [re.sub("-AR-", "_b", header) for header in sc_headers]
+        sc_atac.columns = sc_headers
+        # merge
+        all_atac = sc_atac.merge(bulk_atac, left_index=True, right_index=True)
+        all_atac.to_csv(
+            sc_v_bulk_mat_file, sep="\t", index=True, header=True, compression="gzip")
+
+    # run rlog norm
+    if False:
+        sc_v_bulk_rlog_mat_file = "{}.rlog.mat.txt.gz".format(
+            sc_v_bulk_mat_file.split(".mat")[0])
+        rlog_cmd = "normalize.rlog.R {} {}".format(
+            sc_v_bulk_mat_file, sc_v_bulk_rlog_mat_file)
+        print rlog_cmd
+        os.system(rlog_cmd)
+    
+    # send to R to plot
+    r_cmd = "~/git/ggr-project/R/plot.sc_vs_bulk.dim_reduction.R {} {}".format(
+        sc_v_bulk_mat_file, "{}/sc_vs_bulk".format(out_dir))
+    print r_cmd
+    #os.system(r_cmd)
+    
+    quit()
     
     return

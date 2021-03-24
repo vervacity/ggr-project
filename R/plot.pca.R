@@ -183,6 +183,8 @@ if (grepl("atac", plot_file, fixed=TRUE)) {
 }  else {
     plot_ht <- 1.75 * 0.8
     plot_wid <- 2.5 * 0.8
+    plot_ht <- 1.25
+    plot_wid <- 2
 }
 
 ggsave(plot_file, height=plot_ht, width=plot_wid, useDingbats=FALSE)

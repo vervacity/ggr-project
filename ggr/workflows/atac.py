@@ -329,11 +329,14 @@ def runall(args, prefix):
     scATAC_file = "/mnt/lab_data3/dskim89/ggr/data_external/GSE116248_scATAC/GSE116248_Peak_counts_Keratinocyte_WT.txt.gz"
 
     if False:
+        bulk_read_files = sorted(glob.glob(
+            "{}/{}".format(
+                args.inputs["atac"][args.cluster]["data_dir"],
+                args.inputs["atac"][args.cluster]["tagalign_glob"])))
         compare_to_scATAC(
-            args.outputs["data"]["atac.counts.pooled.mat"],
             scATAC_file,
-            compare_dir)
-    
-
+            bulk_read_files,
+            compare_dir,
+            threads=args.threads)
         
     return args
