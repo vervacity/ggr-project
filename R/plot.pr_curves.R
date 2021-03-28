@@ -4,6 +4,7 @@
 # plot PR curves
 
 library(ggplot2)
+library(ggsci)
 library(RColorBrewer)
 
 args <- commandArgs(trailingOnly=TRUE)
@@ -15,15 +16,16 @@ data <- read.table(data_file, sep="\t", header=TRUE)
 data$fold <- as.factor(data$fold)
 
 # plot
-my_palette <- rev(colorRampPalette(brewer.pal(11, 'Spectral'))(length(unique(data$fold))))
+#my_palette <- rev(colorRampPalette(brewer.pal(11, 'Spectral'))(length(unique(data$fold))))
 ggplot(data, aes(x=recall, y=precision, group=fold)) +
-    geom_line(aes(color=fold)) +
-    labs(x="Recall", y="Precision", title="Genome-wide enhancer prediction") +
+    geom_line(size=0.230, aes(color=fold)) +
+    labs(x="Recall", y="Precision", title="Precision recall on\nenhancer prediction") +
     scale_x_continuous(limits=c(0,1), expand=c(0,0)) +
     scale_y_continuous(limits=c(0,1), expand=c(0,0)) + 
     theme_bw() +
     coord_fixed() +
     theme(
+        aspect.ratio=1,
         text=element_text(family="ArialMT"),
         plot.margin=margin(5,10,1,5),
         plot.title=element_text(size=8, hjust=0.5, margin=margin(b=1)),
@@ -51,9 +53,11 @@ ggplot(data, aes(x=recall, y=precision, group=fold)) +
         legend.title=element_blank(),
         legend.text=element_text(size=5),
         legend.position="bottom") +
-    scale_colour_manual(values=my_palette)
-
+    #scale_colour_manual(values=my_palette)
+    scale_color_npg() +
+    scale_fill_npg()
+        
 out_file <- paste(plot_prefix, ".pdf", sep="")
-ggsave(out_file, height=2, width=2, useDingbats=FALSE)
+ggsave(out_file, height=2, width=1.5, useDingbats=FALSE)
 
 
