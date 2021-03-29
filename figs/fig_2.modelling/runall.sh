@@ -27,7 +27,7 @@ ANNOT_DIR=/mnt/lab_data3/dskim89/ggr/annotations
 #$SCRIPT_DIR/fig_2-b.1.plot.ggr_clf.R fig_2-b.1 $EVAL_DIR/ggr.basset.clf.random_init.testfold-*/by_task/*txt $EVAL_DIR/ggr.basset.clf.pretrained.folds.testfold-*/by_task/*txt
 
 # REVISION: PR curves - just show one fold examples?
-$SCRIPT_DIR/fig_2-b.2.plot.ggr_clf_pr_curves.R fig_2-b.1 $EVAL_DIR/ggr.basset.clf.pretrained.folds.testfold-*/by_task/auprc
+#$SCRIPT_DIR/fig_2-b.2.plot.ggr_clf_pr_curves.R fig_2-b.1 $EVAL_DIR/ggr.basset.clf.pretrained.folds.testfold-*/by_task/auprc
 
 # -----------
 # B
@@ -151,3 +151,43 @@ UNFILT_SCAN_FILE=$SCANMOTIFS_DIR/motifs.background.100k/ggr.scanmotifs.h5
 # check whether right script
 # check dataset choice (new or old pwms)
 #$SCRIPT_DIR/analyze.genome.spacing.py $SCRIPT_DIR genome.spacing.v5 $UNFILT_SCAN_FILE $SIG_PWMS_FILE
+
+
+
+# ------------
+# other suppls
+# ------------
+
+# plot TF-modisco vs HOCOMOCO motif comparisons
+tfmodisco_dir=/mnt/lab_data2/msharmin/oc-atlas/DanSkinData/fold_0_ggr/result_early/modisco_out
+tfmodisco_file=${tfmodisco_dir}/results.hdf5
+
+# TP63 - both
+$SCRIPT_DIR/plot_pwm.py $PWM_FILE TP53
+$SCRIPT_DIR/plot_tfmodisco_pwm.py $tfmodisco_file metacluster_0 pattern_1 tfmodisco.early
+
+# ATF1 - both
+$SCRIPT_DIR/plot_pwm.py $PWM_FILE ATF1
+$SCRIPT_DIR/plot_tfmodisco_pwm.py $tfmodisco_file metacluster_0 pattern_6 tfmodisco.early
+
+# ERG
+$SCRIPT_DIR/plot_pwm.py $PWM_FILE ERG
+$SCRIPT_DIR/plot_tfmodisco_pwm.py $tfmodisco_file metacluster_0 pattern_10 tfmodisco.early
+
+# RELA
+$SCRIPT_DIR/plot_pwm.py $PWM_FILE RELA
+$SCRIPT_DIR/plot_tfmodisco_pwm.py $tfmodisco_file metacluster_0 pattern_12 tfmodisco.early
+
+# CBFB
+$SCRIPT_DIR/plot_pwm.py $PWM_FILE CBFB
+$SCRIPT_DIR/plot_tfmodisco_pwm.py $tfmodisco_file metacluster_0 pattern_4 tfmodisco.early
+
+# TFAP2A
+$SCRIPT_DIR/plot_pwm.py $PWM_FILE TFAP2A
+$SCRIPT_DIR/plot_tfmodisco_pwm.py $tfmodisco_file metacluster_0 pattern_11 tfmodisco.early
+
+
+# dimer - AP1, TEAD
+$SCRIPT_DIR/plot_pwm.py $PWM_FILE TEAD
+$SCRIPT_DIR/plot_tfmodisco_pwm.py $tfmodisco_file metacluster_0 pattern_9 tfmodisco.early
+
