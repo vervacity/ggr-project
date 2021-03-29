@@ -11,6 +11,7 @@ from ggr.analyses.linking import regions_to_genes
 from ggr.analyses.nn import get_motif_region_set
 from ggr.analyses.nn import compare_nn_gene_set_to_diff_expr
 from ggr.analyses.nn import evaluate_enhancer_prediction
+from ggr.analyses.nn import run_low_affinity_workflow
 from ggr.analyses.tronn_scripts import tronn_intersect_with_expression_cmd
 
 from ggr.util.utils import run_shell_cmd
@@ -192,6 +193,38 @@ def runall(args, prefix):
     NN_DIR = "/mnt/lab_data3/dskim89/ggr/nn/2019-03-12.freeze"
 
     # -------------------------------------------
+    # ANALYSIS - motifs to TF occupancy - low affinity sites
+    # -------------------------------------------
+    affinity_dir = "{}/low_affinity".format(results_dir)
+    if not os.path.isdir(affinity_dir):
+        os.system("mkdir -p {}".format(affinity_dir))
+    prefix = "nn.low_affinity_hits"
+
+    scanmotifs_dir = "/mnt/lab_data3/dskim89/ggr/nn/2020-01-13/scanmotifs/motifs.background.lite"
+    #scanmotifs_dir = "/mnt/lab_data3/dskim89/ggr/nn/2019-03-12.freeze/motifs.input_x_grad.lite"
+    scanmotifs_file = "{}/ggr.scanmotifs.h5".format(scanmotifs_dir)
+
+    tfs = [
+        #("TP53", 6, "TP63_LABELS", 1),
+        ("TP53", 0, "TP63_LABELS", 0),
+        ("CTCF", 6, "CTCF_LABELS", 1),
+        ("KLF12", 6, "KLF4_LABELS", 1),
+        ("TFAP2A", 6, "ZNF750_LABELS", 0)
+    ]
+    for motif_name, timepoint_idx, chipseq_key, chipseq_idx in tfs:
+        plot_file = "{}/{}.{}.chipseq_pr_curves.pdf".format(
+            affinity_dir, prefix, motif_name)
+        if not os.path.isfile(plot_file):
+            run_low_affinity_workflow(
+                scanmotifs_file,
+                motif_name,
+                timepoint_idx,
+                chipseq_key,
+                chipseq_idx,
+                affinity_dir,
+                "{}.{}".format(prefix, motif_name))
+    
+    # -------------------------------------------
     # ANALYSIS - baselines: compare results to non-NN framework
     # -------------------------------------------
     baselines_dir = "{}/baselines".format(results_dir)
@@ -281,8 +314,6 @@ def runall(args, prefix):
             ["NN", "Homer+ATAC"],
             baselines_dir, prefix)
 
-    quit()
-
     # -------------------------------------------
     # ANALYSIS - predicting enhancers as defined by chromatin state
     # -------------------------------------------
@@ -299,11 +330,8 @@ def runall(args, prefix):
     if not os.path.isfile("{}.pdf".format(plot_prefix)):
         evaluate_enhancer_prediction(eval_files, plot_prefix)
 
-
     quit()
 
-
-        
     # -------------------------------------------
     # ANALYSIS - predicting TF KD/KO gene sets from learning results
     # -------------------------------------------
@@ -359,76 +387,75 @@ def runall(args, prefix):
     #    nn_motif_files = glob.glob(
     #        "{}/motifs.input_x_grad.mid/ggr.scanmotifs.h5".format(NN_DIR))
 
-    
-    # run for each motif-timepoint
-    for motif_name, timepoint_idx, diff_expr_file in motifs:
-        print ">>", motif_name
+    if False:
+        # run for each motif-timepoint
+        for motif_name, timepoint_idx, diff_expr_file in motifs:
+            print ">>", motif_name
 
-        # first run with motif hits
-        
-        # get bed file of regions
-        bed_file = "{}/{}-{}.bed.gz".format(tf_kd_dir, motif_name, timepoint_idx)
-        #if not os.path.isfile(bed_file):
-        if True:
-            get_motif_region_set(
-                nn_motif_files,
-                motif_name,
-                timepoint_idx,
-                bed_file)
-            
-        # link to nearby genes
-        # TODO how are we up/downweighting things?
-        genes_file = "{}.genes.txt.gz".format(bed_file.split(".bed")[0])
-        #if not os.path.isfile(genes_file):
-        if True:
-            regions_to_genes(
-                bed_file,
-                interactions_file,
-                args.outputs["annotations"]["tss.pc.bed"],
-                genes_file,
-                filter_by_score=0.00)
-                #filter_by_score=0.5) # proximity corr thresh
-        
-        # compare to differential dataset
-        if True:
-            compare_nn_gene_set_to_diff_expr(
-                genes_file,
-                diff_expr_file,
-                convert_table=args.outputs["annotations"]["geneids.mappings.mat"])
+            # first run with motif hits
+
+            # get bed file of regions
+            bed_file = "{}/{}-{}.bed.gz".format(tf_kd_dir, motif_name, timepoint_idx)
+            #if not os.path.isfile(bed_file):
+            if True:
+                get_motif_region_set(
+                    nn_motif_files,
+                    motif_name,
+                    timepoint_idx,
+                    bed_file)
+
+            # link to nearby genes
+            # TODO how are we up/downweighting things?
+            genes_file = "{}.genes.txt.gz".format(bed_file.split(".bed")[0])
+            #if not os.path.isfile(genes_file):
+            if True:
+                regions_to_genes(
+                    bed_file,
+                    interactions_file,
+                    args.outputs["annotations"]["tss.pc.bed"],
+                    genes_file,
+                    filter_by_score=0.00)
+                    #filter_by_score=0.5) # proximity corr thresh
+
+            # compare to differential dataset
+            if True:
+                compare_nn_gene_set_to_diff_expr(
+                    genes_file,
+                    diff_expr_file,
+                    convert_table=args.outputs["annotations"]["geneids.mappings.mat"])
 
 
-        # then run with NN-active motifs
-        bed_file = "{}/{}-{}.bed.gz".format(tf_kd_dir, motif_name, timepoint_idx)
-        #if not os.path.isfile(bed_file):
-        if True:
-            get_motif_region_set(
-                nn_motif_files,
-                motif_name,
-                timepoint_idx,
-                bed_file,
-                motif_key="sequence.active.pwm-scores.thresh.sum")
-            
-        # link to nearby genes
-        # TODO how are we up/downweighting things?
-        genes_file = "{}.genes.txt.gz".format(bed_file.split(".bed")[0])
-        #if not os.path.isfile(genes_file):
-        if True:
-            regions_to_genes(
-                bed_file,
-                interactions_file,
-                args.outputs["annotations"]["tss.pc.bed"],
-                genes_file,
-                filter_by_score=0.00)
-                #filter_by_score=0.5) # proximity corr thresh
+            # then run with NN-active motifs
+            bed_file = "{}/{}-{}.bed.gz".format(tf_kd_dir, motif_name, timepoint_idx)
+            #if not os.path.isfile(bed_file):
+            if True:
+                get_motif_region_set(
+                    nn_motif_files,
+                    motif_name,
+                    timepoint_idx,
+                    bed_file,
+                    motif_key="sequence.active.pwm-scores.thresh.sum")
+
+            # link to nearby genes
+            # TODO how are we up/downweighting things?
+            genes_file = "{}.genes.txt.gz".format(bed_file.split(".bed")[0])
+            #if not os.path.isfile(genes_file):
+            if True:
+                regions_to_genes(
+                    bed_file,
+                    interactions_file,
+                    args.outputs["annotations"]["tss.pc.bed"],
+                    genes_file,
+                    filter_by_score=0.00)
+                    #filter_by_score=0.5) # proximity corr thresh
+
+            # compare to differential dataset
+            if True:
+                compare_nn_gene_set_to_diff_expr(
+                    genes_file,
+                    diff_expr_file,
+                    convert_table=args.outputs["annotations"]["geneids.mappings.mat"])
         
-        # compare to differential dataset
-        if True:
-            compare_nn_gene_set_to_diff_expr(
-                genes_file,
-                diff_expr_file,
-                convert_table=args.outputs["annotations"]["geneids.mappings.mat"])
         
-        
-    quit()
                     
     return args

@@ -260,3 +260,89 @@ def evaluate_enhancer_prediction(eval_files, prefix):
     os.system(r_cmd)
         
     return
+
+
+
+def run_low_affinity_workflow(
+        motifs_file,
+        motif_name,
+        timepoint_idx,
+        chipseq_key,
+        chipseq_idx,
+        out_dir,
+        prefix):
+    """run low affinity analysis
+    """
+    # get motif idx
+    with h5py.File(motifs_file, "r") as hf:
+        motifs = hf["sequence-weighted.active.pwm-scores.thresh.sum"].attrs["pwm_names"]
+        #for key in sorted(hf.keys()): print key, hf[key].shape
+    motif_idx = None
+    for i in range(len(motifs)):
+        if motif_name in motifs[i]:
+            motif_idx = i
+    if motif_idx is None:
+        raise ValueError, "No motif by that name found: {}".format(motif_name)
+    print motifs[motif_idx]
+
+    # then pull from the file
+    with h5py.File(motifs_file, "r") as hf:
+        #for key in sorted(hf.keys()): print key, hf[key].shape
+        nn_scores = hf["sequence-weighted.active.pwm-scores.thresh.sum"][
+            :,timepoint_idx,motif_idx]
+        pwm_scores = hf["sequence.active.pwm-scores.thresh.sum"][
+            :,0,motif_idx]
+        labels = hf[chipseq_key][:,chipseq_idx]
+
+    # dataframe, save these out to plot cumulative results
+    results = pd.DataFrame({
+        "NN": nn_scores,
+        "PWM": pwm_scores,
+        "labels": labels})
+    scores_file = "{}/{}.scores.mat.txt.gz".format(out_dir, prefix)
+    results.to_csv(
+        scores_file,
+        sep="\t", compression="gzip", header=True, index=False)
+
+    # plot by ranked score
+    plot_file = "{}/{}.chipseq_by_ranked_scores.pdf".format(out_dir, prefix)
+    r_cmd = "~/git/ggr-project/R/plot.chipseq_by_ranked_scores.R {} {} {}".format(
+        scores_file, plot_file, motif_name)
+    print r_cmd
+    os.system(r_cmd)
+    
+    # AUPRC
+    pr_curve = precision_recall_curve(
+        results["labels"].values.astype(int),        
+        results["NN"].values)
+    precision, recall = pr_curve[:2]
+    print auc(recall, precision)
+
+    plot_data = pd.DataFrame({
+        "precision": precision,
+        "recall": recall})
+    plot_data["group"] = "NN"
+    
+    pr_curve = precision_recall_curve(
+        results["labels"].values.astype(int),        
+        results["PWM"].values)
+    precision, recall = pr_curve[:2]
+    print auc(recall, precision)
+    
+    plot_data_pwm = pd.DataFrame({
+        "precision": precision,
+        "recall": recall})
+    plot_data_pwm["group"] = "PWM"
+
+    plot_data = pd.concat([plot_data, plot_data_pwm], axis=0)
+    pr_file = "{}/{}.pr_data.txt.gz".format(out_dir, prefix)
+    plot_data.to_csv(pr_file, sep="\t", compression="gzip", header=True, index=False)
+
+    # plot PR curves
+    plot_file = "{}/{}.chipseq_pr_curves.pdf".format(out_dir, prefix)
+    r_cmd = "~/git/ggr-project/R/plot.chipseq_pr_curves.R {} {}".format(
+        pr_file, plot_file)
+    print r_cmd
+    os.system(r_cmd)
+
+    return
