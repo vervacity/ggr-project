@@ -15,6 +15,7 @@ from ggr.util.bed_utils import merge_regions
 from ggr.util.bed_utils import id_to_bed
 
 from ggr.analyses.atac import compare_to_scATAC
+from ggr.analyses.atac import get_consensus_summits_file
 from ggr.analyses.filtering import filter_for_ids
 from ggr.analyses.counting import make_count_matrix
 from ggr.analyses.counting import count_present_regions_per_sample
@@ -120,6 +121,20 @@ def runall(args, prefix):
             static_region_summary_file, plot_file)
         print plot_cmd
         os.system(plot_cmd)
+
+    # -------------------------------------------
+    # ANALYSIS - make an ATAC summits file
+    # input: master regions, bed files
+    # output: consensus summits file
+    # -------------------------------------------
+    summits_key = "atac.master.summits.bed"
+    out_data[summits_key] = '{0}/{1}.idr.summits.bed.gz'.format(
+        data_dir, prefix)
+    if not os.path.isfile(out_data[summits_key]):
+        get_consensus_summits_file(
+            out_data[master_regions_key],
+            timepoints_files,
+            out_data[summits_key])
         
     # -------------------------------------------
     # ANALYSIS 2 - get read counts in these regions

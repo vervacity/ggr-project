@@ -166,3 +166,47 @@ def compare_to_scATAC(sc_atac_counts, bulk_read_files, out_dir, threads=12):
     quit()
     
     return
+
+
+
+def get_consensus_summits_file(master_regions_file, peak_files, out_file):
+    """given a union peak set and individual region files, get consensus summits
+    NOTE: should only use on data that produces mostly narrowpeaks
+    (ie, likely inappropriate for histone marks)
+    """
+    # first overlap files with master regions file
+    tmp_file = "{}.tmp.intersect.txt.gz".format(out_file.split(".bed")[0])
+    intersect_cmd = (
+        "bedtools intersect -loj -a {} -b {} | "
+        "gzip -c > {}").format(
+            master_regions_file,
+            " ".join(peak_files),
+            tmp_file)
+    print intersect_cmd
+    os.system(intersect_cmd)
+
+    # read in and get averaged summit
+    data = pd.read_csv(tmp_file, sep="\t", header=None)
+    data["summit"] = data[5] + data[13]
+    
+    # two step: first need to reconcile summit within timepoint
+    # do this based on max signalValue (col 7)
+    data = data[[0,1,2,3,"summit",10]]
+    data = data.loc[data.groupby([0,1,2,3])[10].idxmax()]
+    
+    # then average
+    data = data[[0,1,2,"summit"]]
+    data = data.groupby([0,1,2]).mean().reset_index()
+    data["start"] = data["summit"].astype(int)
+    data["stop"] = data["start"] + 1
+
+    # save out
+    data.to_csv(
+        out_file,
+        columns=[0, "start", "stop"],
+        header=False, index=False, sep="\t", compression="gzip")
+
+    # clean up
+    os.system("rm {}".format(tmp_file))
+    
+    return
