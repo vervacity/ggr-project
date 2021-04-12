@@ -2,19 +2,127 @@
 """
 
 import os
+import h5py
 import glob
 import logging
 
+import numpy as np
+
 from ggr.analyses.baselines import compare_sig_motifs
 from ggr.analyses.baselines import compare_tf_motif_corrs
+from ggr.analyses.bioinformatics import run_gprofiler
 from ggr.analyses.linking import regions_to_genes
 from ggr.analyses.nn import get_motif_region_set
+from ggr.analyses.nn import get_sig_motif_list
 from ggr.analyses.nn import compare_nn_gene_set_to_diff_expr
 from ggr.analyses.nn import evaluate_enhancer_prediction
 from ggr.analyses.nn import run_low_affinity_workflow
+from ggr.analyses.nn import summarize_functional_enrichments
+from ggr.analyses.nn import get_summit_centric_motif_maps
 from ggr.analyses.tronn_scripts import tronn_intersect_with_expression_cmd
 
 from ggr.util.utils import run_shell_cmd
+
+
+def _run_motif_functional_enrichment_workflow(args, motif_name, bed_file, out_dir):
+    """motif to region set and functional enrichments
+    """
+    # linking file
+    links_dir = "{}/linking/proximity".format(args.outputs["results"]["dir"])
+    #links_dir = "{}/linking/hichip".format(args.outputs["results"]["dir"])
+    interactions_file = "{}/ggr.linking.ALL.overlap.interactions.txt.gz".format(links_dir)
+        
+    # link to nearby genes
+    # TODO how are we up/downweighting things?
+    genes_file = "{}.genes.txt.gz".format(bed_file.split(".bed")[0])
+    if not os.path.isfile(genes_file):
+        regions_to_genes(
+            bed_file,
+            interactions_file,
+            #args.outputs["annotations"]["tss.pc.bed"],
+            args.outputs["results"]["rna"]["expression_filtering"]["tss.pc.expressed"],
+            genes_file,
+            filter_by_score=0.01)
+            #filter_by_score=0.1) # proximity corr thresh
+
+    # then run gene enrichment
+    gprofiler_output = "{}/{}.genes.go_gprofiler.txt".format(out_dir, motif_name)
+    if not os.path.isfile(gprofiler_output):
+        run_gprofiler(
+            genes_file,
+            args.outputs["data"]["rna.counts.pc.expressed.mat"],
+            out_dir, ordered=True, header=True)
+    
+    return
+
+
+def _run_motifs_functional_enrichment_workflow(args, pvals_file, nn_files, out_dir):
+    """get a mapping of motifs to regions and functions
+    """
+    # first get motifs list
+    motif_names = get_sig_motif_list(pvals_file, nn_files[0])
+
+    # then get results per motif
+    for motif_name in motif_names:
+        bed_file = "{}/{}.bed.gz".format(out_dir, motif_name)
+        if not os.path.isfile(bed_file):
+            get_motif_region_set(nn_files, motif_name, bed_file)
+        _run_motif_functional_enrichment_workflow(args, motif_name, bed_file, out_dir)
+
+    # summarize results
+    summary_dir = "{}/summary".format(out_dir)
+    if not os.path.isdir(summary_dir):
+        os.system("mkdir -p {}".format(summary_dir))
+        summarize_functional_enrichments(out_dir, summary_dir)
+    
+    return
+
+
+def _run_atac_summit_centric_workflow(args, pvals_file, nn_files, work_dir):
+    """look at motif positions around atac summit
+    """
+    # first get motifs list
+    motif_names = get_sig_motif_list(pvals_file, nn_files[0])
+    print len(motif_names)
+
+    print args.outputs["data"]["atac.master.summits.bed"]
+    
+    # then get results per motif
+    for motif_name in motif_names:
+
+        run_motifs = ["FOX", "CEBP", "TP53", "KLF", "TFAP2", "ZNF350"]
+        run_motifs = ["TP53"]
+        dont_run = True
+        for motif_str in run_motifs:
+            if motif_str in motif_name:
+                dont_run = False
+        if dont_run:
+            continue
+
+        if True:
+            get_summit_centric_motif_maps(
+                motif_name,
+                nn_files,
+                args.outputs["data"]["atac.master.bed"],
+                args.outputs["data"]["atac.master.summits.bed"],
+                work_dir)
+
+            # get the bed file and run functional enrichments
+            bed_file = "{}/{}.summit_center_filt.bed.gz".format(work_dir, motif_name)
+            _run_motif_functional_enrichment_workflow(args, motif_name, bed_file, work_dir)
+        
+    quit()
+        
+    # then summarize functional enrichment results
+    summary_dir = "{}/summary".format(work_dir)
+    if not os.path.isdir(summary_dir):
+        os.system("mkdir -p {}".format(summary_dir))
+        summarize_functional_enrichments(work_dir, summary_dir)
+
+        
+    quit()
+        
+    return
 
 
 def runall(args, prefix):
@@ -330,8 +438,55 @@ def runall(args, prefix):
     if not os.path.isfile("{}.pdf".format(plot_prefix)):
         evaluate_enhancer_prediction(eval_files, plot_prefix)
 
+    # -------------------------------------------
+    # ANALYSIS - homotypic grammars
+    # -------------------------------------------
+    work_dir = "{}/homotypic".format(results_dir)
+    if not os.path.isdir(work_dir):
+        os.system("mkdir -p {}".format(work_dir))
+
+    NN_DIR = "/mnt/lab_data3/dskim89/ggr/nn/2019-03-12.freeze"
+        
+    # motifs to look at
+    nn_pvals_file = (
+        "{}/motifs.sig/motifs.adjust.diff.rna_filt.dmim/pvals.rna_filt.corr_filt.h5").format(
+            NN_DIR)
+
+    nn_motif_files = [
+        "/mnt/lab_data3/dskim89/ggr/nn/2020-01-13/scanmotifs/motifs.background.lite/ggr.scanmotifs.h5"
+    ]
+
+    nn_motif_files = [
+        "{}/motifs.input_x_grad.early/ggr.scanmotifs.h5".format(NN_DIR),
+        "{}/motifs.input_x_grad.mid/ggr.scanmotifs.h5".format(NN_DIR),
+        "{}/motifs.input_x_grad.late/ggr.scanmotifs.h5".format(NN_DIR),
+    ]
+    print "DEBUGGING"
+    if False:
+        nn_motif_files = [
+            #"{}/motifs.input_x_grad.early/ggr.scanmotifs.h5".format(NN_DIR)
+            "{}/motifs.input_x_grad.late/ggr.scanmotifs.h5".format(NN_DIR)
+        ]
+
+    # run a functional enrichment mapping just based on presence of NN-active motifs
+    _run_motifs_functional_enrichment_workflow(args, nn_pvals_file, nn_motif_files, work_dir)
+    
+    # do ATAC summit-centric view on motifs
+    # also functional enrichment mapping here too
+    work_dir = "{}/homotypic.atac_summits".format(results_dir)
+    if not os.path.isdir(work_dir):
+        os.system("mkdir -p {}".format(work_dir))
+    
+    _run_atac_summit_centric_workflow(args, nn_pvals_file, nn_motif_files, work_dir)
+        
     quit()
 
+
+
+
+
+
+    
     # -------------------------------------------
     # ANALYSIS - predicting TF KD/KO gene sets from learning results
     # -------------------------------------------
@@ -401,8 +556,8 @@ def runall(args, prefix):
                 get_motif_region_set(
                     nn_motif_files,
                     motif_name,
-                    timepoint_idx,
-                    bed_file)
+                    bed_file,
+                    timepoint_idx=timepoint_idx)
 
             # link to nearby genes
             # TODO how are we up/downweighting things?
@@ -432,8 +587,8 @@ def runall(args, prefix):
                 get_motif_region_set(
                     nn_motif_files,
                     motif_name,
-                    timepoint_idx,
                     bed_file,
+                    timepoint_idx=timepoint_idx,
                     motif_key="sequence.active.pwm-scores.thresh.sum")
 
             # link to nearby genes
