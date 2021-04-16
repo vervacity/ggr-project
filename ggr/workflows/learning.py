@@ -84,14 +84,13 @@ def _run_atac_summit_centric_workflow(args, pvals_file, nn_files, work_dir):
     # first get motifs list
     motif_names = get_sig_motif_list(pvals_file, nn_files[0])
     print len(motif_names)
-
-    print args.outputs["data"]["atac.master.summits.bed"]
     
     # then get results per motif
     for motif_name in motif_names:
 
+        # debug
         run_motifs = ["FOX", "CEBP", "TP53", "KLF", "TFAP2", "ZNF350"]
-        run_motifs = ["TP53"]
+        run_motifs = ["KLF12"]
         dont_run = True
         for motif_str in run_motifs:
             if motif_str in motif_name:
@@ -109,7 +108,7 @@ def _run_atac_summit_centric_workflow(args, pvals_file, nn_files, work_dir):
 
             # get the bed file and run functional enrichments
             bed_file = "{}/{}.summit_center_filt.bed.gz".format(work_dir, motif_name)
-            _run_motif_functional_enrichment_workflow(args, motif_name, bed_file, work_dir)
+            #_run_motif_functional_enrichment_workflow(args, motif_name, bed_file, work_dir)
         
     quit()
         

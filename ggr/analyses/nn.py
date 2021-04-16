@@ -524,6 +524,10 @@ def get_motif_distances(motif_data, metadata_cols, out_file):
     for row_idx in range(motif_data.shape[0]):
         motif_vector = motif_data.iloc[row_idx,:].values
         motif_vector[motif_vector == -1] = 0
+
+        # tmp trackers
+        row_motifs = []
+        row_distances = []
         
         start_idx = 0
         start_score = 0
@@ -538,11 +542,24 @@ def get_motif_distances(motif_data, metadata_cols, out_file):
                     start_motif.append(start_score)
                     stop_motif.append(motif_score)
                     distances.append(pos_idx - start_idx)
-
+                    
                 # and increment
                 start_idx = pos_idx
                 start_score = motif_score
 
+                # and put into tmp trackers
+                row_motifs.append(motif_score)
+                row_distances.append(pos_idx)
+                
+        # TODO - need to go through again for the longer distances
+        for i in range(len(row_motifs)):
+            for j in range(len(row_motifs)):
+                if i > j + 1:
+                    # add in the motif and distance
+                    start_motif.append(row_motifs[i])
+                    stop_motif.append(row_motifs[j])
+                    distances.append(row_distances[i] - row_distances[j])
+        
     results = pd.DataFrame({
         "start_score": start_motif,
         "stop_score": stop_motif,
@@ -616,11 +633,11 @@ def get_summit_centric_motif_maps(
     os.system(r_cmd)
 
     # plot HITS: distances v affinity
-    distances_file = "{}/{}.hits.distances_v_affinity.txt.gz".format(work_dir, motif_name)
-    get_motif_distances(motif_data_raw, index_cols, distances_file)
+    distances_hits_file = "{}/{}.hits.distances_v_affinity.txt.gz".format(work_dir, motif_name)
+    get_motif_distances(motif_data_raw, index_cols, distances_hits_file)
     plot_file = "{}/{}.distance_v_affinity.hits.pdf".format(work_dir, motif_name)
     r_cmd = "~/git/ggr-project/R/plot.distance_vs_affinity.R {} {} {}".format(
-        distances_file, plot_file, motif_name)
+        distances_hits_file, plot_file, motif_name)
     print r_cmd
     os.system(r_cmd)
 
@@ -679,11 +696,11 @@ def get_summit_centric_motif_maps(
     os.system(r_cmd)
 
     # plot NN: distances vs affinity
-    distances_file = "{}/{}.nn.distances_v_affinity.txt.gz".format(work_dir, motif_name)
-    get_motif_distances(motif_data_filt, index_cols, distances_file)
+    distances_nn_file = "{}/{}.nn.distances_v_affinity.txt.gz".format(work_dir, motif_name)
+    get_motif_distances(motif_data_filt, index_cols, distances_nn_file)
     plot_file = "{}/{}.distance_v_affinity.nn.pdf".format(work_dir, motif_name)
     r_cmd = "~/git/ggr-project/R/plot.distance_vs_affinity.R {} {} {}".format(
-        distances_file, plot_file, motif_name)
+        distances_nn_file, plot_file, motif_name)
     print r_cmd
     os.system(r_cmd)
 
@@ -701,9 +718,19 @@ def get_summit_centric_motif_maps(
     # joint analysis
     # ==================================
     # TODO - look at distances from hits vs NN - where did NN results remove motifs?
+    # TODO also consider using NN weighted scores here
+    if True:
+        distances_nn_file = "{}/{}.nn.distances_v_affinity.nn_scores.txt.gz".format(work_dir, motif_name)
+        get_motif_distances(motif_data_nn, index_cols, distances_nn_file)
     
+    plot_file = "{}/{}.distance_v_affinity.nn_v_hits.pdf".format(work_dir, motif_name)
+    r_cmd = "~/git/ggr-project/R/plot.distance_vs_affinity.hits_v_nn.R {} {} {} {}".format(
+        distances_hits_file, distances_nn_file, plot_file, motif_name)
+    print r_cmd
+    os.system(r_cmd)
 
-        
+    quit()
+    
     # TODO save out a reduced bed file of filtered regions
     bed_file = "{}/{}.summit_center_filt.bed.gz".format(work_dir, motif_name)
     region_data = motif_data_nn["region"].str.split(":", n=2, expand=True)
