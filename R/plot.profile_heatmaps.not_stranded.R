@@ -69,6 +69,7 @@ data[data < 0] <- 0
 
 # breaks: use percentiles to remove extreme outliers
 data_melted <- melt(data)
+data_melted$value[is.na(data_melted$value)] <- 0
 my_breaks <- seq(
     quantile(data_melted$value, 0),
     quantile(data_melted$value, 0.98),
@@ -162,7 +163,7 @@ plot_profile_heatmap <- function(plot_data, i, plot_key) {
         col=my_palette,
         breaks=my_breaks,
         #add.expr=add_borders(i),
-        useRaster=FALSE, # CHANGE BACK IF NEEDED
+        useRaster=TRUE, # CHANGE BACK IF NEEDED
         par(xpd=FALSE)) # xpd - where plotting shows up
 
     if (plot_key) {
@@ -206,8 +207,8 @@ grob_list <- lapply(
     })
 
 # plot joint heatmap
-#pdf(file=out_file, height=3, width=0.7, onefile=FALSE, family="ArialMT")
-pdf(file=out_file, height=2, width=1.4, onefile=FALSE, family="ArialMT")
+pdf(file=out_file, height=3, width=0.7, onefile=FALSE, family="ArialMT")
+#pdf(file=out_file, height=2, width=1.4, onefile=FALSE, family="ArialMT")
 grid.newpage()
 grid.arrange(grobs=grob_list, nrow=1, ncol=length(start_stop_sets), clip=FALSE)
 dev.off()

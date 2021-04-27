@@ -31,28 +31,39 @@ data_vals <- data[,signal_headers]
 
 
 # already rlog space, so subtract to get FC
-    data_z <- data_vals - data_vals[,1]
+data_z <- data_vals - data_vals[,1]
 
 # percentile clip
-thresholds <- quantile(melt(data_z)$value, c(0.01, 0.99))
-#if (grepl("epigenome", plot_prefix)) {
-#    thresholds <- quantile(melt(data_z)$value, c(0.01, 0.99))
-#} else {
-#    thresholds <- quantile(melt(data_z)$value, c(0.10, 0.90))
-#}
+data_melt <- melt(data_z)
+data_melt$value[is.na(data_melt$value)] <- 0
+thresholds <- quantile(data_melt$value, c(0.01, 0.99))
 data_z[data_z < thresholds[1]] <- thresholds[1]
 data_z[data_z > thresholds[2]] <- thresholds[2]
+
+color_granularity <- 50
+#data_melted <- melt(data_z)
+#data_melted$value[is.na(data_melted$value)] <- 0
+#my_breaks <- seq(
+#    quantile(data_melted$value, 0.01),
+#    quantile(data_melted$value, 0.99),
+#    length.out=color_granularity)
+#if (sum(my_breaks) == 0) {
+#    my_breaks <- seq(
+#        quantile(data_melted$value, 0),
+#        quantile(data_melted$value, 1),
+#        length.out=color_granularity)
+#}
 
 # subsample for plotting
 max_n <- 2000
 if (nrow(data_z) > max_n) {
-    print("WARNING: num examples too high, not plotting")
-    quit()
+    keep_indices <- seq(1, nrow(data_z), length.out=1000)
+    data_z <- data_z[keep_indices,]
 }
 
 # plotting
 plot_file <- paste(plot_prefix, ".heatmap.pdf", sep="")
-my_palette <- rev(colorRampPalette(brewer.pal(11, "RdBu"))(49))
+my_palette <- rev(colorRampPalette(brewer.pal(11, "RdBu"))(color_granularity - 1))
 
 # color bar
 cluster_palette <- get_trajectory_palette(11) # TODO set as needed
@@ -118,6 +129,7 @@ heatmap.2(
     lhei=mylhei,
     
     col=my_palette,
+    #breaks=my_breaks,
     RowSideColors=cluster_colors)
 title(plot_title, adj=0.2, outer=TRUE, line=-0.5, cex.main=0.5)
 dev.off()

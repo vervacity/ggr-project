@@ -1329,7 +1329,8 @@ def plot_profile_heatmaps_workflow(args, tss_file, plot_prefix):
         tss_data = pd.read_csv(tss_file, sep="\t")
         if tss_data.shape[0] > 1000:
             step_size = int(tss_data.shape[0] / 1000)
-            keep_indices = np.arange(0, tss_data.shape[0], step=step_size)
+            keep_indices = np.linspace(0, tss_data.shape[0]-1, num=1000).astype(int)
+            #keep_indices = np.arange(0, tss_data.shape[0], step=step_size)
             print tss_data.shape
             tss_data = tss_data.iloc[keep_indices]
             print tss_data.shape
@@ -1368,7 +1369,7 @@ def plot_profile_heatmaps_workflow(args, tss_file, plot_prefix):
             out_prefix,
             sort=False,
             referencepoint="center",
-            extend_dist=10000,
+            extend_dist=5000, #10000
             bin_total=100, # note: do not adjust
             color="Blues")
         
@@ -1422,7 +1423,7 @@ def plot_profile_heatmaps_workflow(args, tss_file, plot_prefix):
                 out_prefix,
                 sort=False,
                 referencepoint="center",
-                extend_dist=10000, #15000,
+                extend_dist=5000, #10000, #15000,
                 bin_total=100, # if change this, need to change R plot params below
                 color=histone_color)
 
@@ -1766,14 +1767,33 @@ def run_distal_v_proximal_workflow(args, prefix):
     tss_stable_bed = args.outputs["data"]["tss.stable"]
     tss_nonexpr_bed = args.outputs["data"]["tss.non_expr"]
 
+    # adjust the atac dynamic for a fold change thresh
+    # NOTE: currently not used
+    atac_dynamic_filt_bed = "{}/{}.atac_fc_filt.dynamic.bed.gz".format(
+        results_dir, prefix)
+    if not os.path.isfile(atac_dynamic_filt_bed):
+        atac_traj_mat = pd.read_csv(
+            args.outputs["data"]["atac.counts.pooled.rlog.dynamic.traj.mat"],
+            sep="\t", index_col=0)
+        max_vals = atac_traj_mat.max(axis=1)
+        min_vals = atac_traj_mat.min(axis=1)
+        atac_traj_mat["max"] = max_vals
+        atac_traj_mat["min"] = min_vals
+        # keep only those with minimum 2-fold change
+        atac_traj_mat = atac_traj_mat[atac_traj_mat["max"] - atac_traj_mat["min"] > 1]
+        atac_traj_mat = atac_traj_mat.reset_index()
+        atac_traj_mat[["chrom", "start-stop"]] = atac_traj_mat["index"].str.split(":", n=2, expand=True)
+        atac_traj_mat[["start", "stop"]] = atac_traj_mat["start-stop"].str.split("-", n=2, expand=True)
+        atac_traj_mat.to_csv(
+            atac_dynamic_filt_bed,
+            columns=["chrom", "start", "stop"],
+            sep="\t", compression="gzip", header=False, index=False)
+
     atac_files = [atac_master_bed, atac_dynamic_bed, atac_stable_bed]
     tss_files = [tss_dynamic_bed, tss_stable_bed, tss_nonexpr_bed]
 
     for atac_file in atac_files:
-        
         for tss_file in tss_files:
-            spread_bp = 50
-
             # overlap file
             overlap_file = "{}/{}.atac_{}.rna_{}.bed.gz".format(
                 results_dir, prefix,
@@ -1788,15 +1808,71 @@ def run_distal_v_proximal_workflow(args, prefix):
                     "gzip -c > {4}").format(
                         tss_file,
                         args.inputs["annot"][args.cluster]["chromsizes"],
-                        spread_bp,
+                        args.inputs["params"]["tss.extend_len"],
                         atac_file,
                         overlap_file)
                 print bedtools_cmd
                 os.system(bedtools_cmd)
-            
-            #data = pd.read_csv(overlap_file, sep="\t", header=None)
-            #print data.shape
-            
+
+    # ANALYSIS - look at range of fold changes for distal vs proximal ATAC
+    foldchanges_by_group_file = "{}/{}.atac_foldchanges.by_tss_group.txt.gz".format(
+        results_dir, prefix)
+    if not os.path.isfile(foldchanges_by_group_file):
+
+        # first pull in atac data
+        atac_mat = pd.read_csv(
+            args.outputs["data"]["atac.counts.pooled.rlog.mat"], sep="\t")
+        max_val = atac_mat.max(axis=1)
+        min_val = atac_mat.min(axis=1)
+        atac_mat["max_val"] = max_val
+        atac_mat["min_val"] = min_val
+        atac_mat = atac_mat[["max_val", "min_val"]]
+        atac_mat["foldchange"] = atac_mat["max_val"] - atac_mat["min_val"]
+
+        # for each tss group, get ATAC ids
+        for tss_file_idx in range(len(tss_files)):
+            tss_file = tss_files[tss_file_idx]
+            tss_group = os.path.basename(tss_file).split(".")[-3]
+
+            atac_ids = []
+            for atac_file in atac_files:
+                # overlap file
+                overlap_file = "{}/{}.atac_{}.rna_{}.bed.gz".format(
+                    results_dir, prefix,
+                    os.path.basename(atac_file).split(".")[-3],
+                    tss_group)
+                match_data = pd.read_csv(
+                    overlap_file, sep="\t", header=None)
+                match_data["atac_id"] = match_data[0] + ":" + match_data[1].map(str) + "-" + match_data[2].map(str)
+                atac_ids += match_data["atac_id"].values.tolist()
+                
+            # now select those in atac ids and save out
+            tss_group_atac_mat = atac_mat[atac_mat.index.isin(atac_ids)].copy()
+            tss_group_atac_mat["group"] = "{} genes (n={})".format(tss_group, len(set(atac_ids)))
+            if tss_file_idx == 0:
+                tss_atac_mat = tss_group_atac_mat.copy()
+            else:
+                tss_atac_mat = pd.concat([tss_atac_mat, tss_group_atac_mat], axis=0)
+            print tss_atac_mat.shape
+
+        # now all the rest are distal
+        distal_atac_mat = atac_mat[~atac_mat.index.isin(tss_atac_mat.index)].copy()
+        distal_atac_mat["group"] = "Distal regions (n={})".format(distal_atac_mat.shape[0])
+        tss_atac_mat = pd.concat([tss_atac_mat, distal_atac_mat], axis=0)
+        tss_atac_mat.to_csv(
+            foldchanges_by_group_file,
+            columns=["foldchange", "group"],
+            sep="\t", header=True, index=False, compression="gzip")
+        print tss_atac_mat.shape
+        
+    # and plot
+    plot_file = "{}/{}.atac_fc.by_tss_group.pdf".format(results_dir, prefix)
+    if not os.path.isfile(plot_file):
+        plot_cmd = "~/git/ggr-project/R/plot.atac_fc.by_tss_group.R {} {}".format(
+            foldchanges_by_group_file, plot_file)
+        print plot_cmd
+        os.system(plot_cmd)
+                
     return args
 
 
@@ -1826,7 +1902,6 @@ def _run_epigenome_summary_workflow(args, prefix):
     summary_mat_file = "{}/{}.summary_mat.txt.gz".format(results_dir, prefix)
     plot_mat_file = "{}/{}.summary_mat.plot.txt.gz".format(results_dir, prefix)
     out_results["summary_mat"] = summary_mat_file
-
     
     # make a union file of non ATAC centric regions to be able to add to plot
     work_dir = "{}/no_atac".format(results_dir)
@@ -1852,7 +1927,7 @@ def _run_epigenome_summary_workflow(args, prefix):
                 "gzip -c > {4}").format(
                     args.outputs["data"]["atac.master.bed"],
                     args.inputs["annot"][args.cluster]["chromsizes"],
-                    500,
+                    args.inputs["params"]["tss.extend_len"],
                     master_tss_file,
                     tmp_intersect_file)
             print bedtools_cmd
@@ -1915,7 +1990,6 @@ def _run_epigenome_summary_workflow(args, prefix):
     tss_files = [tss_dynamic_bed, tss_stable_bed, tss_nonexpr_bed]
 
     for tss_file in tss_files:
-        spread_bp = 50
         overlap_file = "{}/{}.no_atac.rna_{}.bed.gz".format(
             work_dir, prefix, os.path.basename(tss_file).split(".")[-3])
         if not os.path.isfile(overlap_file):
@@ -1925,7 +1999,7 @@ def _run_epigenome_summary_workflow(args, prefix):
                 "gzip -c > {4}").format(
                     tss_file,
                     args.inputs["annot"][args.cluster]["chromsizes"],
-                    spread_bp,
+                    args.inputs["params"]["tss.extend_len"],
                     no_atac_master_bed,
                     overlap_file)
             print bedtools_cmd
@@ -1957,7 +2031,8 @@ def _run_epigenome_summary_workflow(args, prefix):
             args.inputs["annot"][args.cluster]["chromsizes"])
 
     # now pull it all together for the part of the matrix that is non-ATAC centric
-    if True:
+    if not os.path.isfile(out_results["summary_mat"]):
+
         data = pd.read_csv(no_atac_master_bed, sep="\t", header=None)
         data["atac_id"] = data[0] + ":" + data[1].map(str) + "-" + data[2].map(str)
         data = data[["atac_id"]] # not really atac id, but use dummy id to match the atac-centric part
@@ -2010,8 +2085,7 @@ def _run_epigenome_summary_workflow(args, prefix):
         
         data_no_atac = data.copy()
     
-    #if not os.path.isfile(out_results["summary_mat"]):
-    if True:
+    if not os.path.isfile(out_results["summary_mat"]):
         
         # pull in ATAC region ids
         data = pd.read_csv(args.outputs["data"]["atac.master.bed"], sep="\t", header=None)
@@ -2086,20 +2160,20 @@ def _run_epigenome_summary_workflow(args, prefix):
         data = data.merge(histone_data, how="left", left_on="atac_id", right_on="id")
         data = data.drop("id", axis=1)
 
-        # TODO this is where to merge
+        # MERGE: bring together the non-ATAC and ATAC data
         data = pd.concat([data, data_no_atac], axis=0)
         
         # making some into binary
         data["atac_dynamic"] = 0
-        data.loc[data["atac_cluster"] > 0, "atac_dynamic"] = 2
-        data.loc[data["atac_cluster"] == 0, "atac_dynamic"] = 1
+        data.loc[data["atac_cluster"] > 0, "atac_dynamic"] = 8
+        data.loc[data["atac_cluster"] == 0, "atac_dynamic"] = 7
         data["rna_present"] = 0
-        data.loc[data["rna_pattern"] == "dynamic", "rna_present"] = 5
-        data.loc[data["rna_pattern"] == "stable", "rna_present"] = 4
-        data.loc[data["rna_pattern"] == "nonexpr", "rna_present"] = 3
-        data["H3K27ac_present"] = (data["H3K27ac"] != 9).astype(int) * 6
-        data["H3K4me1_present"] = (data["H3K4me1"] != 9).astype(int) * 7
-        data["H3K27me3_present"] = (data["H3K27me3"] != 9).astype(int) * 8
+        data.loc[data["rna_pattern"] == "dynamic", "rna_present"] = 6
+        data.loc[data["rna_pattern"] == "stable", "rna_present"] = 5
+        data.loc[data["rna_pattern"] == "nonexpr", "rna_present"] = 4
+        data["H3K27ac_present"] = (data["H3K27ac"] != 9).astype(int) * 3
+        data["H3K4me1_present"] = (data["H3K4me1"] != 9).astype(int) * 2
+        data["H3K27me3_present"] = (data["H3K27me3"] != 9).astype(int) * 1
 
         # save out file
         data.to_csv(
@@ -2135,89 +2209,223 @@ def _run_epigenome_summary_workflow(args, prefix):
 
     # plot
     plot_file = "{}.pdf".format(summary_mat_file.split(".txt")[0])
-    r_cmd = "~/git/ggr-project/R/plot.epigenome_summary.R {} {}".format(
-        plot_mat_file, plot_file)
-    print r_cmd
-    #os.system(r_cmd)
+    if not os.path.isfile(plot_file):
+        r_cmd = "~/git/ggr-project/R/plot.epigenome_summary.R {} {}".format(
+            plot_mat_file, plot_file)
+        print r_cmd
+        os.system(r_cmd)
+    
+    return args
 
-    quit()
+
+def _run_epigenome_tss_workflow(args, prefix):
+    """run tss centric analyses
+    """
+    # logging and folder set up
+    logger = logging.getLogger(__name__)
+    logger.info("WORKFLOW: look at distal v proximal regions")
+
+    # assertions
+    
+    # setup data and results
+    data_dir = args.outputs["data"]["dir"]
+    out_data = args.outputs["data"]
+
+    results_dirname = "proximal_regions"
+    results_dir = "{}/{}".format(
+        args.outputs["results"]["epigenome"]["dir"],
+        results_dirname)
+    args.outputs["results"]["epigenome"][results_dirname] = {
+        "dir": results_dir}
+    run_shell_cmd("mkdir -p {}".format(results_dir))
+    out_results = args.outputs["results"]["epigenome"][results_dirname]
+
+    # inputs
+    work_dir = args.outputs["results"]["epigenome"]["dir"]
+    atac_categories = ["atac_dynamic", "atac_stable", "no_atac"]
+    tss_categories = ["rna_dynamic", "rna_stable", "rna_non_expr"]
+    dirnames = ["distal_v_proximal", "distal_v_proximal", "summary"]
+
+    tss_dynamic_bed = args.outputs["data"]["tss.dynamic"]
+    tss_stable_bed = args.outputs["data"]["tss.stable"]
+    tss_nonexpr_bed = args.outputs["data"]["tss.non_expr"]
+    tss_files = [tss_dynamic_bed, tss_stable_bed, tss_nonexpr_bed]
+    
+    # summary file to summary bed
+    summary_mat_file = args.outputs["results"]["epigenome"]["summary"]["summary_mat"]
+    summary_bed = "{}/{}.all_regions.for_matching.bed.gz".format(results_dir, prefix)
+    if not os.path.isfile(summary_bed):
+        summary_mat = pd.read_csv(summary_mat_file, sep="\t")
+        summary_mat[["chrom", "start-stop"]] = summary_mat["atac_id"].str.split(":", n=2, expand=True)
+        summary_mat[["start", "stop"]] = summary_mat["start-stop"].str.split("-", n=2, expand=True)
+        summary_mat.to_csv(
+            summary_bed, columns=["chrom", "start", "stop"],
+            sep="\t", compression="gzip", header=False, index=False)
         
-    return args
+    # don't separate by ATAC category, just do TSS categories and plot out data sorted
+    for tss_file_idx in range(len(tss_files)):
+        tss_file = tss_files[tss_file_idx]
+        tss_category = tss_categories[tss_file_idx]
+        
+        # overlap with summary mat file
+        tss_overlap_file = "{}/{}.overlap_summary.mat.txt.gz".format(
+            results_dir, os.path.basename(tss_file).split(".bed")[0])
+        print tss_overlap_file
+        if not os.path.isfile(tss_overlap_file):
+            bedtools_cmd = (
+                "bedtools intersect -wao -a {} -b {} | "
+                "gzip -c > {}").format(
+                    tss_file, summary_bed, tss_overlap_file)
+            print bedtools_cmd
+            os.system(bedtools_cmd)
 
+        # sort TSS file according to epigenetic/transcriptomic details
+        tss_sorted_file = "{}/{}.sorted.bed.gz".format(
+            results_dir, os.path.basename(tss_file).split(".bed")[0])
+        if not os.path.isfile(tss_sorted_file):
+            
+            # (clean up) and match over to relevant data in summary mat
+            overlap_mat = pd.read_csv(tss_overlap_file, sep="\t", header=None)
+            overlap_mat = overlap_mat[overlap_mat[6] != "."]
+            overlap_mat["atac_id"] = overlap_mat[6] + ":" + overlap_mat[7].map(str) + "-" + overlap_mat[8].map(str)
+            summary_mat = pd.read_csv(summary_mat_file, sep="\t")
+            tss_data = overlap_mat.merge(summary_mat, how="left", on="atac_id")
 
+            # add in orig TSS files to get back to 1bp coords
+            tss_orig_data = pd.read_csv(
+                args.outputs["annotations"]["tss.pc.bed"], sep="\t", header=None)
+            tss_columns = [
+                "tss.chrom", "tss.start", "tss.stop", "tss.gene_id", "tss.score", "tss.strand"]
+            tss_orig_data.columns = tss_columns
+            tss_data = tss_data.merge(
+                tss_orig_data, how="left", left_on=3, right_on="tss.gene_id")
+            tss_data["atac_not_present"] = (tss_data["atac_cluster"] <= 0).astype(int)
+            tss_data["H3K27ac_not_present"] = (tss_data["H3K27ac_present"] == 0).astype(int)
+            tss_data["H3K4me1_not_present"] = (tss_data["H3K4me1_present"] == 0).astype(int)
 
-
-def not_used():
-    
-    # TODO test plot
+            
+            # sort and save out
+            sort_columns = [
+                "H3K27me3_present",
+                "rna_cluster",
+                "atac_not_present",
+                "H3K27ac_not_present",
+                "H3K4me1_not_present"
+            ]
+            tss_data = tss_data.sort_values(sort_columns, axis=0) # note: ascending sort
+            tss_sorted = tss_data[tss_columns].drop_duplicates()
+            tss_sorted.to_csv(
+                tss_sorted_file,
+                sep="\t", header=False, index=False, compression="gzip")
+            
+            # make a promoter data matrix to get the RNA vals
+            rna_data_file = "{}/{}.promoter_rna_data.mat.txt.gz".format(
+                results_dir, os.path.basename(tss_sorted_file).split(".bed")[0])
+            rna_traj_data = pd.read_csv(
+                args.outputs["data"]["rna.counts.pc.expressed.timeseries_adj.pooled.rlog.mat"],
+                sep="\t")
+            rna_traj_filt = tss_sorted.merge(
+                rna_traj_data, how="left", left_on="tss.gene_id", right_index=True, sort=False)
+            rna_traj_filt.to_csv(
+                rna_data_file, sep="\t", header=True, index=False, compression="gzip")
+            
+        # and plot
+        plot_prefix = "{}/{}".format(
+            results_dir, os.path.basename(tss_sorted_file).split(".bed")[0])
+        plot_profile_heatmaps_workflow(args, tss_sorted_file, plot_prefix)
 
     quit()
-    # if many regions still left (>500?), go to marks and use those.
-    print "after chrom states, num remaining:", stable_regions.shape[0]
-    if stable_regions.shape[0] >= _MIN_REGION_NUM:
-        used_mark_regions = [] # TODO add to here as going through, and then reduce out at end
-        for mark_file in mark_files:
 
-            # load, and only keep if > 500 in stable_regions
-            mark_regions = pd.read_csv(mark_file, sep="\t", header=None).iloc[:,0].values
-            mark_not_used_indices = np.where(np.isin(mark_regions, traj_regions))[0]
-            if mark_not_used_indices.shape[0] < _MIN_REGION_NUM:
-                continue
 
-            # if keeping, extract data
-            print mark_file
-            mark_name = os.path.basename(mark_file).split(".")[-3]
-            mark_not_used_regions = mark_regions[mark_not_used_indices]
-            mark_summary = get_aggregate_chromatin_state_summary(
-                mark_not_used_regions, trajectories, cluster_num, atac_rlog_mat, dynamic_histones,
-                index=mark_name)
-            if full_summary is None:
-                full_summary = mark_summary.copy()
-            else:
-                full_summary = pd.concat([full_summary, mark_summary], axis=0)
+    # TODO - remove?
+    # for each atac category, for each tss category (OLD, but keep for summary plots):
+    for cat_i in range(len(atac_categories)):
+        atac_category = atac_categories[cat_i]
+        dirname = dirnames[cat_i]
+        subroot = dirname
+        if dirname == "summary":
+            dirname = "summary/no_atac"
+        
+        for tss_category in tss_categories:
+            tss_mat_file = "{0}/{1}/ggr.epigenome.{2}.{3}.{4}.bed.gz".format(
+                work_dir, dirname, subroot, atac_category, tss_category)
 
-            #print mark_not_used_regions.shape
-            used_mark_regions += list(mark_not_used_regions)
-            print len(used_mark_regions)
-
-        # keep track of whatever is left over
-        traj_regions = traj_regions[np.isin(traj_regions, used_mark_regions, invert=True)]
-
-    # if remainder in traj that are NOT in union (chrom states, marks)
-    # is greater than 500, include as null state (just ATAC, no chrom marks)
-    if traj_regions.shape[0] >= _MIN_REGION_NUM:
-        group_name = "Null"
-        null_summary = get_aggregate_chromatin_state_summary(
-            traj_regions, trajectories, cluster_num, atac_rlog_mat, dynamic_histones,
-            index=group_name)
-        if full_summary is None:
-            full_summary = null_summary.copy()
-        else:
-            full_summary = pd.concat([full_summary, null_summary], axis=0)
+            # clean up
+            tss_file = "{}/{}.{}.{}.slop_{}.bed.gz".format(
+                results_dir, prefix, atac_category, tss_category, args.inputs["params"]["tss.extend_len"])
+            if not os.path.isfile(tss_file):
+                tss_mat = pd.read_csv(tss_mat_file, sep="\t", header=None)
+                tss_mat = tss_mat[[3, 4, 5, 6, 7, 8]]
+                tss_mat.to_csv(
+                    tss_file, sep="\t", compression="gzip", header=False, index=False)
                 
+            # overlap with summary mat file
+            tss_overlap_file = "{}/{}.overlap_summary.mat.txt.gz".format(
+                results_dir, os.path.basename(tss_file).split(".bed")[0])
+            print tss_overlap_file
+            if not os.path.isfile(tss_overlap_file):
+                bedtools_cmd = (
+                    "bedtools intersect -wao -a {} -b {} | "
+                    "gzip -c > {}").format(
+                        tss_file, summary_bed, tss_overlap_file)
+                print bedtools_cmd
+                os.system(bedtools_cmd)
 
+            # (clean up) and match over to relevant data in summary mat
+            overlap_mat = pd.read_csv(tss_overlap_file, sep="\t", header=None)
+            # no need to make tss id bc will just match over to master TSS file
+            # based on gene
+            overlap_mat["atac_id"] = overlap_mat[6] + ":" + overlap_mat[7].map(str) + "-" + overlap_mat[8].map(str)
+            summary_mat = pd.read_csv(summary_mat_file, sep="\t")
+            tss_data = overlap_mat.merge(summary_mat, how="left", on="atac_id")
 
+            # TODO - for no ATAC, don't merge with ATAC?
+            
+            # add in orig TSS files to get back to 1bp coords
+            tss_orig_data = pd.read_csv(
+                args.outputs["annotations"]["tss.pc.bed"], sep="\t", header=None)
+            tss_columns = [
+                "tss.chrom", "tss.start", "tss.stop", "tss.gene_id", "tss.score", "tss.strand"]
+            tss_orig_data.columns = tss_columns
+            tss_data = tss_data.merge(
+                tss_orig_data, how="left", left_on=3, right_on="tss.gene_id")
+            
+            # sort and save out
+            tss_sorted_file = "{}/{}.sorted.bed.gz".format(
+                results_dir, os.path.basename(tss_file).split(".bed")[0])
+            sort_columns = [
+                "H3K27me3_present",
+                "rna_cluster",
+                "atac_cluster",
+                "H3K27ac_present",
+                "H3K4me1_present"
+            ]
+            tss_data = tss_data.sort_values(sort_columns, axis=0)
+            tss_sorted = tss_data[tss_columns].drop_duplicates()
+            tss_sorted.to_csv(
+                tss_sorted_file,
+                sep="\t", header=False, index=False, compression="gzip")
 
-
-
-
-    
-
-    # finally - important to look at non ATAC regions that are marked with histone marks!
-    # TODO need to pull histone marks that DONT overlap with ATAC - use inverse set?
-    # just copy the stable workflow but use the non-ATAC regions (with padding)
-    # as the set.
-
-
-    # sort and save out
-    full_summary = full_summary.sort_values(trajectories, ascending=False)
-    print full_summary
-    full_summary.to_csv("testing.txt", sep="\t")
-    
+            # TODO make a promoter data matrix to get the RNA vals
+            rna_data_file = "{}/{}.promoter_rna_data.mat.txt.gz".format(
+                results_dir, os.path.basename(tss_sorted_file).split(".bed")[0])
+            rna_traj_data = pd.read_csv(
+                args.outputs["data"]["rna.counts.pc.expressed.timeseries_adj.pooled.rlog.mat"],
+                sep="\t")
+            rna_traj_filt = tss_sorted.merge(
+                rna_traj_data, how="left", left_on="tss.gene_id", right_index=True, sort=False)
+            rna_traj_filt.to_csv(
+                rna_data_file, sep="\t", header=True, index=False, compression="gzip")
+            
+            # and plot
+            plot_prefix = "{}/{}".format(
+                results_dir, os.path.basename(tss_sorted_file).split(".bed")[0])
+            plot_profile_heatmaps_workflow(args, tss_sorted_file, plot_prefix)
 
     quit()
     
-    return args
+    return
+
 
 
 
@@ -2282,9 +2490,6 @@ def runall(args, prefix):
     args = run_chromatin_states_workflow(
         args, "{}.chromatin_states".format(prefix))
 
-    # TODO: look at the histone marks that are outside of ATAC regions
-    # NOTE: H3K27me3 analyzed in repression analyses
-
     # -----------------------------------------
     # ANALYSIS - look at distal v proximal regions
     # inputs: epigenome outputs
@@ -2301,8 +2506,17 @@ def runall(args, prefix):
     args = _run_epigenome_summary_workflow(
         args, "{}.summary".format(prefix))
 
+    # -----------------------------------------
+    # ANALYSIS - look at proximal regions only ie TSS
+    # inputs: TSS files
+    # outputs: plots
+    # -----------------------------------------
+    args = _run_epigenome_tss_workflow(
+        args, "{}.tss".format(prefix))
+
     quit()
-    
+
+    # TODO also look at distal no-ATAC regions
     
     # -----------------------------------------
     # ANALYSIS - look at signal spreading

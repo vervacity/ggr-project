@@ -94,6 +94,7 @@
 	    "idr_thresh": 0.05
 	}
 	
-    }
+    },
+    "tss.extend_len": 50
     
 }

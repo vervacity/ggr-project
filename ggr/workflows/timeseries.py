@@ -458,7 +458,8 @@ def run_timeseries_enumeration_workflow(
         datatype_key="histone",
         subtype_key="H3K27ac",
         master_regions_key="master.bed",
-        mat_key="counts.mat"):
+        mat_key="counts.mat",
+        results_dirname="timeseries"):
     """Run DESeq2 and then enumerate trajectories
     
     Use for histone marks, lo-res timeseries (ie 3 timepoints)
@@ -479,7 +480,6 @@ def run_timeseries_enumeration_workflow(
     logging.debug("data going to {}".format(data_dir))
     out_data = args.outputs["data"]
     
-    results_dirname = "timeseries"
     results_dir = "{}/{}".format(args.outputs["results"][datatype_key][subtype_key]["dir"], results_dirname)
     args.outputs["results"][datatype_key][subtype_key][results_dirname] = {"dir": results_dir}
     run_shell_cmd("mkdir -p {}".format(results_dir))

@@ -240,5 +240,48 @@ def runall(args, prefix):
                 plot_dir,
                 os.path.basename(histone_mat_files[0]).split(".rep")[0])
             plot_PCA(filt_mat_files, pca_file)
+
+        # -------------------------------------------
+        # ANALYSIS - get read counts per master region, the HISTONE-centric set
+        # input: peak files
+        # output: master regions
+        # -------------------------------------------
+        master_regions_key = "{}.master.bed".format(histone)
+        work_dir = "{}/histone-centric".format(histone_dir)
+        if not os.path.isdir(work_dir):
+            os.system("mkdir -p {}".format(work_dir))
         
+        logger.info("ANALYSIS:{}: get read counts per master region - HISTONE centric".format(histone))
+        adjustment = "midpoints"
+        counts_key = "{}.histone-centric.counts.mat".format(histone)
+        out_data[counts_key] = "{0}/{1}.overlap.midpoints.counts.mat.txt.gz".format(
+            data_dir, histone_prefix)
+        if not os.path.isfile(out_data[counts_key]):
+            bedpe_files = sorted(
+                glob.glob("{}/{}".format(
+                    inputs["data_dir"],
+                    inputs["histones"][histone]["bedpe_glob"])))
+            make_count_matrix(
+                out_data[master_regions_key],
+                bedpe_files,
+                out_data[counts_key],
+                histone,
+                adjustment=adjustment,
+                tmp_dir=work_dir)
+        
+        # -------------------------------------------
+        # ANALYSIS - run DESeq on forward sequential pairs of timepoints
+        # input: count matrix
+        # output: clusters of regions (enumeration
+        # -------------------------------------------
+        logger.info("ANALYSIS:{}: Running timeseries enumeration workflow...".format(histone))
+        args = run_timeseries_enumeration_workflow(
+            args,
+            histone_prefix,
+            datatype_key="histones",
+            subtype_key=histone,
+            master_regions_key=master_regions_key,
+            mat_key=counts_key,
+            results_dirname="timeseries.histone-centric")
+
     return args
