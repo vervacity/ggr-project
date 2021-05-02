@@ -10,6 +10,7 @@
 		"overlap_glob":"*H3K27ac*/*/macs2/overlap/*filt.narrowPeak.gz",
 		"narrowPeak_glob":"*H3K27ac*/*/macs2/rep*/*filt.narrowPeak.gz",
 		"pooled_bigwig_glob":"*H3K27ac*/signal/macs2/pooled_rep/*pval*bw",
+		"pooled_fc_bigwig_glob":"*H3K27ac*/signal/macs2/pooled_rep/*fc*bw",
 		"bigwig_glob":"*H3K27ac*/signal/macs2/rep*/*pval*bw"
 	    },
 	    "H3K4me1":{
@@ -17,6 +18,7 @@
 		"overlap_glob":"*H3K4me1*/*/macs2/overlap/*filt.narrowPeak.gz",
 		"narrowPeak_glob":"*H3K4me1*/*/macs2/rep*/*filt.narrowPeak.gz",
 		"pooled_bigwig_glob":"*H3K4me1*/signal/macs2/pooled_rep/*pval*bw",
+		"pooled_fc_bigwig_glob":"*H3K4me1*/signal/macs2/pooled_rep/*fc*bw",
 		"bigwig_glob":"*H3K4me1*/signal/macs2/rep*/*pval*bw"
 	    },
 	    "H3K27me3":{
@@ -24,6 +26,7 @@
 		"overlap_glob":"*H3K27me3*/*/macs2/overlap/*filt.narrowPeak.gz",
 		"narrowPeak_glob":"*H3K27me3*/*/macs2/rep*/*filt.narrowPeak.gz",
 		"pooled_bigwig_glob":"*H3K27me3*/signal/macs2/pooled_rep/*pval*bw",
+		"pooled_fc_bigwig_glob":"*H3K27me3*/signal/macs2/pooled_rep/*fc*bw",
 		"bigwig_glob":"*H3K27me3*/signal/macs2/rep*/*pval*bw"
 	    }
 	},

@@ -1320,12 +1320,33 @@ def run_chromatin_states_workflow(args, prefix):
     return args
 
 
+def _agg_deeptools_mat_data(mat_file, assay, extend_dist, bin_total):
+    """summarize agg data
+    """
+    mat = pd.read_csv(mat_file, sep="\t", header=None, comment="@")
+    mat = mat.iloc[:,6:]
+    mat = mat.mean(axis=0)
+    positions = np.arange(-extend_dist, extend_dist, bin_total)
+    positions = np.tile(positions, 3)
+    days = np.concatenate([
+        np.tile(["d0"], bin_total),
+        np.tile(["d3"], bin_total),
+        np.tile(["d6"], bin_total)])
+    agg_mat = pd.DataFrame({
+        "value": mat,
+        "position": positions,
+        "day": days})
+    agg_mat["assay"] = assay
+    
+    return agg_mat
+
+
 def plot_profile_heatmaps_workflow(args, tss_file, plot_prefix):
     """plot histone heatmaps for a specific set of tss regions (ordered
     """
+    # make a subsample file if necessary
     atac_plot_file = "{}.ATAC.heatmap.profile.pdf".format(plot_prefix)
     if not os.path.isfile(atac_plot_file):
-        # make a subsample file if necessary
         tss_data = pd.read_csv(tss_file, sep="\t")
         if tss_data.shape[0] > 1000:
             step_size = int(tss_data.shape[0] / 1000)
@@ -1352,7 +1373,7 @@ def plot_profile_heatmaps_workflow(args, tss_file, plot_prefix):
         print r_cmd
         os.system(r_cmd)
 
-    # TODO plot ATAC seq as profile map (to show small changes but sig H3K27ac movement)
+    # plot ATAC seq as profile map
     atac_bigwigs = sorted(
         glob.glob("{}/{}".format(
             args.inputs["atac"][args.cluster]["data_dir"],
@@ -1361,7 +1382,6 @@ def plot_profile_heatmaps_workflow(args, tss_file, plot_prefix):
 
     out_prefix = "{}.ATAC".format(plot_prefix)
     plot_file = "{}.heatmap.profile.pdf".format(out_prefix)
-    
     if not os.path.isfile(plot_file):
         make_deeptools_heatmap(
             tss_file,
@@ -1411,11 +1431,10 @@ def plot_profile_heatmaps_workflow(args, tss_file, plot_prefix):
         histone_bigwigs = sorted(
             glob.glob("{}/{}".format(
                 args.inputs["chipseq"][args.cluster]["data_dir"],
-                args.inputs["chipseq"][args.cluster]["histones"][histone]["pooled_bigwig_glob"])))
+                args.inputs["chipseq"][args.cluster]["histones"][histone]["pooled_fc_bigwig_glob"])))
 
         out_prefix = "{}.{}_overlap".format(plot_prefix, histone)
         plot_file = "{}.heatmap.profile.pdf".format(out_prefix)
-    
         if not os.path.isfile(plot_file):
             make_deeptools_heatmap(
                 tss_file,
@@ -1443,8 +1462,28 @@ def plot_profile_heatmaps_workflow(args, tss_file, plot_prefix):
                     histone_r_color)
             print replot
             run_shell_cmd(replot)
-        
-        
+
+    # and plot agg plot with all together in one plot
+    extend_dist = 5000
+    bin_total = 100
+    
+    # pull in ATAC, histone data
+    atac_mat_file = "{}.ATAC.point.mat.gz".format(plot_prefix)
+    mat_data = _agg_deeptools_mat_data(atac_mat_file, "ATAC", extend_dist, bin_total)
+    for histone in histones:
+        histone_mat_file = "{}.{}_overlap.point.mat.gz".format(plot_prefix, histone)
+        histone_mat_data = _agg_deeptools_mat_data(histone_mat_file, histone, extend_dist, bin_total)
+        mat_data = pd.concat([mat_data, histone_mat_data], axis=0)
+    summary_mat_file = "{}.agg_data.melted.txt.gz".format(plot_prefix)
+    mat_data.to_csv(
+        summary_mat_file,
+        header=True, index=False, compression="gzip", sep="\t")
+    plot_prefix = "{}.agg".format(plot_prefix)
+    plot_cmd = "~/git/ggr-project/R/plot.profile_agg_plots.R {} {}".format(
+        summary_mat_file, plot_prefix)
+    print plot_cmd
+    os.system(plot_cmd)
+    
     return args
 
 
@@ -2328,105 +2367,147 @@ def _run_epigenome_tss_workflow(args, prefix):
                 rna_traj_data, how="left", left_on="tss.gene_id", right_index=True, sort=False)
             rna_traj_filt.to_csv(
                 rna_data_file, sep="\t", header=True, index=False, compression="gzip")
+
+            # get subsetted agg plots here
+
+            # if dynamic TSS, split by RNA trajectories/H3K27me3 into 4 files
+            if tss_categories[tss_file_idx] == "rna_dynamic":
+                # progenitor genes, no H3K27me3
+                tss_progenitor_file = "{}/{}.progenitor_genes.bed.gz".format(
+                    results_dir, os.path.basename(tss_file).split(".bed")[0])
+                tss_dynamic = tss_data[tss_data["rna_cluster"] <= 5]
+                tss_dynamic = tss_dynamic[tss_dynamic["rna_cluster"] != 0]
+                tss_dynamic = tss_dynamic[tss_dynamic["H3K27me3_present"] == 0]
+                tss_dynamic = tss_dynamic.sort_values(sort_columns, axis=0)
+                tss_dynamic = tss_dynamic[tss_columns].drop_duplicates()
+                tss_dynamic.to_csv(
+                    tss_progenitor_file,
+                    sep="\t", header=False, index=False, compression="gzip")
+                plot_prefix = "{}/{}".format(
+                    results_dir, os.path.basename(tss_progenitor_file).split(".bed")[0])
+                plot_profile_heatmaps_workflow(args, tss_progenitor_file, plot_prefix)
+
+                # early diff
+                tss_earlydiff_file = "{}/{}.earlydiff_genes.bed.gz".format(
+                    results_dir, os.path.basename(tss_file).split(".bed")[0])
+                tss_earlydiff = tss_data[tss_data["rna_cluster"] >=6]
+                tss_earlydiff = tss_earlydiff[tss_earlydiff["rna_cluster"] >=7]
+                tss_earlydiff = tss_earlydiff[tss_earlydiff["H3K27me3_present"] == 0]
+                tss_earlydiff = tss_earlydiff.sort_values(sort_columns, axis=0)
+                tss_earlydiff = tss_earlydiff[tss_columns].drop_duplicates()
+                tss_earlydiff.to_csv(
+                    tss_earlydiff_file,
+                    sep="\t", header=False, index=False, compression="gzip")
+                plot_prefix = "{}/{}".format(
+                    results_dir, os.path.basename(tss_earlydiff_file).split(".bed")[0])
+                plot_profile_heatmaps_workflow(args, tss_earlydiff_file, plot_prefix)
+
+                # late diff
+                tss_latediff_file = "{}/{}.latediff_genes.bed.gz".format(
+                    results_dir, os.path.basename(tss_file).split(".bed")[0])
+                tss_latediff = tss_data[tss_data["rna_cluster"] >=8]
+                tss_latediff = tss_latediff[tss_latediff["H3K27me3_present"] == 0]
+                tss_latediff = tss_latediff.sort_values(sort_columns, axis=0)
+                tss_latediff = tss_latediff[tss_columns].drop_duplicates()
+                tss_latediff.to_csv(
+                    tss_latediff_file,
+                    sep="\t", header=False, index=False, compression="gzip")
+                plot_prefix = "{}/{}".format(
+                    results_dir, os.path.basename(tss_latediff_file).split(".bed")[0])
+                plot_profile_heatmaps_workflow(args, tss_latediff_file, plot_prefix)
+
+                # H3K27me3 group
+                tss_repr_file = "{}/{}.H3K27me3_genes.bed.gz".format(
+                    results_dir, os.path.basename(tss_file).split(".bed")[0])
+                tss_repr = tss_data[tss_data["H3K27me3_present"] == 1]
+                tss_repr = tss_repr.sort_values(sort_columns, axis=0)
+                tss_repr = tss_repr[tss_columns].drop_duplicates()
+                tss_repr.to_csv(
+                    tss_repr_file,
+                    sep="\t", header=False, index=False, compression="gzip")
+                plot_prefix = "{}/{}".format(
+                    results_dir, os.path.basename(tss_repr_file).split(".bed")[0])
+                plot_profile_heatmaps_workflow(args, tss_repr_file, plot_prefix)
             
-        # and plot
+            # if stable TSS, split H3K27me3 group and H3K27ac/H3K4me1 group
+            if tss_categories[tss_file_idx] == "rna_stable":
+                # activating marks
+                tss_activemarks_file = "{}/{}.activating_marks.bed.gz".format(
+                    results_dir, os.path.basename(tss_file).split(".bed")[0])
+                tss_activating = tss_data[tss_data["H3K27me3_present"] == 0]
+                tss_activating = tss_activating.sort_values(sort_columns, axis=0)
+                tss_activating = tss_activating[tss_columns].drop_duplicates()
+                tss_activating.to_csv(
+                    tss_activemarks_file,
+                    sep="\t", header=False, index=False, compression="gzip")
+                plot_prefix = "{}/{}".format(
+                    results_dir, os.path.basename(tss_activemarks_file).split(".bed")[0])
+                plot_profile_heatmaps_workflow(args, tss_activemarks_file, plot_prefix)
+
+                # repressive mark
+                tss_repr_file = "{}/{}.repressing_marks.bed.gz".format(
+                    results_dir, os.path.basename(tss_file).split(".bed")[0])
+                tss_repr = tss_data[tss_data["H3K27me3_present"] == 1]
+                tss_repr = tss_repr.sort_values(sort_columns, axis=0)
+                tss_repr = tss_repr[tss_columns].drop_duplicates()
+                tss_repr.to_csv(
+                    tss_repr_file,
+                    sep="\t", header=False, index=False, compression="gzip")
+                plot_prefix = "{}/{}".format(
+                    results_dir, os.path.basename(tss_repr_file).split(".bed")[0])
+                plot_profile_heatmaps_workflow(args, tss_repr_file, plot_prefix)
+
+            # if non_expr TSS, split H3K27me3 group and H3K27ac/H3K4me1 group
+            if tss_categories[tss_file_idx] == "rna_non_expr":
+                # activating marks
+                tss_activemarks_file = "{}/{}.activating_marks.bed.gz".format(
+                    results_dir, os.path.basename(tss_file).split(".bed")[0])
+                tss_activating = tss_data[tss_data["H3K27me3_present"] == 0]
+                tss_activating = tss_activating[tss_activating["H3K27ac_not_present"] == 0]
+                tss_activating = tss_activating[tss_activating["H3K4me1_not_present"] == 0]
+                tss_activating = tss_activating.sort_values(sort_columns, axis=0)
+                tss_activating = tss_activating[tss_columns].drop_duplicates()
+                tss_activating.to_csv(
+                    tss_activemarks_file,
+                    sep="\t", header=False, index=False, compression="gzip")
+                plot_prefix = "{}/{}".format(
+                    results_dir, os.path.basename(tss_activemarks_file).split(".bed")[0])
+                plot_profile_heatmaps_workflow(args, tss_activemarks_file, plot_prefix)
+
+                # repressive mark
+                tss_repr_file = "{}/{}.repressing_marks.bed.gz".format(
+                    results_dir, os.path.basename(tss_file).split(".bed")[0])
+                tss_repr = tss_data[tss_data["H3K27me3_present"] == 1]
+                tss_repr = tss_repr.sort_values(sort_columns, axis=0)
+                tss_repr = tss_repr[tss_columns].drop_duplicates()
+                tss_repr.to_csv(
+                    tss_repr_file,
+                    sep="\t", header=False, index=False, compression="gzip")
+                plot_prefix = "{}/{}".format(
+                    results_dir, os.path.basename(tss_repr_file).split(".bed")[0])
+                plot_profile_heatmaps_workflow(args, tss_repr_file, plot_prefix)
+
+                # and neither
+                tss_no_file = "{}/{}.no_marks.bed.gz".format(
+                    results_dir, os.path.basename(tss_file).split(".bed")[0])
+                tss_no = tss_data[tss_data["H3K27me3_present"] == 0]
+                tss_no = tss_no[tss_no["H3K27ac_not_present"] == 1]
+                tss_no = tss_no[tss_no["H3K4me1_not_present"] == 1]
+                tss_no = tss_no.sort_values(sort_columns, axis=0)
+                tss_no = tss_no[tss_columns].drop_duplicates()
+                tss_no.to_csv(
+                    tss_no_file,
+                    sep="\t", header=False, index=False, compression="gzip")
+                plot_prefix = "{}/{}".format(
+                    results_dir, os.path.basename(tss_no_file).split(".bed")[0])
+                plot_profile_heatmaps_workflow(args, tss_no_file, plot_prefix)
+            
+        # and plot global ones
         plot_prefix = "{}/{}".format(
             results_dir, os.path.basename(tss_sorted_file).split(".bed")[0])
-        plot_profile_heatmaps_workflow(args, tss_sorted_file, plot_prefix)
+        plot_profile_heatmaps_workflow(args, tss_sorted_file, plot_prefix) # modify this to also produce agg plots
 
-    quit()
-
-
-    # TODO - remove?
-    # for each atac category, for each tss category (OLD, but keep for summary plots):
-    for cat_i in range(len(atac_categories)):
-        atac_category = atac_categories[cat_i]
-        dirname = dirnames[cat_i]
-        subroot = dirname
-        if dirname == "summary":
-            dirname = "summary/no_atac"
-        
-        for tss_category in tss_categories:
-            tss_mat_file = "{0}/{1}/ggr.epigenome.{2}.{3}.{4}.bed.gz".format(
-                work_dir, dirname, subroot, atac_category, tss_category)
-
-            # clean up
-            tss_file = "{}/{}.{}.{}.slop_{}.bed.gz".format(
-                results_dir, prefix, atac_category, tss_category, args.inputs["params"]["tss.extend_len"])
-            if not os.path.isfile(tss_file):
-                tss_mat = pd.read_csv(tss_mat_file, sep="\t", header=None)
-                tss_mat = tss_mat[[3, 4, 5, 6, 7, 8]]
-                tss_mat.to_csv(
-                    tss_file, sep="\t", compression="gzip", header=False, index=False)
-                
-            # overlap with summary mat file
-            tss_overlap_file = "{}/{}.overlap_summary.mat.txt.gz".format(
-                results_dir, os.path.basename(tss_file).split(".bed")[0])
-            print tss_overlap_file
-            if not os.path.isfile(tss_overlap_file):
-                bedtools_cmd = (
-                    "bedtools intersect -wao -a {} -b {} | "
-                    "gzip -c > {}").format(
-                        tss_file, summary_bed, tss_overlap_file)
-                print bedtools_cmd
-                os.system(bedtools_cmd)
-
-            # (clean up) and match over to relevant data in summary mat
-            overlap_mat = pd.read_csv(tss_overlap_file, sep="\t", header=None)
-            # no need to make tss id bc will just match over to master TSS file
-            # based on gene
-            overlap_mat["atac_id"] = overlap_mat[6] + ":" + overlap_mat[7].map(str) + "-" + overlap_mat[8].map(str)
-            summary_mat = pd.read_csv(summary_mat_file, sep="\t")
-            tss_data = overlap_mat.merge(summary_mat, how="left", on="atac_id")
-
-            # TODO - for no ATAC, don't merge with ATAC?
-            
-            # add in orig TSS files to get back to 1bp coords
-            tss_orig_data = pd.read_csv(
-                args.outputs["annotations"]["tss.pc.bed"], sep="\t", header=None)
-            tss_columns = [
-                "tss.chrom", "tss.start", "tss.stop", "tss.gene_id", "tss.score", "tss.strand"]
-            tss_orig_data.columns = tss_columns
-            tss_data = tss_data.merge(
-                tss_orig_data, how="left", left_on=3, right_on="tss.gene_id")
-            
-            # sort and save out
-            tss_sorted_file = "{}/{}.sorted.bed.gz".format(
-                results_dir, os.path.basename(tss_file).split(".bed")[0])
-            sort_columns = [
-                "H3K27me3_present",
-                "rna_cluster",
-                "atac_cluster",
-                "H3K27ac_present",
-                "H3K4me1_present"
-            ]
-            tss_data = tss_data.sort_values(sort_columns, axis=0)
-            tss_sorted = tss_data[tss_columns].drop_duplicates()
-            tss_sorted.to_csv(
-                tss_sorted_file,
-                sep="\t", header=False, index=False, compression="gzip")
-
-            # TODO make a promoter data matrix to get the RNA vals
-            rna_data_file = "{}/{}.promoter_rna_data.mat.txt.gz".format(
-                results_dir, os.path.basename(tss_sorted_file).split(".bed")[0])
-            rna_traj_data = pd.read_csv(
-                args.outputs["data"]["rna.counts.pc.expressed.timeseries_adj.pooled.rlog.mat"],
-                sep="\t")
-            rna_traj_filt = tss_sorted.merge(
-                rna_traj_data, how="left", left_on="tss.gene_id", right_index=True, sort=False)
-            rna_traj_filt.to_csv(
-                rna_data_file, sep="\t", header=True, index=False, compression="gzip")
-            
-            # and plot
-            plot_prefix = "{}/{}".format(
-                results_dir, os.path.basename(tss_sorted_file).split(".bed")[0])
-            plot_profile_heatmaps_workflow(args, tss_sorted_file, plot_prefix)
-
-    quit()
-    
-    return
-
-
+    return args
 
 
 def runall(args, prefix):
