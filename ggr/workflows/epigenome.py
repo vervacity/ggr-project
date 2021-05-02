@@ -1468,21 +1468,24 @@ def plot_profile_heatmaps_workflow(args, tss_file, plot_prefix):
     bin_total = 100
     
     # pull in ATAC, histone data
-    atac_mat_file = "{}.ATAC.point.mat.gz".format(plot_prefix)
-    mat_data = _agg_deeptools_mat_data(atac_mat_file, "ATAC", extend_dist, bin_total)
-    for histone in histones:
-        histone_mat_file = "{}.{}_overlap.point.mat.gz".format(plot_prefix, histone)
-        histone_mat_data = _agg_deeptools_mat_data(histone_mat_file, histone, extend_dist, bin_total)
-        mat_data = pd.concat([mat_data, histone_mat_data], axis=0)
-    summary_mat_file = "{}.agg_data.melted.txt.gz".format(plot_prefix)
-    mat_data.to_csv(
-        summary_mat_file,
-        header=True, index=False, compression="gzip", sep="\t")
-    plot_prefix = "{}.agg".format(plot_prefix)
-    plot_cmd = "~/git/ggr-project/R/plot.profile_agg_plots.R {} {}".format(
-        summary_mat_file, plot_prefix)
-    print plot_cmd
-    os.system(plot_cmd)
+    agg_plot_prefix = "{}.agg".format(plot_prefix)
+    plot_file = "{}.ALL.pdf".format(agg_plot_prefix)
+    if not os.path.isfile(plot_file):
+        atac_mat_file = "{}.ATAC.point.mat.gz".format(plot_prefix)
+        mat_data = _agg_deeptools_mat_data(atac_mat_file, "ATAC", extend_dist, bin_total)
+        for histone in histones:
+            histone_mat_file = "{}.{}_overlap.point.mat.gz".format(plot_prefix, histone)
+            histone_mat_data = _agg_deeptools_mat_data(histone_mat_file, histone, extend_dist, bin_total)
+            mat_data = pd.concat([mat_data, histone_mat_data], axis=0)
+        summary_mat_file = "{}.agg_data.melted.txt.gz".format(plot_prefix)
+        mat_data.to_csv(
+            summary_mat_file,
+            header=True, index=False, compression="gzip", sep="\t")
+
+        plot_cmd = "~/git/ggr-project/R/plot.profile_agg_plots.R {} {}".format(
+            summary_mat_file, agg_plot_prefix)
+        print plot_cmd
+        os.system(plot_cmd)
     
     return args
 
@@ -2309,7 +2312,6 @@ def _run_epigenome_tss_workflow(args, prefix):
         # overlap with summary mat file
         tss_overlap_file = "{}/{}.overlap_summary.mat.txt.gz".format(
             results_dir, os.path.basename(tss_file).split(".bed")[0])
-        print tss_overlap_file
         if not os.path.isfile(tss_overlap_file):
             bedtools_cmd = (
                 "bedtools intersect -wao -a {} -b {} | "
@@ -2341,7 +2343,6 @@ def _run_epigenome_tss_workflow(args, prefix):
             tss_data["atac_not_present"] = (tss_data["atac_cluster"] <= 0).astype(int)
             tss_data["H3K27ac_not_present"] = (tss_data["H3K27ac_present"] == 0).astype(int)
             tss_data["H3K4me1_not_present"] = (tss_data["H3K4me1_present"] == 0).astype(int)
-
             
             # sort and save out
             sort_columns = [
@@ -2505,8 +2506,78 @@ def _run_epigenome_tss_workflow(args, prefix):
         # and plot global ones
         plot_prefix = "{}/{}".format(
             results_dir, os.path.basename(tss_sorted_file).split(".bed")[0])
-        plot_profile_heatmaps_workflow(args, tss_sorted_file, plot_prefix) # modify this to also produce agg plots
+        plot_profile_heatmaps_workflow(args, tss_sorted_file, plot_prefix)
 
+    # here, get distal regions and plot same plots based on ATAC summits
+    summary_mat = pd.read_csv(summary_mat_file, sep="\t")
+    summary_mat = summary_mat[summary_mat["atac_cluster"] > 0]
+    summary_mat = summary_mat[summary_mat["rna_id"].isna()]
+    summary_mat[["chrom", "start-stop"]] = summary_mat["atac_id"].str.split(":", n=2, expand=True)
+    summary_mat[["start", "stop"]] = summary_mat["start-stop"].str.split("-", n=2, expand=True)
+    distal_regions_file = "{}/{}.atac.distal.master.bed.gz".format(results_dir, prefix)
+    summary_mat.to_csv(
+        distal_regions_file, columns=["chrom", "start", "stop"],
+        header=False, index=False, compression="gzip", sep="\t")
+
+    # also split into groups: progenitor assoc, early diff assoc, late diff assoc
+    timeseries_dir = args.outputs["results"]["atac"]["timepoint_region_dir"]
+    atac_timeseries_files = sorted(
+        glob.glob("{}/*narrowPeak.gz".format(timeseries_dir)))
+
+    # progenitor assoc
+    distal_prefix = "{}/{}.atac.distal.progenitor_assoc".format(results_dir, prefix)
+    distal_regions_file = "{}.bed.gz".format(distal_prefix)
+    if not os.path.isfile(distal_regions_file):
+        distal_data = summary_mat[summary_mat["atac_cluster"] <= 6]
+        distal_data.to_csv(
+            distal_regions_file, columns=["chrom", "start", "stop"],
+            header=False, index=False, compression="gzip", sep="\t")
+    summit_file = "{}.summits.bed".format(distal_regions_file.split(".bed")[0])
+    if not os.path.isfile(summit_file):
+        get_best_summit(
+            distal_regions_file,
+            atac_timeseries_files,
+            summit_file)
+    plot_profile_heatmaps_workflow(args, summit_file, distal_prefix)
+
+    # early diff assoc
+    distal_prefix = "{}/{}.atac.distal.earlydiff_assoc".format(results_dir, prefix)
+    distal_regions_file = "{}.bed.gz".format(distal_prefix)
+    if not os.path.isfile(distal_regions_file):
+        distal_data = summary_mat[summary_mat["atac_cluster"] >= 7]
+        distal_data = distal_data[distal_data["atac_cluster"] <= 10]
+        distal_data.to_csv(
+            distal_regions_file, columns=["chrom", "start", "stop"],
+            header=False, index=False, compression="gzip", sep="\t")
+    summit_file = "{}.summits.bed".format(distal_regions_file.split(".bed")[0])
+    if not os.path.isfile(summit_file):
+        get_best_summit(
+            distal_regions_file,
+            atac_timeseries_files,
+            summit_file)
+    plot_profile_heatmaps_workflow(args, summit_file, distal_prefix)
+
+    # late diff assoc
+    distal_prefix = "{}/{}.atac.distal.latediff_assoc".format(results_dir, prefix)
+    distal_regions_file = "{}.bed.gz".format(distal_prefix)
+    if not os.path.isfile(distal_regions_file):
+        distal_data = summary_mat[summary_mat["atac_cluster"] >= 11]
+        distal_data = distal_data[distal_data["atac_cluster"] <= 14]
+        distal_data.to_csv(
+            distal_regions_file, columns=["chrom", "start", "stop"],
+            header=False, index=False, compression="gzip", sep="\t")
+    summit_file = "{}.summits.bed".format(distal_regions_file.split(".bed")[0])
+    if not os.path.isfile(summit_file):
+        get_best_summit(
+            distal_regions_file,
+            atac_timeseries_files,
+            summit_file)
+    plot_profile_heatmaps_workflow(args, summit_file, distal_prefix)
+
+    
+    quit()
+
+        
     return args
 
 
@@ -2598,6 +2669,8 @@ def runall(args, prefix):
     quit()
 
     # TODO also look at distal no-ATAC regions
+    # maybe just homer analysis?
+    
     
     # -----------------------------------------
     # ANALYSIS - look at signal spreading
