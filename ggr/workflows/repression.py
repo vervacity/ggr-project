@@ -170,15 +170,12 @@ def runall(args, prefix):
     atac_clusters_file = args.outputs["results"]["atac"]["timeseries"]["dp_gp"][
         "clusters.reproducible.hard.reordered.list"]
     atac_mat_file = args.outputs["data"]["atac.counts.pooled.rlog.dynamic.traj.mat"]
-    atac_mat = pd.read_csv(atac_mat_file, sep="\t", index_col=0)
-    atac_mat = atac_mat.drop("d05", axis=1)
     
     # RNA traj files
     rna_clusters_file = args.outputs["results"]["rna"]["timeseries"]["dp_gp"][
         "clusters.reproducible.hard.reordered.list"]
     rna_mat_file = args.outputs["data"][
         "rna.counts.pc.expressed.timeseries_adj.pooled.rlog.dynamic.traj.mat"]
-    rna_mat = pd.read_csv(rna_mat_file, sep="\t", index_col=0)
     
     # linking file
     links_dir = "{}/linking/proximity".format(args.outputs["results"]["dir"])
@@ -200,7 +197,6 @@ def runall(args, prefix):
         args.outputs["results"]["atac"]["timeseries"]["dp_gp"]["dir"])
     region_sets = sorted(glob.glob("{}/*.bed.gz".format(region_bed_dir)))
 
-
     # for each region set, run analysis
     for region_set in region_sets:
         
@@ -209,16 +205,20 @@ def runall(args, prefix):
             work_dir, os.path.basename(region_set).split(".bed")[0])
         if not os.path.isdir(region_dir):
             run_shell_cmd("mkdir -p {}".format(region_dir))
-
-        # make sure it has ATAC oriented IDs
-        tmp_file = "{}/{}".format(region_dir, os.path.basename(region_set))
-        regions = pd.read_csv(region_set, sep="\t", header=None)
-        regions[3] = regions[0] + ":" + regions[1].astype(str) + "-" + regions[2].astype(str)
-        regions.to_csv(tmp_file, sep="\t", compression="gzip", header=False, index=False)
         
         # get genes
         gene_file = "{}/genes.txt.gz".format(region_dir)
         if not os.path.isfile(gene_file):
+            atac_mat = pd.read_csv(atac_mat_file, sep="\t", index_col=0)
+            atac_mat = atac_mat.drop("d05", axis=1)
+            rna_mat = pd.read_csv(rna_mat_file, sep="\t", index_col=0)
+
+            # make sure it has ATAC oriented IDs
+            tmp_file = "{}/{}".format(region_dir, os.path.basename(region_set))
+            regions = pd.read_csv(region_set, sep="\t", header=None)
+            regions[3] = regions[0] + ":" + regions[1].astype(str) + "-" + regions[2].astype(str)
+            regions.to_csv(tmp_file, sep="\t", compression="gzip", header=False, index=False)
+            
             regions_to_genes_w_correlation_filtering(
                 tmp_file,
                 interactions_file,
@@ -271,8 +271,6 @@ def runall(args, prefix):
 
     # use stable atac
     atac_mat_file = args.outputs["data"]["atac.counts.pooled.rlog.stable.mat"]
-    atac_mat = pd.read_csv(atac_mat_file, sep="\t", index_col=0)
-    atac_mat = atac_mat.drop("d05", axis=1)
     
     # for each region set, run analysis
     for region_set in region_sets:
@@ -281,16 +279,19 @@ def runall(args, prefix):
         region_dir = "{}/{}".format(
             work_dir, os.path.basename(region_set).split(".bed")[0])
         run_shell_cmd("mkdir -p {}".format(region_dir))
-
-        # make sure it has ATAC oriented IDs
-        tmp_file = "{}/{}".format(region_dir, os.path.basename(region_set))
-        regions = pd.read_csv(region_set, sep="\t", header=None)
-        regions[3] = regions[0] + ":" + regions[1].astype(str) + "-" + regions[2].astype(str)
-        regions.to_csv(tmp_file, sep="\t", compression="gzip", header=False, index=False)
         
         # get genes
         gene_file = "{}/genes.txt.gz".format(region_dir)
         if not os.path.isfile(gene_file):
+            atac_mat = pd.read_csv(atac_mat_file, sep="\t", index_col=0)
+            atac_mat = atac_mat.drop("d05", axis=1)
+
+            # make sure it has ATAC oriented IDs
+            tmp_file = "{}/{}".format(region_dir, os.path.basename(region_set))
+            regions = pd.read_csv(region_set, sep="\t", header=None)
+            regions[3] = regions[0] + ":" + regions[1].astype(str) + "-" + regions[2].astype(str)
+            regions.to_csv(tmp_file, sep="\t", compression="gzip", header=False, index=False)
+            
             regions_to_genes_w_correlation_filtering(
                 tmp_file,
                 interactions_file,
@@ -322,8 +323,6 @@ def runall(args, prefix):
 
     # adjust signal mats
     h3k27me3_mat_file = args.outputs["data"]["H3K27me3.counts.pooled.rlog.dynamic.mat"]
-    h3k27me3_mat = pd.read_csv(h3k27me3_mat_file, sep="\t", index_col=0)
-    rna_for_h3k27me3_mat = rna_mat[["d00", "d30", "d60"]]
     
     # take the dynamic clusters (not 9 or 4) and analyze those
     h3k27me3_clusters_bed = args.outputs[
@@ -340,18 +339,22 @@ def runall(args, prefix):
         region_dir = "{}/cluster_{}".format(work_dir, cluster_id)
         if not os.path.isdir(region_dir):
             run_shell_cmd("mkdir -p {}".format(region_dir))
-        
-        # make a bed id file
-        tmp_file = "{}/cluster_{}.bed.gz".format(region_dir, cluster_id)
-        regions = h3k27me3_clusters[h3k27me3_clusters[3] == cluster_id]
-        if regions.shape[0] < 100:
-            continue
-        regions = regions.drop(3, axis=1)
-        regions.to_csv(tmp_file, sep="\t", compression="gzip", header=False, index=False)
     
         # get genes
         gene_file = "{}/genes.txt.gz".format(region_dir)
         if not os.path.isfile(gene_file):
+            h3k27me3_mat = pd.read_csv(h3k27me3_mat_file, sep="\t", index_col=0)
+            rna_mat = pd.read_csv(rna_mat_file, sep="\t", index_col=0)
+            rna_for_h3k27me3_mat = rna_mat[["d00", "d30", "d60"]]
+
+            # make a bed id file
+            tmp_file = "{}/cluster_{}.bed.gz".format(region_dir, cluster_id)
+            regions = h3k27me3_clusters[h3k27me3_clusters[3] == cluster_id]
+            if regions.shape[0] < 100:
+                continue
+            regions = regions.drop(3, axis=1)
+            regions.to_csv(tmp_file, sep="\t", compression="gzip", header=False, index=False)
+            
             regions_to_genes_w_correlation_filtering(
                 tmp_file,
                 interactions_file,
