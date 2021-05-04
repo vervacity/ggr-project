@@ -41,10 +41,10 @@ rna_rep2_mat_file=$GGR_DIR/results/rna/timeseries/matrices/ggr.rna.counts.pc.exp
 
 
 # more vignette bars
-$SCRIPT_DIR/plot.rna_bar.R $GGR_DIR/results/rna/timeseries/matrices/ggr.rna.counts.pc.expressed.timeseries_adj.pooled.rlog.mat.txt.gz ENSG00000171223 gene_vals.JUNB.pdf
-$SCRIPT_DIR/plot.rna_bar.R $GGR_DIR/results/rna/timeseries/matrices/ggr.rna.counts.pc.expressed.timeseries_adj.pooled.rlog.mat.txt.gz ENSG00000204103 gene_vals.MAFB.pdf
-$SCRIPT_DIR/plot.rna_bar.R $GGR_DIR/results/rna/timeseries/matrices/ggr.rna.counts.pc.expressed.timeseries_adj.pooled.rlog.mat.txt.gz ENSG00000203782 gene_vals.LOR.pdf
-$SCRIPT_DIR/plot.rna_bar.R $GGR_DIR/results/rna/timeseries/matrices/ggr.rna.counts.pc.expressed.timeseries_adj.pooled.rlog.mat.txt.gz ENSG00000172818 gene_vals.OVOL1.pdf
+#$SCRIPT_DIR/plot.rna_bar.R $GGR_DIR/results/rna/timeseries/matrices/ggr.rna.counts.pc.expressed.timeseries_adj.pooled.rlog.mat.txt.gz ENSG00000171223 gene_vals.JUNB.pdf
+#$SCRIPT_DIR/plot.rna_bar.R $GGR_DIR/results/rna/timeseries/matrices/ggr.rna.counts.pc.expressed.timeseries_adj.pooled.rlog.mat.txt.gz ENSG00000204103 gene_vals.MAFB.pdf
+#$SCRIPT_DIR/plot.rna_bar.R $GGR_DIR/results/rna/timeseries/matrices/ggr.rna.counts.pc.expressed.timeseries_adj.pooled.rlog.mat.txt.gz ENSG00000203782 gene_vals.LOR.pdf
+#$SCRIPT_DIR/plot.rna_bar.R $GGR_DIR/results/rna/timeseries/matrices/ggr.rna.counts.pc.expressed.timeseries_adj.pooled.rlog.mat.txt.gz ENSG00000172818 gene_vals.OVOL1.pdf
 
 
 # --------------------
@@ -57,15 +57,15 @@ biomarker_mat_file=$GGR_DIR/results/rna/plots/biomarkers.mat.txt.gz
 
 # global summary stats - ATAC
 atac_static_counts_file=$GGR_DIR/results/atac/plots/ggr.atac.idr.timepoint_count_summary.static.txt
-#$R_DIR/plot.counts.global.R $atac_static_counts_file fig_1.SUPPL.atac.timepoint_count_summary.static.pdf static
+$R_DIR/plot.counts.global.R $atac_static_counts_file fig_1.SUPPL.atac.timepoint_count_summary.static.pdf static
 atac_dynamic_counts_file=$GGR_DIR/results/atac/timeseries/deseq2/differential_summary.d0_baseline_only.txt.gz
-#$R_DIR/plot.counts.global.R $atac_dynamic_counts_file fig_1.SUPPL.atac.timepoint_count_summary.dynamic.pdf dynamic
+$R_DIR/plot.counts.global.R $atac_dynamic_counts_file fig_1.SUPPL.atac.timepoint_count_summary.dynamic.pdf dynamic
 
 # global summary stats - RNA
 rna_static_counts_file=$GGR_DIR/results/rna/plots/ggr.rna.gene_count_summary.static.txt
-#$R_DIR/plot.counts.global.R $rna_static_counts_file fig_1.SUPPL.rna.gene_count_summary.static.pdf static
+$R_DIR/plot.counts.global.R $rna_static_counts_file fig_1.SUPPL.rna.gene_count_summary.static.pdf static
 rna_dynamic_counts_file=$GGR_DIR/results/rna/timeseries/deseq2/differential_summary.d0_baseline_only.txt.gz
-#$R_DIR/plot.counts.global.R $rna_dynamic_counts_file fig_1.SUPPL.rna.gene_count_summary.dynamic.pdf dynamic
+$R_DIR/plot.counts.global.R $rna_dynamic_counts_file fig_1.SUPPL.rna.gene_count_summary.dynamic.pdf dynamic
 
 # PCA for other datasets
 h3k27ac_rep1_mat_file=$GGR_DIR/results/histones/H3K27ac/plots/ggr.histone.H3K27ac.midpoints.counts.rep1.rlog.filt.mat.txt.gz

@@ -66,12 +66,12 @@ ggplot(data, aes(x=group, y=foldchange)) +
         axis.title.y=element_text(vjust=-1),
         axis.line=element_line(color="black", size=0.115, lineend="square"),
         axis.text.y=element_text(size=6),
-        axis.text.x=element_text(size=6, angle=45, vjust=1, hjust=1),
+        axis.text.x=element_text(size=6, angle=30, vjust=1, hjust=1),
         axis.ticks=element_line(size=0.115),
         axis.ticks.length=unit(0.01, "in"),
         legend.text=element_text(size=5),
         legend.title=element_blank(),
         legend.key.size=unit(0.05, "in"))
 
-ggsave(plot_file, height=2, width=2, useDingbats=FALSE)
+ggsave(plot_file, height=1.75, width=2, useDingbats=FALSE)
 

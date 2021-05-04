@@ -24,8 +24,8 @@ data <- read.table(gzfile(counts_file), header=TRUE, sep="\t")
 
 # assay adjustments
 plot_width <- 1.25
-plot_height <- 1.5
-divide_count <- 100
+plot_height <- 1.15
+divide_count <- 1000
 num_type <- "regions"
 
 if (grepl("atac", plot_file, fixed=TRUE)) {
@@ -34,6 +34,8 @@ if (grepl("atac", plot_file, fixed=TRUE)) {
     plot_width <- 1.75
     y_static_lim <- 160
     y_dynamic_lim <- 15
+    y_dynamic_lim_neg <- -15
+    y_dynamic_lim_pos <- 15
 } else if (grepl("H3K27ac", plot_file, fixed=TRUE)) {
     color <- get_ggr_assay_palette("Reds", 50)
     title <- "H3K27ac ChIP-seq"
@@ -46,6 +48,7 @@ if (grepl("atac", plot_file, fixed=TRUE)) {
     y_dynamic_lim_neg <- -12
     y_dynamic_lim_pos <- 2
     plot_height <- 1.25
+    divide_count <- 100
 } else if (grepl("hichip", plot_file, fixed=TRUE)) {
     color <- get_ggr_assay_palette("Purples", 50)
     title <- "HiChIP"
@@ -56,6 +59,9 @@ if (grepl("atac", plot_file, fixed=TRUE)) {
     num_type <- "genes"
     y_static_lim <- 12
     y_dynamic_lim <- 2
+    y_dynamic_lim_neg <- -2
+    y_dynamic_lim_pos <- 2
+
 }
 
 
@@ -76,12 +82,15 @@ if (count_type == "static") {
     data$down <- -data$down
     data <- melt(data, id.vars=c("timepoint", "color"))
     data$timepoint <- gsub("^.+_to_", "", data$timepoint)
-    #data$timepoint <- gsub("_", " ", data$timepoint)
+    #if (grepl("H3K27me3", plot_file, fixed=TRUE)) {
     data$timepoint <- gsub("0$", ".0", data$timepoint)
     data$timepoint <- gsub("5$", ".5", data$timepoint)
-    #data$timepoint <- gsub("0 ", ".0 ", data$timepoint)
-    #data$timepoint <- gsub("5 ", ".5 ", data$timepoint)
     data$timepoint <- gsub("d", "", data$timepoint)
+    #} else {
+    #    data$timepoint <- gsub("_", " ", data$timepoint)
+    #    data$timepoint <- gsub("0 ", ".0 ", data$timepoint)
+    #    data$timepoint <- gsub("5 ", ".5 ", data$timepoint)
+    #}
 
     # adjust darker colors
     data$color[data$variable == "down"] <- darken(color, amount=0.2)

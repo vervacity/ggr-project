@@ -98,6 +98,7 @@ for (day_idx in 1:length(days)) {
             legend.text=element_text(size=5),
             legend.title=element_blank(),
             legend.key.size=unit(0.05, "in"),
+            legend.spacing.x=unit(0.05, "in"),
             legend.margin=margin(0,0,0,0)) +
         scale_colour_manual(values=day_colors) +
         scale_y_continuous(limit=c(0, max_val))
