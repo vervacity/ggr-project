@@ -60,19 +60,27 @@ layout <- layout[layout$group != "d35",]
 layout <- layout[layout$group != "d40",]
 layout <- layout[layout$group != "d55",]
 
+# set up a color column to properly color points
+layout$rep_label <- layout$rep
+layout$rep_label[grepl("sc", layout$group)] <- "sc"
+layout$color <- paste(layout$rep_label, layout$group, sep="_")
+
 # set up colors
 ggr_colors <- get_ggr_timepoint_colors()
+my_colors_r1 <- lighten(ggr_colors, amount=0.2)
+my_colors_r2 <- darken(ggr_colors, amount=0.2)
 sc_colors <- lighten(
     c(ggr_colors[1], ggr_colors[7], ggr_colors[10]), amount=0.5) #0.2
-ggr_colors <- c(ggr_colors, sc_colors)
+#ggr_colors <- c(ggr_colors, sc_colors)
+ggr_colors <- c(my_colors_r1, my_colors_r2, sc_colors)
 
 # split out to highlight bulk
 sc_layout <- layout[grepl("sc", layout$group),]
 bulk_layout <- layout[!grepl("sc", layout$group),]
 
 # plot
-ggplot(layout, aes(x=x, y=y, group=group)) +
-    geom_point(size=0.115, aes(colour=group)) +
+ggplot(layout, aes(x=x, y=y, group=color)) +
+    geom_point(size=0.115, aes(colour=color)) +
     geom_point(data=bulk_layout, shape=21, size=1, aes(x=x, y=y)) +
     labs(
         x="UMAP 1", y="UMAP 2", title="Bulk ATAC-seq projected\nto scATAC-seq") +
@@ -96,7 +104,9 @@ ggplot(layout, aes(x=x, y=y, group=group)) +
         legend.text=element_text(size=5),
         legend.title=element_blank(),
         legend.key.size=unit(0.05, "in")) +
-    scale_color_manual(values=ggr_colors)
+    scale_color_manual(values=ggr_colors) +
+    guides(color=guide_legend(nrow=10))
         
 plot_file <- paste(plot_prefix, ".", rand_i, ".umap.pdf", sep="")
-ggsave(plot_file, height=1.5, width=2, useDingbats=FALSE)
+#ggsave(plot_file, height=1.5, width=2, useDingbats=FALSE)
+ggsave(plot_file, height=2, width=4, useDingbats=FALSE)

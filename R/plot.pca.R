@@ -105,7 +105,8 @@ if (grepl("hichip", plot_file, fixed=TRUE)) {
 }
 
 # plot
-p <- ggplot(pca_data, aes(x=x, y=y, colour=group, fill=day)) +
+#p <- ggplot(pca_data, aes(x=x, y=y, colour=group, fill=day)) +
+p <- ggplot(pca_data, aes(x=x, y=y, colour=group, fill=group)) +
     geom_tile() + 
     geom_tile(size=1.1, fill="white", colour="white", show.legend=FALSE) +
     #geom_point(size=1, show.legend=FALSE) + # size=0.25
@@ -115,13 +116,16 @@ p <- ggplot(pca_data, aes(x=x, y=y, colour=group, fill=day)) +
         y=paste("PC2 (", format(round(var_explained[2]*100, 2), nsmall=2), "%)", sep=""),
         title=title) + 
     scale_color_manual(values=my_colors_joint, guide="none") +
-    scale_fill_manual(values=my_colors) +
+    #scale_fill_manual(values=my_colors) +
+    scale_fill_manual(values=my_colors_joint) +
     coord_fixed() +
     theme_bw() +
     theme(
         #aspect.ratio=1,
         text=element_text(family="ArialMT"),
-        plot.margin=margin(5,20,1,0),
+        #plot.margin=margin(5,20,1,0),
+        plot.margin=margin(5,60,1,0),
+        #plot.margin=margin(5,40,1,0),
         plot.title=element_text(size=8, hjust=0.5, margin=margin(b=3)),
         panel.background=element_blank(),
         panel.border=element_blank(),
@@ -134,7 +138,8 @@ p <- ggplot(pca_data, aes(x=x, y=y, colour=group, fill=day)) +
         axis.text=element_text(size=6),
         axis.ticks=element_line(size=0.115),
         axis.ticks.length=unit(0.01, "in"),
-        legend.position=c(1.15, 0.5),
+        #legend.position=c(1.15, 0.5),
+        legend.position=c(1.25, 0.5),
         legend.text=element_text(size=5),
         legend.title=element_blank(),
         legend.spacing.x=unit(0.05, "in"),
@@ -146,45 +151,57 @@ p <- ggplot(pca_data, aes(x=x, y=y, colour=group, fill=day)) +
 # default scale (RNA)
 min_x <- -100
 max_x <- 100
+legend_nrow <- 9
 
 if (grepl("atac", plot_file, fixed=TRUE)) {
     min_x <- -170
     max_x <- 130
+    legend_nrow <- 10
 }
 
 if (grepl("H3K27ac", plot_file, fixed=TRUE)) {
     min_x <- -230
     max_x <- 230
+    legend_nrow <- 3
 }
 
 if (grepl("H3K4me1", plot_file, fixed=TRUE)) {
     min_x <- -200
     max_x <- 200
+    legend_nrow <- 3
 }
 
 if (grepl("H3K27me3", plot_file, fixed=TRUE)) {
     min_x <- -60
     max_x <- 60
+    legend_nrow <- 3
 }
 
 if (grepl("hichip", plot_file, fixed=TRUE)) {
     min_x <- -400
     max_x <- 400
+    legend_nrow <- 3
 }
 
 y_lim <- 0.75*max_x
 
 p <- p + scale_x_continuous(limits=c(min_x, max_x), expand=c(0,0)) +
-    scale_y_continuous(limits=c(-y_lim, y_lim), expand=c(0,0))
+    scale_y_continuous(limits=c(-y_lim, y_lim), expand=c(0,0)) +
+    guides(fill=guide_legend(nrow=legend_nrow))
 
+        
 if (grepl("atac", plot_file, fixed=TRUE)) {
     plot_ht <- 1.75
-    plot_wid <- 2.5
+    #plot_wid <- 2.5
+    plot_wid <- 3
+    
 }  else {
     plot_ht <- 1.75 * 0.8
     plot_wid <- 2.5 * 0.8
     plot_ht <- 1.25
-    plot_wid <- 2
+    #plot_wid <- 2
+    plot_ht <- 1.75
+    plot_wid <- 2.5
 }
 
 ggsave(plot_file, height=plot_ht, width=plot_wid, useDingbats=FALSE)
