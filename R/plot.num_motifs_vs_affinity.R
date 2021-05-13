@@ -50,7 +50,8 @@ results <- data.frame(
 ggplot(results, aes(x=num_motifs, y=mean_affinities, group=num_motifs)) +
     #geom_violin()
     #geom_boxplot()
-    geom_jitter(shape=20, alpha=0.5, size=1, stroke=0, aes(color=labels)) +
+    #geom_jitter(shape=20, alpha=0.5, size=1, stroke=0, aes(color=labels)) +
+    geom_jitter(shape=16, alpha=0.1, size=0.5, stroke=0) +
     labs(x="Number of motif instances in region",
          y="Average motif affinity score",
          title=title) +
@@ -76,6 +77,7 @@ ggplot(results, aes(x=num_motifs, y=mean_affinities, group=num_motifs)) +
         legend.title=element_blank(),
         legend.key.size=unit(0.05, "in"),
         legend.margin=margin(0,0,0,0)) +
-    scale_colour_distiller(direction=1, limits=c(0,1))
-    #scale_y_continuous(limits=c(0, 0.025))
-ggsave(plot_file, height=3, width=3)
+    scale_colour_distiller(direction=1, limits=c(0,1)) +
+    scale_x_continuous(limits=c(0.5, 6.5))
+
+ggsave(plot_file, height=1.5, width=2)

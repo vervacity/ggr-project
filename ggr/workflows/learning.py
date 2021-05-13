@@ -19,6 +19,7 @@ from ggr.analyses.nn import evaluate_enhancer_prediction
 from ggr.analyses.nn import run_low_affinity_workflow
 from ggr.analyses.nn import summarize_functional_enrichments
 from ggr.analyses.nn import get_summit_centric_motif_maps
+from ggr.analyses.nn import compare_aligned_motif_orientations
 from ggr.analyses.tronn_scripts import tronn_intersect_with_expression_cmd
 
 from ggr.util.utils import run_shell_cmd
@@ -83,22 +84,24 @@ def _run_atac_summit_centric_workflow(args, pvals_file, nn_files, work_dir):
     """
     # first get motifs list
     motif_names = get_sig_motif_list(pvals_file, nn_files[0])
-    print len(motif_names)
     
     # then get results per motif
     for motif_name in motif_names:
 
         # debug
-        run_motifs = ["FOX", "CEBP", "TP53", "KLF", "TFAP2", "ZNF350"]
-        run_motifs = ["KLF12"]
-        dont_run = True
-        for motif_str in run_motifs:
-            if motif_str in motif_name:
-                dont_run = False
-        if dont_run:
-            continue
-
         if True:
+            run_motifs = ["GRHL", "TP53", "CEBPA", "CEBPD", "TFAP2A"]
+            #run_motifs = ["FOX", "CEBP", "TP53", "KLF", "TFAP2", "ZNF350"]
+            dont_run = True
+            for motif_str in run_motifs:
+                if motif_str in motif_name:
+                    dont_run = False
+            if dont_run:
+                continue
+        
+        # run FWD motifs        
+        fwd_regions_file = "{}/{}.FWD.summit_center_filt.bed.gz".format(work_dir, motif_name)
+        if not os.path.isfile(fwd_regions_file):
             get_summit_centric_motif_maps(
                 motif_name,
                 nn_files,
@@ -106,12 +109,60 @@ def _run_atac_summit_centric_workflow(args, pvals_file, nn_files, work_dir):
                 args.outputs["data"]["atac.master.summits.bed"],
                 work_dir)
 
-            # get the bed file and run functional enrichments
-            bed_file = "{}/{}.summit_center_filt.bed.gz".format(work_dir, motif_name)
-            #_run_motif_functional_enrichment_workflow(args, motif_name, bed_file, work_dir)
-        
+        # plotting - use these for final figs
+        aligned_file = "{}/{}.FWD.hits.aligned.mat.txt.gz".format(work_dir, motif_name)
+        plot_prefix = "{}/{}.FWD.aligned.hits".format(work_dir, motif_name)
+        if not os.path.isfile("{}.sum.pdf".format(plot_prefix)):
+            r_cmd = "~/git/ggr-project/R/plot.summit_aligned_motif_maps.R {} {} {}".format(
+                aligned_file, plot_prefix, motif_name)
+            print r_cmd
+            os.system(r_cmd)
+
+        aligned_file = "{}/{}.FWD.nn.aligned.mat.txt.gz".format(work_dir, motif_name)
+        plot_prefix = "{}/{}.FWD.aligned.nn".format(work_dir, motif_name)
+        if not os.path.isfile("{}.sum.pdf".format(plot_prefix)):
+            r_cmd = "~/git/ggr-project/R/plot.summit_aligned_motif_maps.R {} {} {}".format(
+                aligned_file, plot_prefix, motif_name)
+            print r_cmd
+            os.system(r_cmd)
+
+        data_file = "{}/{}.FWD.hits.affinities.mat.txt.gz".format(work_dir, motif_name)
+        plot_file = "{}/{}.FWD.num_v_affinity.hits.pdf".format(work_dir, motif_name)
+        if not os.path.isfile(plot_file):
+            r_cmd = "~/git/ggr-project/R/plot.num_motifs_vs_affinity.R {} {} {}".format(
+                data_file, plot_file, motif_name)
+            print r_cmd
+            os.system(r_cmd)
+            
+            
+        # run REV motifs
+        rev_regions_file = "{}/{}.REV.summit_center_filt.bed.gz".format(work_dir, motif_name)
+        #if not os.path.isfile(rev_regions_file):
+        if False:
+            get_summit_centric_motif_maps(
+                motif_name,
+                nn_files,
+                args.outputs["data"]["atac.master.bed"],
+                args.outputs["data"]["atac.master.summits.bed"],
+                work_dir,
+                reverse_pwm=True)
+
+        if False:
+            # do not use: if there were positional dependence based on orientation, should have seen it
+            # when just looking at FWD version
+            fwd_aligned_file = "{}/{}.FWD.aligned.mat.txt.gz".format(work_dir, motif_name) # note this is NN filt
+            rev_aligned_file = "{}/{}.REV.aligned.mat.txt.gz".format(work_dir, motif_name) # note this is NN filt
+            compare_aligned_motif_orientations(fwd_aligned_file, rev_aligned_file, work_dir, motif_name)
+
+        # make a joint BED file of FWD and REV?
+            
+        # TODO run functional enrichments
+        #_run_motif_functional_enrichment_workflow(args, motif_name, bed_file, work_dir)
+            
     quit()
-        
+
+    # TODO save out a NN motif clustering mapping for each motif?
+    
     # then summarize functional enrichment results
     summary_dir = "{}/summary".format(work_dir)
     if not os.path.isdir(summary_dir):
@@ -444,38 +495,36 @@ def runall(args, prefix):
     if not os.path.isdir(work_dir):
         os.system("mkdir -p {}".format(work_dir))
 
-    NN_DIR = "/mnt/lab_data3/dskim89/ggr/nn/2019-03-12.freeze"
-        
-    # motifs to look at
+    # sig motifs
     nn_pvals_file = (
         "{}/motifs.sig/motifs.adjust.diff.rna_filt.dmim/pvals.rna_filt.corr_filt.h5").format(
             NN_DIR)
 
-    nn_motif_files = [
-        "/mnt/lab_data3/dskim89/ggr/nn/2020-01-13/scanmotifs/motifs.background.lite/ggr.scanmotifs.h5"
-    ]
-
+    # scanmotif files
+    NN_DIR = "/mnt/lab_data3/dskim89/ggr/nn/2019-03-12.freeze"
     nn_motif_files = [
         "{}/motifs.input_x_grad.early/ggr.scanmotifs.h5".format(NN_DIR),
         "{}/motifs.input_x_grad.mid/ggr.scanmotifs.h5".format(NN_DIR),
-        "{}/motifs.input_x_grad.late/ggr.scanmotifs.h5".format(NN_DIR),
-    ]
-    print "DEBUGGING"
-    if False:
+        "{}/motifs.input_x_grad.late/ggr.scanmotifs.h5".format(NN_DIR)]
+
+    if False: # debug
+        NN_DIR = "/mnt/lab_data3/dskim89/ggr/nn/2020-01-13/scanmotifs"
         nn_motif_files = [
-            #"{}/motifs.input_x_grad.early/ggr.scanmotifs.h5".format(NN_DIR)
-            "{}/motifs.input_x_grad.late/ggr.scanmotifs.h5".format(NN_DIR)
+            "{}/motifs.dynamic.early/ggr.scanmotifs.h5".format(NN_DIR),
+            "{}/motifs.dynamic.mid/ggr.scanmotifs.h5".format(NN_DIR),
+            "{}/motifs.dynamic.late/ggr.scanmotifs.h5".format(NN_DIR)
         ]
 
-    # run a functional enrichment mapping just based on presence of NN-active motifs
-    _run_motifs_functional_enrichment_workflow(args, nn_pvals_file, nn_motif_files, work_dir)
+    if False:
+        # run a functional enrichment mapping just based on presence of NN-active motifs
+        _run_motifs_functional_enrichment_workflow(args, nn_pvals_file, nn_motif_files, work_dir)
     
     # do ATAC summit-centric view on motifs
     # also functional enrichment mapping here too
-    work_dir = "{}/homotypic.atac_summits".format(results_dir)
+    work_dir = "{}/homotypic.atac_summits.FIGS".format(results_dir)
     if not os.path.isdir(work_dir):
         os.system("mkdir -p {}".format(work_dir))
-    
+        
     _run_atac_summit_centric_workflow(args, nn_pvals_file, nn_motif_files, work_dir)
         
     quit()

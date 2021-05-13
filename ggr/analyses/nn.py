@@ -383,18 +383,20 @@ def get_motif_scores(
         nn_motif_files,
         score_key="sequence-weighted.active.pwm-scores.thresh",
         extra_key=None,
-        extra_idx=0):
+        extra_idx=0,
+        reverse_pwm=False):
     """using motif name, pull out vectors
     """
     # first, make sure we have motif_idx set up
     with h5py.File(nn_motif_files[0], "r") as hf:
         motifs = hf["sequence-weighted.active.pwm-scores.thresh.sum"].attrs["pwm_names"]
+        dataset_shape = hf[score_key].shape
     for i in range(len(motifs)):
         if motif_name in motifs[i]:
             motif_idx = i
     if motif_idx is None:
         raise ValueError, "No motif by that name found: {}".format(motif_name)
-    
+        
     # pull in metadata and motif vectors
     # use reduced motif vectors to filter down first before pulling in full motif vector
     for nn_file_idx in range(len(nn_motif_files)):
@@ -402,11 +404,13 @@ def get_motif_scores(
         
         # get motif presence to figure out which subset to pull
         with h5py.File(nn_file, "r") as hf:
-            #for key in sorted(hf.keys()): print key, hf[key].shape
             motif_present = hf["sequence.active.pwm-scores.thresh.sum"][:,0,motif_idx]
+            # check if using a fwd and rev file, look at both to make sure fwd and rev runs match
+            if len(motifs) * 2 == dataset_shape[-1]:
+                motif_present_fwd = hf["sequence.active.pwm-scores.thresh.sum"][:,0,motif_idx]
+                motif_present_rev = hf["sequence.active.pwm-scores.thresh.sum"][:,0,motif_idx+len(motifs)]
+                motif_present = motif_present_fwd + motif_present_rev
         keep_indices = np.where(motif_present != 0)[0]
-        print motif_present.shape
-        print keep_indices.shape
     
         # pull metadata, only keep orig region and start position of pwm hits vector
         with h5py.File(nn_file, "r") as hf:
@@ -429,7 +433,11 @@ def get_motif_scores(
             
         # pull motif vectors and reduce to max scores
         with h5py.File(nn_file, "r") as hf:
-            motif_scores = hf[score_key][keep_indices,:,:,motif_idx]
+            # adjust for reverse pwm here
+            if reverse_pwm:
+                motif_scores = hf[score_key][keep_indices,:,:,motif_idx+len(motifs)]
+            else:
+                motif_scores = hf[score_key][keep_indices,:,:,motif_idx]
         if False:
             if "weighted" in score_key:
                 motif_scores = motif_scores[:,9]
@@ -572,7 +580,8 @@ def get_motif_distances(motif_data, metadata_cols, out_file):
 
 
 def get_summit_centric_motif_maps(
-        motif_name, nn_motif_files, master_bed_file, summit_file, work_dir):
+        motif_name, nn_motif_files, master_bed_file, summit_file, work_dir,
+        reverse_pwm=False):
     """for a motif, plot the following:
         - motif hits: num hits in region vs affinity
         - motif hits: distance (between motif instances) vs affinity
@@ -594,6 +603,12 @@ def get_summit_centric_motif_maps(
             extra_key = motif_name_to_key[extra_name][0]
             extra_idx = motif_name_to_key[extra_name][1]
 
+    # adjust prefix if reverse pwm
+    if reverse_pwm:
+        prefix = "{}.REV".format(motif_name)
+    else:
+        prefix = "{}.FWD".format(motif_name)
+        
     # ==================================
     # motif HITS
     # ==================================
@@ -601,7 +616,8 @@ def get_summit_centric_motif_maps(
         motif_name, nn_motif_files,
         score_key="sequence.active.pwm-scores.thresh",
         extra_key=extra_key,
-        extra_idx=extra_idx)
+        extra_idx=extra_idx,
+        reverse_pwm=reverse_pwm)
     print "Num regions (HITS): {}".format(motif_data_raw.shape[0])
     
     # adjust index cols as needed
@@ -610,42 +626,43 @@ def get_summit_centric_motif_maps(
         index_cols += ["extra"]
     
     # plot HITS: positions relative to ATAC summit
-    aligned_file = "{}/{}.aligned.mat.txt.gz".format(work_dir, motif_name)
+    aligned_file = "{}/{}.hits.aligned.mat.txt.gz".format(work_dir, prefix)
     motif_data_raw, index_cols = align_scores_to_summits(
         motif_data_raw, master_bed_file, summit_file, aligned_file,
         index_cols=index_cols)
     print "Num regions (HITS) after aligned to summit: {}".format(motif_data_raw.shape[0])
-    plot_file = "{}/{}.aligned.hits.pdf".format(work_dir, motif_name)
+    plot_prefix = "{}/{}.aligned.hits".format(work_dir, prefix)
     r_cmd = "~/git/ggr-project/R/plot.summit_aligned_motif_maps.R {} {} {}".format(
-        aligned_file, plot_file, motif_name)
+        aligned_file, plot_prefix, motif_name)
     print r_cmd
     os.system(r_cmd)
     
     # plot HITS: num hits v affinity
-    data_file = "{}/{}.hits.affinities.mat.txt.gz".format(work_dir, motif_name)
+    data_file = "{}/{}.hits.affinities.mat.txt.gz".format(work_dir, prefix)
     motif_data_raw.to_csv(
         data_file,
         sep="\t", header=True, index=False, compression="gzip")
-    plot_file = "{}/{}.num_v_affinity.hits.pdf".format(work_dir, motif_name)
+    plot_file = "{}/{}.num_v_affinity.hits.pdf".format(work_dir, prefix)
     r_cmd = "~/git/ggr-project/R/plot.num_motifs_vs_affinity.R {} {} {}".format(
         data_file, plot_file, motif_name)
     print r_cmd
     os.system(r_cmd)
 
     # plot HITS: distances v affinity
-    distances_hits_file = "{}/{}.hits.distances_v_affinity.txt.gz".format(work_dir, motif_name)
-    get_motif_distances(motif_data_raw, index_cols, distances_hits_file)
-    plot_file = "{}/{}.distance_v_affinity.hits.pdf".format(work_dir, motif_name)
-    r_cmd = "~/git/ggr-project/R/plot.distance_vs_affinity.R {} {} {}".format(
-        distances_hits_file, plot_file, motif_name)
-    print r_cmd
-    os.system(r_cmd)
+    if False:
+        distances_hits_file = "{}/{}.hits.distances_v_affinity.txt.gz".format(work_dir, prefix)
+        get_motif_distances(motif_data_raw, index_cols, distances_hits_file)
+        plot_file = "{}/{}.distance_v_affinity.hits.pdf".format(work_dir, prefix)
+        r_cmd = "~/git/ggr-project/R/plot.distance_vs_affinity.R {} {} {}".format(
+            distances_hits_file, plot_file, motif_name)
+        print r_cmd
+        os.system(r_cmd)
 
     if False:
         # plot HITS: positions relative to ATAC summit
-        aligned_file = "{}/{}.aligned.mat.txt.gz".format(work_dir, motif_name)
+        aligned_file = "{}/{}.aligned.mat.txt.gz".format(work_dir, prefix)
         aligned_data = align_scores_to_summits(motif_data_raw, master_bed_file, summit_file, aligned_file)
-        plot_file = "{}/{}.hits.aligned.pdf".format(work_dir, motif_name)
+        plot_file = "{}/{}.hits.aligned.pdf".format(work_dir, prefix)
         r_cmd = "~/git/ggr-project/R/plot.summit_aligned_motif_maps.R {} {}".format(
             aligned_file, plot_file)
         print r_cmd
@@ -658,7 +675,8 @@ def get_summit_centric_motif_maps(
         motif_name, nn_motif_files,
         score_key="sequence-weighted.active.pwm-scores.thresh",
         extra_key=extra_key,
-        extra_idx=extra_idx)
+        extra_idx=extra_idx,
+        reverse_pwm=reverse_pwm)
     print "Num regions (NN): {}".format(motif_data_nn.shape[0])
     
     # adjust index cols as needed
@@ -667,14 +685,14 @@ def get_summit_centric_motif_maps(
         index_cols += ["extra"]
 
     # plot NN: positions relative to ATAC summit
-    aligned_file = "{}/{}.aligned.mat.txt.gz".format(work_dir, motif_name)
+    aligned_file = "{}/{}.nn.aligned.mat.txt.gz".format(work_dir, prefix)
     motif_data_nn, index_cols = align_scores_to_summits(
         motif_data_nn, master_bed_file, summit_file, aligned_file,
         index_cols=index_cols)
     print "Num regions (NN) after aligned to summit: {}".format(motif_data_nn.shape[0])
-    plot_file = "{}/{}.aligned.nn.pdf".format(work_dir, motif_name)
+    plot_prefix = "{}/{}.aligned.nn".format(work_dir, prefix)
     r_cmd = "~/git/ggr-project/R/plot.summit_aligned_motif_maps.R {} {} {}".format(
-        aligned_file, plot_file, motif_name)
+        aligned_file, plot_prefix, motif_name)
     print r_cmd
     os.system(r_cmd)
 
@@ -685,24 +703,25 @@ def get_summit_centric_motif_maps(
     motif_data_filt = motif_raw_tmp.reset_index()
 
     # plot NN: num hits v affinity
-    data_file = "{}/{}.nn_filt_affinities.mat.txt.gz".format(work_dir, motif_name)
+    data_file = "{}/{}.nn_filt_affinities.mat.txt.gz".format(work_dir, prefix)
     motif_data_filt.to_csv(
         data_file,
         sep="\t", header=True, index=False, compression="gzip")
-    plot_file = "{}/{}.num_v_affinity.nn.pdf".format(work_dir, motif_name)
+    plot_file = "{}/{}.num_v_affinity.nn.pdf".format(work_dir, prefix)
     r_cmd = "~/git/ggr-project/R/plot.num_motifs_vs_affinity.R {} {} {}".format(
         data_file, plot_file, motif_name)
     print r_cmd
     os.system(r_cmd)
 
     # plot NN: distances vs affinity
-    distances_nn_file = "{}/{}.nn.distances_v_affinity.txt.gz".format(work_dir, motif_name)
-    get_motif_distances(motif_data_filt, index_cols, distances_nn_file)
-    plot_file = "{}/{}.distance_v_affinity.nn.pdf".format(work_dir, motif_name)
-    r_cmd = "~/git/ggr-project/R/plot.distance_vs_affinity.R {} {} {}".format(
-        distances_nn_file, plot_file, motif_name)
-    print r_cmd
-    os.system(r_cmd)
+    if False:
+        distances_nn_file = "{}/{}.nn.distances_v_affinity.txt.gz".format(work_dir, prefix)
+        get_motif_distances(motif_data_filt, index_cols, distances_nn_file)
+        plot_file = "{}/{}.distance_v_affinity.nn.pdf".format(work_dir, prefix)
+        r_cmd = "~/git/ggr-project/R/plot.distance_vs_affinity.R {} {} {}".format(
+            distances_nn_file, plot_file, motif_name)
+        print r_cmd
+        os.system(r_cmd)
 
     if False:
         # plot NN: positions relative to ATAC summit
@@ -719,27 +738,123 @@ def get_summit_centric_motif_maps(
     # ==================================
     # TODO - look at distances from hits vs NN - where did NN results remove motifs?
     # TODO also consider using NN weighted scores here
-    if True:
-        distances_nn_file = "{}/{}.nn.distances_v_affinity.nn_scores.txt.gz".format(work_dir, motif_name)
+    if False:
+        distances_nn_file = "{}/{}.nn.distances_v_affinity.nn_scores.txt.gz".format(work_dir, prefix)
         get_motif_distances(motif_data_nn, index_cols, distances_nn_file)
     
-    plot_file = "{}/{}.distance_v_affinity.nn_v_hits.pdf".format(work_dir, motif_name)
-    r_cmd = "~/git/ggr-project/R/plot.distance_vs_affinity.hits_v_nn.R {} {} {} {}".format(
-        distances_hits_file, distances_nn_file, plot_file, motif_name)
+        plot_file = "{}/{}.distance_v_affinity.nn_v_hits.pdf".format(work_dir, prefix)
+        r_cmd = "~/git/ggr-project/R/plot.distance_vs_affinity.hits_v_nn.R {} {} {} {}".format(
+            distances_hits_file, distances_nn_file, plot_file, prefix)
+        print r_cmd
+        os.system(r_cmd)
+    
+    # TODO save out a reduced bed file of filtered regions
+    if True:
+        bed_file = "{}/{}.summit_center_filt.bed.gz".format(work_dir, prefix)
+        region_data = motif_data_nn["region"].str.split(":", n=2, expand=True)
+        region_data[["start", "stop"]] = region_data[1].str.split("-", n=2, expand=True)
+        region_data.to_csv(
+            bed_file,
+            columns=[0, "start", "stop"],
+            sep="\t", header=False, index=False, compression="gzip")
+    
+    return
+
+
+def compare_aligned_motif_orientations(
+        fwd_aligned_file, rev_aligned_file, work_dir, motif_name):
+    """with aligned maps, look at orientations
+    """
+    print fwd_aligned_file
+    
+    # read in data
+    index_cols = ["region", "start_summit"]
+    fwd_map = pd.read_csv(fwd_aligned_file, sep="\t").set_index(index_cols)
+    rev_map = pd.read_csv(rev_aligned_file, sep="\t").set_index(index_cols)
+    
+    # use masks to filter scores
+    fwd_mask = fwd_map.ge(rev_map)
+    rev_mask = rev_map.ge(fwd_map)
+    fwd_map = fwd_map.multiply(fwd_mask)
+    rev_map = rev_map.multiply(rev_mask)
+    
+    # try orienting, with FWD more upstream
+    for row_idx in range(fwd_map.shape[0]):
+
+        if row_idx % 1000 == 0: print row_idx
+        index_val = fwd_map.index[row_idx]
+        
+        # FWD analysis
+        values = fwd_map.iloc[row_idx,:].copy()
+        values[values < 0] = 0
+        midpoint = values.shape[0] / 2
+        upstream_val = values[:midpoint].sum()
+        downstream_val = values[midpoint:].sum()
+
+        if upstream_val > downstream_val:
+            fwd_max = upstream_val
+            fwd_direction = "same"
+        else:
+            fwd_max = downstream_val
+            fwd_direction = "flip"
+
+        # REV analysis
+        values = rev_map.iloc[row_idx,:].copy()
+        values[values < 0] = 0
+        midpoint = values.shape[0] / 2
+        upstream_val = values[:midpoint].sum()
+        downstream_val = values[midpoint:].sum()
+            
+        if upstream_val > downstream_val:
+            rev_max = upstream_val
+            rev_direction = "flip"
+        else:
+            rev_max = downstream_val
+            rev_direction = "same"
+            
+        # then compare fwd max to rev max
+        if fwd_max > rev_max:
+            final_direction = fwd_direction
+        else:
+            final_direction = rev_direction
+
+        # then flip if needed
+        # if i flip it, is it now REV?
+        if final_direction == "flip":
+            # TODO save out vectors before resetting
+            new_rev = np.flip(fwd_map.iloc[row_idx,:].values, 0)
+            new_fwd = np.flip(rev_map.iloc[row_idx,:].values, 0)
+            
+            fwd_map.iloc[row_idx,:] = new_fwd
+            rev_map.iloc[row_idx,:] = new_rev
+            
+    # save out and plot
+    aligned_file = "{}/{}.FWD.aligned.FILT.mat.txt.gz".format(work_dir, motif_name)
+    fwd_map.to_csv(aligned_file, sep="\t", compression="gzip", header=True, index=False)
+    plot_file = "{}/{}.FWD.aligned.FILT.nn.pdf".format(work_dir, motif_name)
+    r_cmd = "~/git/ggr-project/R/plot.summit_aligned_motif_maps.R {} {} {}".format(
+        aligned_file, plot_file, motif_name)
     print r_cmd
     os.system(r_cmd)
 
+    aligned_file = "{}/{}.REV.aligned.FILT.mat.txt.gz".format(work_dir, motif_name)
+    rev_map.to_csv(aligned_file, sep="\t", compression="gzip", header=True, index=False)
+    plot_file = "{}/{}.REV.aligned.FILT.nn.pdf".format(work_dir, motif_name)
+    r_cmd = "~/git/ggr-project/R/plot.summit_aligned_motif_maps.R {} {} {}".format(
+        aligned_file, plot_file, motif_name)
+    print r_cmd
+    os.system(r_cmd)
+
+    plot_file = "{}/{}.BOTH.aligned.FILT.nn.pdf".format(work_dir, motif_name)
+    r_cmd = "~/git/ggr-project/R/plot.summit_aligned_motif_maps.R {} {} {}".format(
+        aligned_file, plot_file, motif_name)
+    print r_cmd
+    os.system(r_cmd)
+
+
+    
     quit()
-    
-    # TODO save out a reduced bed file of filtered regions
-    bed_file = "{}/{}.summit_center_filt.bed.gz".format(work_dir, motif_name)
-    region_data = motif_data_nn["region"].str.split(":", n=2, expand=True)
-    region_data[["start", "stop"]] = region_data[1].str.split("-", n=2, expand=True)
-    region_data.to_csv(
-        bed_file,
-        columns=[0, "start", "stop"],
-        sep="\t", header=False, index=False, compression="gzip")
-    
+
     return
 
 
