@@ -78,12 +78,22 @@ def main():
 
     # rules of interest
     rules = [
-        "ggr.TRAJ_LABELS-0_x_TRAJ_LABELS-8-10-11.50_x_26", # ATF1/CREB1 x LEF1
+        "ggr.TRAJ_LABELS-0_x_TRAJ_LABELS-8-10-11.50_x_26", # CREB1 x LEF1
+        "ggr.TRAJ_LABELS-0_x_TRAJ_LABELS-9.16_x_125", # HOXA1 x ERG
+        "ggr.TRAJ_LABELS-0_x_TRAJ_LABELS-8-10-11.34_x_25", # ERG x CREB1
+        "ggr.TRAJ_LABELS-0_x_TRAJ_LABELS-8-10-11_x_TRAJ_LABELS-9.20_x_17_x_53", # CREB1 x HOXA1
+        "ggr.TRAJ_LABELS-9.grammar-48.annot-556", # CREB x VDR
+        
         "ggr.TRAJ_LABELS-2.grammar-99.annot-316", # TP63 x ATF1
         "ggr.TRAJ_LABELS-2.grammar-59.annot-272", # CEBPA x TFAP2
         "ggr.TRAJ_LABELS-2.grammar-60.annot-274", # CEBPD x TFAP2
-        "ggr.TRAJ_LABELS-1_x_TRAJ_LABELS-14_x_TRAJ_LABELS-2.42_x_21_x_58", # KLF x ZNF
-        "ggr.TRAJ_LABELS-0_x_TRAJ_LABELS-9.16_x_125" # HOXA1 x ERG
+        "ggr.TRAJ_LABELS-2.grammar-52.annot-265", # ATF1 x AHR
+        "ggr.TRAJ_LABELS-2.grammar-73.annot-288", # CEBPA, ZFX
+        "ggr.TRAJ_LABELS-2.grammar-74.annot-289", # CEBPD, ZFX
+        "ggr.TRAJ_LABELS-2.grammar-62.annot-276", # ZFX, MAF
+        "ggr.TRAJ_LABELS-1.grammar-71.annot-137", # CEBPA x FOXO1
+        
+        "ggr.TRAJ_LABELS-1_x_TRAJ_LABELS-14_x_TRAJ_LABELS-2.42_x_21_x_58" # KLF x ZNF
     ]
     
     # load data
@@ -150,10 +160,7 @@ def main():
         # plot each rep separately
         plot_cmd = "Rscript ~/git/ggr-project/R/plot.rule_indiv_example.R {}".format(rule_data_file)
         print plot_cmd
-        #os.system(plot_cmd)
-
-        #print good_rule_data.columns
-        #quit()
+        os.system(plot_cmd)
 
     # manual checks:
     # MPRA activity pattern - most important
@@ -164,17 +171,50 @@ def main():
     # Genome browser
     # any available ChIP-seq
 
-
-    # selections - no more than 15
-    selections = {
-        "ggr.TRAJ_LABELS-0_x_TRAJ_LABELS-8-10-11.50_x_26": [163, 1023, 1249], # ATF1/CREB1 x LEF1
-        "ggr.TRAJ_LABELS-0_x_TRAJ_LABELS-9.16_x_125": [33, 945, 1102], # HOXA1 x ERG
+    # selections - best (loose cutoff)
+    selections_orig = {
+        "ggr.TRAJ_LABELS-0_x_TRAJ_LABELS-8-10-11_x_TRAJ_LABELS-9.20_x_17_x_53": [983, 1002, 2023], # CREB1 x HOXA1
+        "ggr.TRAJ_LABELS-0_x_TRAJ_LABELS-8-10-11.34_x_25": [205, 1241], # ERG x ATF1
+        "ggr.TRAJ_LABELS-0_x_TRAJ_LABELS-8-10-11.50_x_26": [163, 1023, 1249], # CREB1 x LEF1
+        "ggr.TRAJ_LABELS-0_x_TRAJ_LABELS-9.16_x_125": [33, 548, 945, 1102], # HOXA1 x ERG
+        
         "ggr.TRAJ_LABELS-1_x_TRAJ_LABELS-14_x_TRAJ_LABELS-2.42_x_21_x_58": [9, 13, 132, 187], # KLF x ZNF
-        "ggr.TRAJ_LABELS-2.grammar-59.annot-272": [], # CEBPA x TFAP2
+        "ggr.TRAJ_LABELS-1.grammar-71.annot-137": [80, 382, 410, 509], # CEBPA x FOXO
+        
+        "ggr.TRAJ_LABELS-2.grammar-52.annot-265": [822], # ATF1 x AHR
+        "ggr.TRAJ_LABELS-2.grammar-59.annot-272": [182, 556], # CEBPA x TFAP2
         "ggr.TRAJ_LABELS-2.grammar-60.annot-274": [278, 343, 508, 669], # CEBPD x TFAP2
-        "ggr.TRAJ_LABELS-2.grammar-99.annot-316": [92, 314] # TP63 x ATF1
+        "ggr.TRAJ_LABELS-2.grammar-62.annot-276": [221, 378], # ZFX, MAF
+        "ggr.TRAJ_LABELS-2.grammar-73.annot-288": [73, 351, 510], # CEBPA, ZFX
+        "ggr.TRAJ_LABELS-2.grammar-74.annot-289": [140, 408, 525], # CEBPD, ZFX
+        "ggr.TRAJ_LABELS-2.grammar-99.annot-316": [92, 314], # TP63 x ATF1
+        
+        "ggr.TRAJ_LABELS-9.grammar-48.annot-556": [48, 408] # CREB x VDR
+
     }
 
+    # filtered selections
+    selections = {
+        "ggr.TRAJ_LABELS-0_x_TRAJ_LABELS-8-10-11_x_TRAJ_LABELS-9.20_x_17_x_53": [2023], # CREB1 x HOXA1 [983, 1002]
+        "ggr.TRAJ_LABELS-0_x_TRAJ_LABELS-8-10-11.34_x_25": [205, 1241], # ERG x ATF1 []
+        "ggr.TRAJ_LABELS-0_x_TRAJ_LABELS-8-10-11.50_x_26": [], # CREB1 x LEF1 [163, 1023, 1249]
+        "ggr.TRAJ_LABELS-0_x_TRAJ_LABELS-9.16_x_125": [33], # HOXA1 x ERG [548, 945, 1102]
+        
+        "ggr.TRAJ_LABELS-1_x_TRAJ_LABELS-14_x_TRAJ_LABELS-2.42_x_21_x_58": [9, 132], # KLF x ZNF [13, 187]
+        "ggr.TRAJ_LABELS-1.grammar-71.annot-137": [80, 509, 410], # CEBPA x FOXO [382] ?410, ?80
+        
+        "ggr.TRAJ_LABELS-2.grammar-52.annot-265": [822], # ATF1 x AHR [] ?822
+        "ggr.TRAJ_LABELS-2.grammar-59.annot-272": [182], # CEBPA x TFAP2 [556]
+        "ggr.TRAJ_LABELS-2.grammar-60.annot-274": [343, 669], # CEBPD x TFAP2 [278, 508]
+        "ggr.TRAJ_LABELS-2.grammar-62.annot-276": [], # ZFX, MAF [221, 378]
+        "ggr.TRAJ_LABELS-2.grammar-73.annot-288": [], # CEBPA, ZFX [73, 351] ?510
+        "ggr.TRAJ_LABELS-2.grammar-74.annot-289": [525], # CEBPD, ZFX [140, 408]
+        "ggr.TRAJ_LABELS-2.grammar-99.annot-316": [314], # TP63 x ATF1 [92]
+        
+        "ggr.TRAJ_LABELS-9.grammar-48.annot-556": [] # CREB x VDR [48, 408]
+
+    }
+    
     # set up keep ids, and plot out importance scores
     interactions_dir = "/mnt/lab_data3/dskim89/ggr/nn/2019-03-12.freeze/dmim.shuffle.complete/synergy"
     keep_ids = []
@@ -187,8 +227,7 @@ def main():
             synergy_file = "{}/{}/ggr.synergy.h5".format(
                 interactions_dir, rule_id)
             with h5py.File(synergy_file, "r") as hf:
-                #for key in sorted(hf.keys()): print key, hf[key].shape
-
+                
                 # across time
                 orig_importances = hf["sequence-weighted"][example_fileidx][:,420:580]
                 match_importances = hf["sequence-weighted.active"][example_fileidx]
@@ -211,12 +250,35 @@ def main():
     # only care about endog version for checks
     selected_data = selected_data[
         selected_data["combos"] == "0,0"]
-    print len(list(set(selected_data["example_id"].values)))
+    print selected_data.shape
+
+    # remove barcodes and reduce
+    drop_cols = [
+        "unique_id",
+        "sequence.mpra",
+        "combos",
+        "example_combo_id",
+        "sequence-weighted.active.pwm-scores.thresh.max.idx.motif_mut",
+        "sequence-weighted.active.pwm-scores.thresh.max.val.motif_mut",
+        "logits.motif_mut",
+        "sequence.motif_mut.string",
+        "synergy.dist.0",
+        "synergy.scores.diff.sig.0"]
+    selected_data = selected_data.drop(drop_cols, axis=1)
+    selected_data = selected_data.drop_duplicates()
+
+    # groupby
+    groupby_cols = [col for col in selected_data.columns if "_b" not in col]
+    val_cols = [col for col in selected_data.columns if "_b" in col]
+    reduced_data = selected_data.groupby(groupby_cols)[val_cols].mean().reset_index()
+
+    # reorder columns
+    impt_cols = ["motifs", "example_metadata", "sequence.nn", "example_id"]
+    other_cols = [col for col in reduced_data.columns if col not in impt_cols]
+    reduced_data = reduced_data[impt_cols + other_cols]
     
-    #print selected_data
-    
-    
-    
+    reduced_data = reduced_data.sort_values("example_id")
+    reduced_data.to_csv("selected_examples.txt.gz", sep="\t", compression="gzip")
 
     return
 

@@ -861,6 +861,14 @@ def regions_to_genes(
     except pd.errors.EmptyDataError:
         return None
     chrom, start, stop, score = _split_interaction_name_field(data[3])
+    
+    # TODO adjust score here?
+    if False:
+        print "NOTE: USING SCORING COLUMN TO RE-WEIGHT"
+        score = data[9] * score.astype(float)
+        score = data[9]
+        
+    # and convert back to strings
     region_id = data[6].map(str) + ":" + data[7].map(str) + "-" + data[8].map(str) + "," + score.map(str)
     bed_data = pd.DataFrame(
         {"chrom": chrom,

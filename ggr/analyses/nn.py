@@ -626,7 +626,7 @@ def get_summit_centric_motif_maps(
         index_cols += ["extra"]
     
     # plot HITS: positions relative to ATAC summit
-    aligned_file = "{}/{}.hits.aligned.mat.txt.gz".format(work_dir, prefix)
+    aligned_file = "{}/{}.aligned.hits.mat.txt.gz".format(work_dir, prefix)
     motif_data_raw, index_cols = align_scores_to_summits(
         motif_data_raw, master_bed_file, summit_file, aligned_file,
         index_cols=index_cols)
@@ -638,7 +638,7 @@ def get_summit_centric_motif_maps(
     os.system(r_cmd)
     
     # plot HITS: num hits v affinity
-    data_file = "{}/{}.hits.affinities.mat.txt.gz".format(work_dir, prefix)
+    data_file = "{}/{}.affinities.hits.mat.txt.gz".format(work_dir, prefix)
     motif_data_raw.to_csv(
         data_file,
         sep="\t", header=True, index=False, compression="gzip")
@@ -685,7 +685,7 @@ def get_summit_centric_motif_maps(
         index_cols += ["extra"]
 
     # plot NN: positions relative to ATAC summit
-    aligned_file = "{}/{}.nn.aligned.mat.txt.gz".format(work_dir, prefix)
+    aligned_file = "{}/{}.aligned.nn.mat.txt.gz".format(work_dir, prefix)
     motif_data_nn, index_cols = align_scores_to_summits(
         motif_data_nn, master_bed_file, summit_file, aligned_file,
         index_cols=index_cols)
@@ -703,7 +703,7 @@ def get_summit_centric_motif_maps(
     motif_data_filt = motif_raw_tmp.reset_index()
 
     # plot NN: num hits v affinity
-    data_file = "{}/{}.nn_filt_affinities.mat.txt.gz".format(work_dir, prefix)
+    data_file = "{}/{}.affinities.nn_filt.mat.txt.gz".format(work_dir, prefix)
     motif_data_filt.to_csv(
         data_file,
         sep="\t", header=True, index=False, compression="gzip")
@@ -748,15 +748,180 @@ def get_summit_centric_motif_maps(
         print r_cmd
         os.system(r_cmd)
     
-    # TODO save out a reduced bed file of filtered regions
-    if True:
-        bed_file = "{}/{}.summit_center_filt.bed.gz".format(work_dir, prefix)
-        region_data = motif_data_nn["region"].str.split(":", n=2, expand=True)
-        region_data[["start", "stop"]] = region_data[1].str.split("-", n=2, expand=True)
-        region_data.to_csv(
-            bed_file,
-            columns=[0, "start", "stop"],
-            sep="\t", header=False, index=False, compression="gzip")
+    # save out a reduced bed file of filtered regions
+    bed_file = "{}/{}.nn_filt.bed.gz".format(work_dir, prefix)
+    motif_data_reduced = motif_nn_tmp[(motif_nn_tmp > 0).sum(axis=1) > 0].reset_index()
+    region_data = motif_data_reduced["region"].str.split(":", n=2, expand=True)
+    region_data[["start", "stop"]] = region_data[1].str.split("-", n=2, expand=True)
+    region_data.to_csv(
+        bed_file,
+        columns=[0, "start", "stop"],
+        sep="\t", header=False, index=False, compression="gzip")
+    
+    return
+
+
+def filter_summit_centric_maps(
+        summit_centric_map_file,
+        bed_file,
+        max_dist=100):
+    """filtering for homotypic clustering params
+    """
+    # read in file
+    aligned_data = pd.read_csv(summit_centric_map_file, sep="\t")
+    index_cols = ["region", "start_summit"]
+    if "extra" in aligned_data.columns:
+        index_cols += ["extra"]
+    aligned_data = aligned_data.set_index(index_cols)
+    print aligned_data.shape
+
+    # params
+    total_bps = aligned_data.shape[1]
+    midpoint = total_bps / 2
+
+    # first filter for min affinity score
+    # let's start with a heuristic and see if there's a way to clean it up: get threshold from locations with 2
+    exactly_2 = aligned_data[(aligned_data > 0).sum(axis=1) == 2]
+    exactly_2_melt = exactly_2.melt()
+    exactly_2_melt = exactly_2_melt[exactly_2_melt["value"] > 0]
+    thresh = np.percentile(exactly_2_melt["value"].values, 20)
+    thresh_data = aligned_data.copy()
+    thresh_data[thresh_data <= 0] = np.nan
+    aligned_data = aligned_data[thresh_data.mean(axis=1, skipna=True) > thresh]
+    
+    # filter for distance from summit
+    aligned_data = aligned_data.iloc[:,midpoint-max_dist:midpoint+max_dist]
+    aligned_data = aligned_data[(aligned_data > 0).sum(axis=1) > 0]
+    print aligned_data.shape
+
+    # save out as bed file
+    aligned_data = aligned_data.reset_index()
+    aligned_data[["chrom", "start-stop"]] = aligned_data["region"].str.split(":", n=2, expand=True)
+    aligned_data[["start", "stop"]] = aligned_data["start-stop"].str.split("-", n=2, expand=True)
+    aligned_data.to_csv(
+        bed_file, columns=["chrom", "start", "stop"],
+        sep="\t", compression="gzip", header=False, index=False)
+    
+    return
+
+
+def compare_homotypic_region_sets_to_chipseq(
+        work_dir, motif_name, nn_files,
+        hits_key="sequence.active.pwm-scores.thresh.sum",
+        nn_key="sequence-weighted.active.pwm-scores.thresh.max.val"):
+    """compare if NN and homotypic rules improve prediction of occupancy
+    """
+    # check for extra key: ie, if ChIP-seq data is available
+    motif_name_to_key = {
+        "TP53": ("TP63_LABELS", 1),
+        "KLF12": ("KLF4_LABELS", 1),
+        "TFAP2A": ("ZNF750_LABELS", 0)}
+    extra_key = None
+    extra_idx = 0
+    for extra_name in motif_name_to_key.keys():
+        if extra_name in motif_name:
+            extra_key = motif_name_to_key[extra_name][0]
+            extra_idx = motif_name_to_key[extra_name][1]
+
+    # first, make sure we have motif_idx set up
+    with h5py.File(nn_files[0], "r") as hf:
+        motifs = hf["sequence-weighted.active.pwm-scores.thresh.sum"].attrs["pwm_names"]
+    for i in range(len(motifs)):
+        if motif_name in motifs[i]:
+            motif_idx = i
+    if motif_idx is None:
+        raise ValueError, "No motif by that name found: {}".format(motif_name)
+        
+    # pull in master regions, motif hits, and chipseq peaks
+    for nn_file_idx in range(len(nn_files)):
+        nn_file = nn_files[nn_file_idx]
+        #with h5py.File(nn_file, "r") as hf:
+        #    for key in sorted(hf.keys()): print key, hf[key].shape
+            
+        # pull metadata, only keep orig region and start position of pwm hits vector
+        with h5py.File(nn_file, "r") as hf:
+            metadata = hf["example_metadata"][:,0]
+        metadata_df = pd.DataFrame({"metadata": metadata})
+        metadata_df[["region", "active", "features"]] = metadata_df["metadata"].str.split(
+            ";", n=3, expand=True)
+        metadata_df[[0,"active"]] = metadata_df["active"].str.split("=", n=2, expand=True)
+        metadata_df = metadata_df[["active"]]
+        
+        # pull the ChIPseq peak labels
+        with h5py.File(nn_file, "r") as hf:
+            extra_data = hf[extra_key][:,extra_idx]
+        extra_data_df = pd.DataFrame({"labels": extra_data})
+            
+        # pull motif vectors and reduce to max scores
+        with h5py.File(nn_file, "r") as hf:
+            hit_present = hf[hits_key][:,0,motif_idx]
+            nn_present = hf[nn_key][:,motif_idx,0]
+        motif_scores_df = pd.DataFrame(
+            {"hit": hit_present,
+             "nn": nn_present})
+
+        # concat to dataframe and merge
+        file_motif_data = pd.concat([metadata_df, motif_scores_df], axis=1)
+        file_motif_data = pd.concat([file_motif_data, extra_data_df], axis=1)
+        if nn_file_idx == 0:
+            motif_data = file_motif_data.copy()
+        else:
+            motif_data = pd.concat([motif_data, file_motif_data])
+
+    motif_data = motif_data.reset_index(drop=True)
+    print motif_data
+
+    # AUPRC
+    pr_curve = precision_recall_curve(
+        motif_data["labels"].values.astype(int),        
+        motif_data["hit"].values > 0)
+    precision, recall = pr_curve[:2]
+    print auc(recall, precision)
+
+    pr_curve = precision_recall_curve(
+        motif_data["labels"].values.astype(int),        
+        motif_data["nn"].values > 0)
+    precision, recall = pr_curve[:2]
+    print auc(recall, precision)
+            
+    # generate master bed file
+    master_bed_file = "{}/{}.master_match.bed.gz".format(work_dir, motif_name)
+    print master_bed_file
+    motif_data[["chrom", "start-stop"]] = motif_data["active"].str.split(":", n=2, expand=True)
+    motif_data[["start", "stop"]] = motif_data["start-stop"].str.split("-", n=2, expand=True)
+    motif_data = motif_data.drop("start-stop", axis=1)
+    motif_data.to_csv(
+        master_bed_file, columns=["chrom", "start", "stop", "active"],
+        sep="\t", compression="gzip", header=False, index=False)
+
+    # use master regions and match to homotypic rules?
+    # pull in affinity and num motifs?
+    nn_filt_file = "{}/{}.FWD.hits.aligned.homotypic_filt.bed.gz".format(work_dir, motif_name)
+    nn_filt_intersect_file = "{}.INTERSECT.bed.gz".format(nn_filt_file.split(".bed")[0])
+    bedtools_cmd = "bedtools intersect -c -a {} -b {} | gzip -c > {}".format(
+        master_bed_file, nn_filt_file, nn_filt_intersect_file)
+    print bedtools_cmd
+    os.system(bedtools_cmd)
+    nn_filt_data = pd.read_csv(nn_filt_intersect_file, sep="\t", header=None)
+    nn_filt_data["homotypic"] = (nn_filt_data[4] > 0).astype(int)
+    motif_data = pd.concat([motif_data, nn_filt_data[["homotypic"]]], axis=1)
+    
+    #print motif_data
+
+    pr_curve = precision_recall_curve(
+        motif_data["labels"].values.astype(int),        
+        motif_data["homotypic"].values)
+    precision, recall = pr_curve[:2]
+    print auc(recall, precision)
+
+    
+    quit()
+    
+    # use master regions and match to homotypic rules
+
+
+    # for each of these, get PR curves and save out
+    
     
     return
 
@@ -875,7 +1040,9 @@ GOOD_GO_TERMS = [
     "fatty acid",
     "sphingolipid",
     "glycerolipid",
-    "cornif"]
+    "cornif",
+    "extracellular structure organization",
+    "junction assembly"]
 
 REMOVE_GO_TERMS = [
     "ameboidal",
@@ -893,7 +1060,9 @@ REMOVE_GO_TERMS = [
     "leukocyte",
     "mononuclear",
     "T cell",
-    "forebrain"]
+    "forebrain",
+    "Purkinje",
+    "positive regulation of"] # regulation of
 
 REMOVE_EXACT_TERMS = [
     "biological adhesion",
