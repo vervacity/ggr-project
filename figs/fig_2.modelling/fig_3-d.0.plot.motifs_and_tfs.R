@@ -79,6 +79,9 @@ pwm_traj_presence_file <- args[1]
 pwm_patterns_file <- args[2]
 tf_traj_presence_file <- args[3]
 tf_patterns_file <- args[4]
+ordering_file <- args[5]
+
+print(is.na(ordering_file))
 
 # read motif files and adjust as necessary
 pwm_traj_presence <- read.table(pwm_traj_presence_file, header=TRUE, row.names=1, sep="\t")
@@ -104,6 +107,11 @@ hc_dend[[1]] <- rev(hc_dend[[1]])
 pwm_ordering <- order.dendrogram(hc_dend)
 pwm_traj_presence <- pwm_traj_presence[pwm_ordering,]
 pwm_patterns <- pwm_patterns[pwm_ordering,]
+
+# save out new ordering
+ordered_file <- "motif_ordering.txt"
+write.table(rownames(pwm_patterns), ordered_file, sep="\t", quote=FALSE)
+
 
 # plot
 pwm_plot_height <- 5.5
@@ -139,6 +147,19 @@ rownames(tf_patterns) <- gsub("HCLUST-\\d+_", "", rownames(tf_patterns))
 rownames(tf_patterns) <- gsub(".UNK.0.A", "", rownames(tf_patterns))
 tf_patterns <- tf_patterns / apply(tf_patterns, 1, max)
 
+if (!is.na(ordering_file)) {
+    tf_ordering_data <- read.table(ordering_file)
+    #tf_ordering <- match(rownames(tf_patterns), tf_ordering_data$ordered)
+    tf_ordering <- match(tf_ordering_data$ordered, rownames(tf_patterns))
+
+    print(rownames(tf_patterns))
+    print(tf_ordering_data)
+    print(tf_ordering)
+
+
+
+} else {
+
 # tf ordering
 #tf_dists <- dist(cbind(tf_traj_presence, t(scale(t(tf_patterns)))))
 tf_dists <- dist(t(scale(t(tf_patterns))))
@@ -150,8 +171,12 @@ hc_dend[[2]] <- rev(hc_dend[[2]])
 
 # get ordering and apply
 tf_ordering <- order.dendrogram(hc_dend)
+}
+
 tf_traj_presence <- tf_traj_presence[tf_ordering,]
 tf_patterns <- tf_patterns[tf_ordering,]
+
+
 
 # plot
 tf_plot_height <- 9
