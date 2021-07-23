@@ -69,6 +69,13 @@ RNA_MAT=$GGR_DIR/results/rna/timeseries/matrices/ggr.rna.counts.pc.expressed.tim
 #$SCRIPT_DIR/fig_3-b.3.prep.py
 #$SCRIPT_DIR/fig_3-b.4.plot.R results.w_imptscore.txt results.sig_only.txt
 
+# other vignettes
+#$GIT_DIR/figs/fig_1.datasets/plot.rna_bar.R $RNA_MAT ENSG00000182718 gene_vals.ANXA2.pdf
+#$GIT_DIR/figs/fig_1.datasets/plot.rna_bar.R $RNA_MAT ENSG00000175029 gene_vals.CTBP2.pdf
+#$GIT_DIR/figs/fig_1.datasets/plot.rna_bar.R $RNA_MAT ENSG00000108064 gene_vals.TFAM.pdf
+$GIT_DIR/figs/fig_1.datasets/plot.rna_bar.R $RNA_MAT ENSG00000122870 gene_vals.BICC1.pdf
+
+
 # -----------
 # D
 # -----------
@@ -163,31 +170,33 @@ tfmodisco_dir=/mnt/lab_data2/msharmin/oc-atlas/DanSkinData/fold_0_ggr/result_ear
 tfmodisco_file=${tfmodisco_dir}/results.hdf5
 
 # TP63 - both
-$SCRIPT_DIR/plot_pwm.py $PWM_FILE TP53
-$SCRIPT_DIR/plot_tfmodisco_pwm.py $tfmodisco_file metacluster_0 pattern_1 tfmodisco.early
+#$SCRIPT_DIR/plot_pwm.py $PWM_FILE TP53
+#$SCRIPT_DIR/plot_tfmodisco_pwm.py $tfmodisco_file metacluster_0 pattern_1 tfmodisco.early
 
 # ATF1 - both
-$SCRIPT_DIR/plot_pwm.py $PWM_FILE ATF1
-$SCRIPT_DIR/plot_tfmodisco_pwm.py $tfmodisco_file metacluster_0 pattern_6 tfmodisco.early
+#$SCRIPT_DIR/plot_pwm.py $PWM_FILE ATF1
+#$SCRIPT_DIR/plot_tfmodisco_pwm.py $tfmodisco_file metacluster_0 pattern_6 tfmodisco.early
 
 # ERG
-$SCRIPT_DIR/plot_pwm.py $PWM_FILE ERG
-$SCRIPT_DIR/plot_tfmodisco_pwm.py $tfmodisco_file metacluster_0 pattern_10 tfmodisco.early
+#$SCRIPT_DIR/plot_pwm.py $PWM_FILE ERG
+#$SCRIPT_DIR/plot_tfmodisco_pwm.py $tfmodisco_file metacluster_0 pattern_10 tfmodisco.early
 
 # RELA
-$SCRIPT_DIR/plot_pwm.py $PWM_FILE RELA
-$SCRIPT_DIR/plot_tfmodisco_pwm.py $tfmodisco_file metacluster_0 pattern_12 tfmodisco.early
+#$SCRIPT_DIR/plot_pwm.py $PWM_FILE RELA
+#$SCRIPT_DIR/plot_tfmodisco_pwm.py $tfmodisco_file metacluster_0 pattern_12 tfmodisco.early
 
 # CBFB
-$SCRIPT_DIR/plot_pwm.py $PWM_FILE CBFB
-$SCRIPT_DIR/plot_tfmodisco_pwm.py $tfmodisco_file metacluster_0 pattern_4 tfmodisco.early
+#$SCRIPT_DIR/plot_pwm.py $PWM_FILE CBFB
+#$SCRIPT_DIR/plot_tfmodisco_pwm.py $tfmodisco_file metacluster_0 pattern_4 tfmodisco.early
 
 # TFAP2A
-$SCRIPT_DIR/plot_pwm.py $PWM_FILE TFAP2A
-$SCRIPT_DIR/plot_tfmodisco_pwm.py $tfmodisco_file metacluster_0 pattern_11 tfmodisco.early
+#$SCRIPT_DIR/plot_pwm.py $PWM_FILE TFAP2A
+#$SCRIPT_DIR/plot_tfmodisco_pwm.py $tfmodisco_file metacluster_0 pattern_11 tfmodisco.early
 
 
 # dimer - AP1, TEAD
-$SCRIPT_DIR/plot_pwm.py $PWM_FILE TEAD
-$SCRIPT_DIR/plot_tfmodisco_pwm.py $tfmodisco_file metacluster_0 pattern_9 tfmodisco.early
+#$SCRIPT_DIR/plot_pwm.py $PWM_FILE TEAD
+#$SCRIPT_DIR/plot_tfmodisco_pwm.py $tfmodisco_file metacluster_0 pattern_9 tfmodisco.early
 
+
+#$SCRIPT_DIR/plot_pwm.py $PWM_FILE KLF12

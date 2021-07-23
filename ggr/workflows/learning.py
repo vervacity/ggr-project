@@ -14,6 +14,7 @@ from ggr.analyses.baselines import compare_tf_motif_corrs
 from ggr.analyses.bioinformatics import run_gprofiler
 from ggr.analyses.linking import regions_to_genes
 from ggr.analyses.nn import get_motif_region_set
+from ggr.analyses.nn import get_motifs_region_set
 from ggr.analyses.nn import get_sig_motif_list
 from ggr.analyses.nn import compare_nn_gene_set_to_diff_expr
 from ggr.analyses.nn import evaluate_enhancer_prediction
@@ -23,12 +24,16 @@ from ggr.analyses.nn import get_summit_centric_motif_maps
 from ggr.analyses.nn import compare_aligned_motif_orientations
 from ggr.analyses.nn import filter_summit_centric_maps
 from ggr.analyses.nn import compare_homotypic_region_sets_to_chipseq
+from ggr.analyses.nn import clean_and_plot_enrichments
+from ggr.analyses.tronn_scripts import tronn_calldiffmotifs_cmd
 from ggr.analyses.tronn_scripts import tronn_intersect_with_expression_cmd
+from ggr.analyses.tronn_scripts import tronn_intersect_with_expression_for_baseline_cmd
 
 from ggr.util.utils import run_shell_cmd
 
 
-def _run_motif_functional_enrichment_workflow(args, motif_name, bed_file, out_dir):
+def _run_motif_functional_enrichment_workflow(
+        args, motif_name, bed_file, out_dir, filter_by_score=0.01):
     """motif to region set and functional enrichments
     """
     # linking file
@@ -47,7 +52,7 @@ def _run_motif_functional_enrichment_workflow(args, motif_name, bed_file, out_di
             args.outputs["results"]["rna"]["expression_filtering"]["tss.pc.expressed"],
             #args.outputs["data"]["tss.dynamic"],
             genes_file,
-            filter_by_score=0.01)
+            filter_by_score=filter_by_score)
             #filter_by_score=0.1) # proximity corr thresh
 
     # just look at top 1000?
@@ -376,10 +381,89 @@ def runall(args, prefix):
                 " \\\n\t".join(signal_strings),
                 prefix,
                 args.threads)
-
         run_shell_cmd("echo '{}' > {}/preprocess.tmp".format(preprocess, results_dir))
         #run_shell_cmd("source preprocess.tmp")
 
+        # run tronn preprocess for just dynamic regions - faster interpretation runs
+        preprocess = (
+            "tronn preprocess \\\n"
+            "--annotations {0} \\\n"
+            "--labels \\\n \t{1} \\\n"
+            "--signals \\\n \t{2} \\\n"
+            "-o ./datasets/{3}.traj \\\n"
+            "--prefix {3}.traj \\\n"
+            "--master_label_keys TRAJ_LABELS \\\n"
+            "--parallel {4}").format(
+                args.inputs["annot"][args.cluster]["tronn_preprocess_annot"],
+                " \\\n\t".join(label_strings),
+                " \\\n\t".join(signal_strings),
+                prefix,
+                args.threads)
+        run_shell_cmd("echo '{}' > {}/preprocess_traj.tmp".format(preprocess, results_dir))
+        #run_shell_cmd("source preprocess_traj.tmp")
+        
+        # Also generate a TSS oriented dataset to run through scanmotifs
+        # note - since TSS are point files, need to extend flanks to properly label
+        l_len = 200 # should give 5 examples per TSS
+        r_len = 100 
+        tss_prep_dir = "{}/tss_prep".format(results_dir)
+        if not os.path.isdir(tss_prep_dir):
+            os.system("mkdir -p {}".format(tss_prep_dir))
+        tss_prep_dir = os.path.abspath(tss_prep_dir)
+        
+        tss_all = os.path.abspath(args.outputs["annotations"]["tss.pc.bed"])
+        tss_all_extend = "{}/tss.all.extend.bed.gz".format(tss_prep_dir)
+        if not os.path.isfile(tss_all_extend):
+            extend_cmd = "bedtools slop -s -i {} -g {} -l {} -r {} | gzip -c > {}".format(
+                tss_all, args.inputs["annot"][args.cluster]["chromsizes"], l_len, r_len, tss_all_extend)
+            print extend_cmd
+            os.system(extend_cmd)
+        
+        tss_dynamic = os.path.abspath(args.outputs["data"]["tss.dynamic"])
+        tss_dynamic_extend = "{}/tss.dynamic.extend.bed.gz".format(tss_prep_dir)
+        if not os.path.isfile(tss_dynamic_extend):
+            extend_cmd = "bedtools slop -s -i {} -g {} -l {} -r {} | gzip -c > {}".format(
+                tss_dynamic, args.inputs["annot"][args.cluster]["chromsizes"], l_len, r_len, tss_dynamic_extend)
+            print extend_cmd
+            os.system(extend_cmd)
+        
+        tss_stable = os.path.abspath(args.outputs["data"]["tss.stable"])
+        tss_stable_extend = "{}/tss.stable.extend.bed.gz".format(tss_prep_dir)
+        if not os.path.isfile(tss_stable_extend):
+            extend_cmd = "bedtools slop -s -i {} -g {} -l {} -r {} | gzip -c > {}".format(
+                tss_stable, args.inputs["annot"][args.cluster]["chromsizes"], l_len, r_len, tss_stable_extend)
+            print extend_cmd
+            os.system(extend_cmd)
+        
+        tss_nonexpr = os.path.abspath(args.outputs["data"]["tss.non_expr"])
+        tss_nonexpr_extend = "{}/tss.nonexpr.extend.bed.gz".format(tss_prep_dir)
+        if not os.path.isfile(tss_nonexpr_extend):
+            extend_cmd = "bedtools slop -s -i {} -g {} -l {} -r {} | gzip -c > {}".format(
+                tss_nonexpr, args.inputs["annot"][args.cluster]["chromsizes"], l_len, r_len, tss_nonexpr_extend)
+            print extend_cmd
+            os.system(extend_cmd)
+        
+        tss_labels = [tss_all_extend, tss_dynamic_extend, tss_stable_extend, tss_nonexpr_extend]
+        label_strings.append("TSS_LABELS={}".format(",".join(tss_labels)))
+
+        # run tronn preprocess
+        preprocess = (
+            "tronn preprocess \\\n"
+            "--annotations {0} \\\n"
+            "--labels \\\n \t{1} \\\n"
+            "--signals \\\n \t{2} \\\n"
+            "-o ./datasets/{3}.tss \\\n"
+            "--prefix {3}.tss \\\n"
+            "--master_label_keys TSS_LABELS \\\n"
+            "--parallel {4}").format(
+                args.inputs["annot"][args.cluster]["tronn_preprocess_annot"],
+                " \\\n\t".join(label_strings),
+                " \\\n\t".join(signal_strings),
+                prefix,
+                args.threads)
+        run_shell_cmd("echo '{}' > {}/preprocess_tss.tmp".format(preprocess, results_dir))
+        #run_shell_cmd("source preprocess_tss.tmp")
+        
     # NOTE: in a linear run, the tronn processes (train, eval, interpret, etc) would all
     # be here in the code
 
@@ -451,7 +535,7 @@ def runall(args, prefix):
     homer_pvals_file = "{}/motifs.rna_filt/pvals.rna_filt.corr_filt.h5".format(
         out_dir)
     if not os.path.isfile(homer_pvals_file):
-        tronn_intersect_with_expression_cmd(
+        tronn_intersect_with_expression_for_baseline_cmd(
             args.outputs["results"]["atac"]["homer.sig_motifs.pvals"],
             args.outputs["annotations"]["pwms.renamed.nonredundant"],
             args.outputs["annotations"]["pwms.metadata.nonredundant.expressed"],
@@ -476,7 +560,7 @@ def runall(args, prefix):
     nn_pvals_file = "{}/motifs.rna_filt/pvals.rna_filt.corr_filt.h5".format(
         out_dir)
     if not os.path.isfile(nn_pvals_file):
-        tronn_intersect_with_expression_cmd(
+        tronn_intersect_with_expression_for_baseline_cmd(
             "{}/motifs.adjust.diff/pvals.h5".format(nn_sig_motifs_dir),
             args.outputs["annotations"]["pwms.renamed.nonredundant"],
             args.outputs["annotations"]["pwms.metadata.nonredundant.expressed"],
@@ -491,7 +575,7 @@ def runall(args, prefix):
     homer_pvals_file = "{}/motifs.rna_filt/pvals.rna_filt.corr_filt.h5".format(
         out_dir)
     if not os.path.isfile(homer_pvals_file):
-        tronn_intersect_with_expression_cmd(
+        tronn_intersect_with_expression_for_baseline_cmd(
             args.outputs["results"]["atac"]["homer.sig_motifs.pvals"],
             args.outputs["annotations"]["pwms.renamed.nonredundant"],
             args.outputs["annotations"]["pwms.metadata.nonredundant.expressed"],
@@ -622,7 +706,183 @@ def runall(args, prefix):
         homotypic = pd.read_csv(homotypic_genes_file, sep="\t")
         total_genes = heterotypic.merge(homotypic, how="outer", on="gene_id")
         total_genes.to_csv(total_genes_file, sep="\t", compression="gzip")
+
+    # -------------------------------------------
+    # ANALYSIS - look at repression
+    # -------------------------------------------
+    work_dir = "{}/repr".format(results_dir)
+    os.system("mkdir -p {}".format(work_dir))
+
+    NN_DIR = "/mnt/lab_data3/dskim89/ggr/nn/2021-05-22.repr_analyses"
+    BACKGROUND_DIR = "/mnt/lab_data3/dskim89/ggr/nn/2020-01-13/scanmotifs/motifs.background.lite"
+    background_file = "{}/ggr.scanmotifs.h5".format(BACKGROUND_DIR)
+    background_files = [background_file]
     
+    # motifs in early dynamic - for negative scores, any sig?
+    # correlated - these repressor motifs INCREASE across time
+    out_dir = "{}/motifs.dynamic.early.REPR".format(work_dir)
+    os.system("mkdir -p {}".format(out_dir))
+    
+    scanmotifs_dir = "motifs.dynamic.early.REPR"
+    h5_file = "{}/{}/ggr.scanmotifs.h5".format(NN_DIR, scanmotifs_dir)
+    infer_json = "{}/{}/infer.scanmotifs.json".format(NN_DIR, scanmotifs_dir)
+
+    # foregrounds and background
+    foregrounds = [
+        "TRAJ_LABELS=0",
+        "TRAJ_LABELS=7",
+        "TRAJ_LABELS=8,10,11",
+        "TRAJ_LABELS=9"]
+    background = "ATAC_LABELS=0,1,2,3,4,5,6,9,10,12"
+    
+    # call sig motifs
+    if False:
+        tronn_calldiffmotifs_cmd(
+            [h5_file],
+            background_files,
+            foregrounds,
+            background,
+            infer_json,
+            out_dir,
+            qval=0.01) # TODO adjust this
+
+    pvals_file = "{}/pvals.h5".format(out_dir)
+    new_pvals_file = "{}/motifs.rna_filt/pvals.rna_filt.corr_filt.h5".format(out_dir)
+    if not os.path.isfile(new_pvals_file):
+        tronn_intersect_with_expression_cmd(
+            [h5_file],
+            pvals_file,
+            args.outputs["annotations"]["pwms.renamed.nonredundant"],
+            args.outputs["annotations"]["pwms.metadata.nonredundant.expressed"],
+            "{}/matrices/ggr.rna.counts.pc.expressed.timeseries_adj.pooled.rlog.mat.txt.gz".format(
+                args.outputs["results"]["rna"]["timeseries"]["dir"]),
+            out_dir)
+
+    # plot the reduced set
+    summary_dir = "{}/motifs.rna_filt/summary".format(out_dir)
+    pwm_traj_presence_file = "{}/ggr.pwms_present_summary.txt".format(summary_dir)
+    pwm_patterns_file = "{}/ggr.pwms_patterns_summary.txt".format(summary_dir)
+    tf_traj_presence_file = "{}/ggr.tfs_corr_summary.txt".format(summary_dir)
+    tf_patterns_file = "{}/ggr.tfs_patterns_summary.txt".format(summary_dir)
+
+    # run once for ordering
+    ordering_file = "{}/tf_ordering.txt".format(summary_dir)
+    if not os.path.isfile(ordering_file):
+        plot_script = "/users/dskim89/git/ggr-project/figs/fig_2.modelling/fig_3-d.0.plot.motifs_and_tfs.R"
+        plot_cmd = "{} {} {} {} {}".format(
+            plot_script, pwm_traj_presence_file, pwm_patterns_file,
+            tf_traj_presence_file, tf_patterns_file)
+        os.system(plot_cmd)
+
+        # python script: get a mapping from motif to TF
+        reordering_script = "/users/dskim89/git/ggr-project/scripts/map_motifs_to_tfs.py"
+        reordering_cmd = "python {} {} {} {} {}".format(
+            reordering_script,
+            "motif_ordering.txt",
+            args.outputs["annotations"]["pwms.metadata.nonredundant.expressed"],
+            tf_patterns_file,
+            ordering_file)
+        os.system(reordering_cmd)
+
+        # and run with extra file for ordering
+        plot_cmd += " {}".format(ordering_file)
+        os.system(plot_cmd)
+
+        # clean up
+        os.system("mv fig_3*pdf {}/".format(summary_dir))
+        os.system("mv motif_ordering.txt {}/".format(summary_dir))
+
+    # -------------------------------------------
+    # ANALYSIS - look at more closely at KLF and CEBP
+    # -------------------------------------------
+    work_dir = "{}/repr/CEBPA_x_KLF".format(results_dir)
+    os.system("mkdir -p {}".format(work_dir))
+        
+    # inputs
+    prefix = "ggr.nn.repr"
+    NN_DIR = "/mnt/lab_data3/dskim89/ggr/nn/2021-05-22.repr_analyses"
+    scanmotifs_dir = "motifs.dynamic.early.REPR"
+    h5_file = "{}/{}/ggr.scanmotifs.h5".format(NN_DIR, scanmotifs_dir)
+    motif_indices = [174, 184] # CEBPA, KLF4 respectively
+    motif_names = ["CEBPA", "KLF4"]
+
+    # linking file
+    links_dir = "{}/linking/proximity".format(args.outputs["results"]["dir"])
+    interactions_file = "{}/ggr.linking.ALL.overlap.interactions.txt.gz".format(links_dir)
+
+    # first look at them separately
+    for i in range(len(motif_indices)):
+        motif_idx = motif_indices[i]
+        motif_name = motif_names[i]
+        print motif_name
+        
+        # get region set (and vignettes table)
+        rule_file = "{}/{}.{}.bed.gz".format(work_dir, prefix, motif_name)
+        if not os.path.isfile(rule_file):
+            get_motifs_region_set([h5_file], [motif_idx], rule_file)
+            
+        # get functional enrichments
+        gprofiler_file = "{}/{}.{}.genes.all.max_1k.go_gprofiler.txt".format(
+            work_dir, prefix, motif_name)
+        if not os.path.isfile(gprofiler_file):
+            _run_motif_functional_enrichment_workflow(
+                args, motif_name, rule_file, work_dir, filter_by_score=0.5)
+
+        # plot enrichments
+        plot_file = "{}.enrichments.pdf".format(gprofiler_file.split(".txt")[0])
+        if not os.path.isfile(plot_file):
+            clean_and_plot_enrichments(gprofiler_file, motif_name, plot_file)
+
+        # vignettes: use tronn helper script?
+        vignette_file = "{}.for_vignettes.mat.txt.gz".format(rule_file.split(".bed")[0])
+        vignette_prefix = "{}/{}.vignette".format(work_dir, motif_name)
+        get_vignettes_cmd = "/users/dskim89/git/tronn/scripts/ggr/ggr_plot_repr_vignettes.py {} {}".format(vignette_file, vignette_prefix)
+        print get_vignettes_cmd
+        #os.system(get_vignettes_cmd)
+
+    quit()
+            
+    # and then look at them together
+    # notes: so far looks like they really don't like to co-occur
+    rule_file = "{}/{}.CEBPA_x_KLF4.bed.gz".format(work_dir, prefix)
+    if not os.path.isfile(rule_file):
+        get_motifs_region_set([h5_file], motif_indices, rule_file)
+    
+    # get functional enrichments
+    gprofiler_file = "{}/{}.CEBPA_x_KLF4.genes.all.max_1k.go_gprofiler.txt".format(
+        work_dir, prefix, motif_name)
+    if not os.path.isfile(gprofiler_file):
+        _run_motif_functional_enrichment_workflow(
+            args, motif_name, rule_file, work_dir, filter_by_score=0.5)
+
+    # plot enrichments
+    plot_file = "{}.enrichments.pdf".format(gprofiler_file.split(".txt")[0])
+    if not os.path.isfile(plot_file):
+        clean_and_plot_enrichments(gprofiler_file, "CEBPA_x_KLF", plot_file)
+
+    # plot out a venn summary of CEBP and KLF
+    
+        
+    # vignettes - plot out following regions
+    
+
+    quit()
+    
+
+
+    # motifs in early dynamic - for normal scores, any sig?
+    # anti-correlated - these activating motifs INCREASE across time
+    # ^ this is hard to explain, why would closing regions have motifs getting LARGER across time
+    # ^ hold off on this
+    
+
+    # TSS - motifs - for H3K2me3 set, any sig?
+    # correlated - these motifs INCREASE across time
+    
+    
+
+        
+    print "here"
     quit()
     
     # -------------------------------------------

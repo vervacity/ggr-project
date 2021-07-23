@@ -137,6 +137,113 @@ def get_motif_region_set(
     return
 
 
+def get_motifs_region_set(
+        nn_files,
+        motif_indices,
+        out_file,
+        timepoint_idx=None,
+        motif_key="sequence-weighted.active.pwm-scores.thresh.sum",
+        regions_key="example_metadata"):
+    """given list of motifs, will select only regions that have all the motifs
+    """
+    # first, make sure we have motif_idx set up
+    with h5py.File(nn_files[0], "r") as hf:
+        motifs = hf["sequence-weighted.active.pwm-scores.thresh.sum"].attrs["pwm_names"]
+    print "building region set for: ", motifs[motif_indices]
+    print len(motifs)
+
+    if "weighted" not in motif_key:
+        timepoint_idx = 0
+        print "NOT USING WEIGHTED SCORES, ADJUSTED TIMEPOINT IDX"
+    
+    # then pull for all files
+    for nn_file_idx in range(len(nn_files)):
+        nn_file = nn_files[nn_file_idx]
+        with h5py.File(nn_file, "r") as hf:
+            #for key in sorted(hf.keys()): print key, hf[key].shape
+            if timepoint_idx is not None:
+                motif_scores = hf[motif_key][:,timepoint_idx,motif_indices] # {N, m}
+                if hf[motif_key].shape[-1] == 2*len(motifs):
+                    print "NOTE USING FWD AND REV"
+                    num_motifs = hf[motif_key].shape[-1] / 2
+                    rev_indices = [motif_idx + num_motifs for motif_idx in motif_indices]
+                    motif_scores_2 = hf[motif_key][:,timepoint_idx,rev_indices]
+                    motif_scores = motif_scores + motif_scores_2
+            else:
+                motif_scores = np.max(hf[motif_key][:,:,motif_indices], axis=1) # {N, m}
+                if hf[motif_key].shape[-1] == 2*len(motifs):
+                    print "NOTE USING FWD AND REV"
+                    num_motifs = hf[motif_key].shape[-1] / 2
+                    rev_indices = [motif_idx + num_motifs for motif_idx in motif_indices]
+                    motif_scores_2 = np.max(hf[motif_key][:,:,rev_indices], axis=1)
+                    motif_scores = motif_scores + motif_scores_2
+
+            # select region indices as desired
+            thresh = 0
+            region_indices = np.where(np.all(motif_scores != thresh, axis=1))[0]
+            print "num regions:", region_indices.shape
+            
+            # get regions and set up as pd dataframe
+            regions = hf[regions_key][:][region_indices,0]
+            regions = pd.DataFrame(
+                {"metadata": regions,
+                 "file_idx": region_indices})
+            regions["file"] = nn_file
+
+        # and adjust scoring as desired (for downstream linking)
+        motif_scores = np.max(motif_scores, axis=1)
+
+        # merge
+        if nn_file_idx == 0:
+            all_regions = regions
+            all_scores = motif_scores[region_indices]
+        else:
+            all_regions = pd.concat([all_regions, regions])
+            all_scores = np.concatenate([all_scores, motif_scores[region_indices]])
+
+    # set up a file for getting vignettes easily
+    vignette_aid_file = "{}.for_vignettes.mat.txt.gz".format(out_file.split(".bed")[0])
+    vignettes = all_regions.copy()
+    vignettes["scores"] = all_scores
+    vignettes = vignettes.sort_values("scores", ascending=False, axis=0)
+    vignettes.to_csv(
+        vignette_aid_file, sep="\t", header=True, index=False, compression="gzip")
+            
+    # extract region details to bed format
+    all_regions[["region", "active", "features"]] = all_regions["metadata"].str.split(
+        ";", expand=True, n=3)
+    all_regions["region_id"] = all_regions["region"].str.split("=", expand=True, n=2)[1]
+    all_regions["score"] = all_scores
+
+    # reduce to strongest score in region
+    all_regions = all_regions[["region_id", "score"]]
+    all_regions = all_regions.groupby(["region_id"]).max().reset_index()
+    
+    all_regions["chrom"] = all_regions["region_id"].str.split(":", expand=True, n=2)[0]
+    all_regions["start-stop"] = all_regions["region_id"].str.split(":", expand=True, n=2)[1]
+    all_regions[["start", "stop"]] = all_regions["start-stop"].str.split("-", expand=True, n=2)
+    print "reduced set of regions:", all_regions.shape
+
+    # TODO test thresholding here
+    if False:
+        n_max = 30000
+        if all_regions.shape[0] > n_max:
+            thresh = np.sort(all_regions["score"].values)[-n_max]
+            all_regions = all_regions[all_regions["score"] > thresh]
+    
+    # save out
+    all_regions.to_csv(
+        out_file,
+        columns=["chrom", "start", "stop", "score"],
+        header=False,
+        index=False,
+        sep="\t",
+        compression="gzip")
+    
+    return
+
+
+
 def compare_nn_gene_set_to_diff_expr(genes_file, diff_file, convert_table=None):
     """compare ranked genes list to diff results file
     """
@@ -1149,5 +1256,54 @@ def summarize_functional_enrichments(work_dir, out_dir):
         all_results_file, plot_file)
     print r_cmd
     os.system(r_cmd)
+    
+    return
+
+
+def clean_and_plot_enrichments(gprofiler_file, motif_name, plot_file):
+    """clean up enrichments for plotting
+    """
+    results = pd.read_csv(gprofiler_file, sep="\t")
+    results = results[results["domain"] == "BP"]
+        
+    # filtering: remove terms
+    remove_indices = []
+    for row_idx in range(results.shape[0]):
+        index_id = results.index[row_idx]
+        for remove_term in REMOVE_GO_TERMS:
+            if remove_term in results.iloc[row_idx]["term.name"]:
+                remove_indices.append(index_id)
+    results = results.drop(remove_indices)
+
+    # filtering: keep terms
+    keep_indices = []
+    for row_idx in range(results.shape[0]):
+        index_id = results.index[row_idx]
+        for keep_term in GOOD_GO_TERMS:
+            if keep_term in results.iloc[row_idx]["term.name"]:
+                keep_indices.append(index_id)
+    results = results.loc[keep_indices,:]
+
+    # filtering: remove exact
+    remove_indices = []
+    for row_idx in range(results.shape[0]):
+        index_id = results.index[row_idx]
+        for remove_term in REMOVE_EXACT_TERMS:
+            if remove_term in results.iloc[row_idx]["term.name"]:
+                remove_indices.append(index_id)
+    results = results.drop(remove_indices)
+    results["-log10pval"] = -np.log10(results["p.value"].values)
+    
+    # now just keep term and pval and save out
+    results = results[["term.name", "-log10pval"]]
+    results = results.sort_values("-log10pval", axis=0)
+    results_file = "{}.plot_mat.txt.gz".format(gprofiler_file.split(".txt")[0])
+    results.to_csv(results_file, sep="\t", header=True, index=False, compression="gzip")
+
+    # plot cmd
+    plot_cmd = "/users/dskim89/git/ggr-project/R/plot.enrichments_barchart.R {} {} {}".format(
+        results_file, motif_name, plot_file)
+    print plot_cmd
+    os.system(plot_cmd)
     
     return

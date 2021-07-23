@@ -104,7 +104,7 @@ hc_dend[[1]] <- rev(hc_dend[[1]])
 #hc_dend[[2]] <- rev(hc_dend[[2]])
 
 # and get ordering and apply
-pwm_ordering <- order.dendrogram(hc_dend)
+pwm_ordering <- rev(order.dendrogram(hc_dend))
 pwm_traj_presence <- pwm_traj_presence[pwm_ordering,]
 pwm_patterns <- pwm_patterns[pwm_ordering,]
 

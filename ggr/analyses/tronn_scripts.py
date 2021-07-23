@@ -5,8 +5,31 @@ import os
 # commands that use the tronn package
 
 
+def tronn_calldiffmotifs_cmd(
+        foreground_files, background_files, foregrounds, background, infer_json, out_dir,
+        qval=0.05, num_threads=12):
+    """
+    """
+    
+    # cmd
+    cmd = "call_differential_motifs.py "
+    cmd += "--foreground_files {} ".format(" ".join(foreground_files))
+    cmd += "--background_files {} ".format(" ".join(background_files))
+    cmd += "--foregrounds {} ".format(" ".join(foregrounds))
+    cmd += "--background {} ".format(background)
+    cmd += "--inference_json {} ".format(infer_json)
+    cmd += "--qval_thresh {} ".format(qval)
+    cmd += "--num_threads {} ".format(num_threads)
+    cmd += "-o {}".format(out_dir)
 
-def tronn_intersect_with_expression_cmd(
+    print cmd
+    os.system(cmd)
+
+
+    return
+
+
+def tronn_intersect_with_expression_for_baseline_cmd(
         pvals_file,
         pwm_file,
         pwm_metadata_file,
@@ -32,7 +55,48 @@ def tronn_intersect_with_expression_cmd(
     cmd += "--pvals_file {} ".format(pvals_file)
     cmd += "--pwm_file {} ".format(pwm_file)
     cmd += "--pwm_metadata_file {} ".format(pwm_metadata_file)
-    cmd += "--pwm_scores_key {} ".format("ATAC_SIGNALS.NORM")
+    cmd += "--pwm_scores_key {} ".format("ATAC_SIGNALS.NORM") # TODO CHANGE HERE
+    cmd += "--cor_thresh {} ".format(min_cor)
+    cmd += "--other_targets ATAC_SIGNALS.NORM=0,2,3,4,5,6,9,10,12 logits=0,2,3,4,5,6,9,10,12 "
+    cmd += "--rna_expression_file {} ".format(rna_file)
+    cmd += use_max_pwm_length
+    cmd += "-o {} ".format(out_dir)
+    print cmd
+    os.system(cmd)
+
+    # also do the summary here too
+    cmd = "ggr_summarize_motifs.py "
+    cmd += "--data_file {}/pvals.rna_filt.corr_filt.h5 ".format(out_dir)
+    cmd += "-o {}/summary ".format(out_dir)
+    cmd += "--prefix ggr"
+    print cmd
+    os.system(cmd)
+    
+    return
+
+
+def tronn_intersect_with_expression_cmd(
+        foreground_files,
+        pvals_file,
+        pwm_file,
+        pwm_metadata_file,
+        rna_file,
+        out_dir,
+        nn_motifs=False,
+        min_cor=0.75): # adjust to 0.5 for homer runs
+    """intersect sig motifs with pwms
+    """
+    # params
+    use_max_pwm_length = "--max_pwm_length 17 "
+    out_dir = "{}/motifs.rna_filt".format(out_dir)
+
+    # cmd
+    cmd = "intersect_pwms_and_rna.py "
+    cmd += "--dataset_files {} ".format(" ".join(foreground_files))
+    cmd += "--pvals_file {} ".format(pvals_file)
+    cmd += "--pwm_file {} ".format(pwm_file)
+    cmd += "--pwm_metadata_file {} ".format(pwm_metadata_file)
+    #cmd += "--pwm_scores_key {} ".format("ATAC_SIGNALS.NORM") # TODO CHANGE HERE
     cmd += "--cor_thresh {} ".format(min_cor)
     cmd += "--other_targets ATAC_SIGNALS.NORM=0,2,3,4,5,6,9,10,12 logits=0,2,3,4,5,6,9,10,12 "
     cmd += "--rna_expression_file {} ".format(rna_file)
