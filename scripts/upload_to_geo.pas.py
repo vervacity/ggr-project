@@ -75,52 +75,61 @@ def main():
     if not os.path.isfile(fastq_table_file):
         fastqs_table = setup_processed_files(
             fastqs, "FASTQ", upload_dir=WORK_DIR, table_name=fastq_table_file)
+
+    # also generate the paired end version
+    fastq_table_paired_file = "{}.paired.tsv".format(fastq_table_file.split(".tsv")[0])
+    if not os.path.isfile(fastq_table_paired_file):
+        fastqs = pd.read_csv(fastq_table_file, sep="\t")
+
+        fastqs = fastqs.drop("file_checksums", axis=1)
+        fastqs = fastqs.drop("file_types", axis=1)
         
-    # TODO need to add in other file details
-    fastq_table_updated_file = "{}.cleaned.tsv".format(fastq_table_file.split(".tsv")[0])
-    if not os.path.isfile(fastq_table_updated_file):
-        fastqs_table = pd.read_csv(fastq_table_file, sep="\t")
-        print fastqs_table
+        # get timepoint
+        fastqs["timepoint"] = fastqs["file_name"].str.replace("^.+cyte-", "").str.replace(".GGR.+$", "")
+        fastqs["timepoint"] = fastqs["timepoint"].str.replace("0$", ".0").str.replace("5$", ".5").str.replace("d", "day-")
 
+        # get biorep
+        fastqs["bio_rep"] = fastqs["file_name"].str.replace("^.+seq.b", "").str.replace(".t1.+$", "")
 
-    # TODO also set up paired files
+        # groupby
+        fastqs = fastqs.groupby(["timepoint", "bio_rep"], as_index=False).agg(lambda x:list(x))
+        fastqs[["R1", "R2"]] = pd.DataFrame(fastqs["file_name"].tolist(), index=fastqs.index)
+        fastqs = fastqs.drop("file_name", axis=1)
 
-        
-    quit()
+        # title
+        fastqs["title"] = "PAS-seq_" + fastqs["timepoint"].str.replace("\.", "").map(str) + "_" + fastqs["bio_rep"].map(str)
+
+        # save out
+        fastqs.to_csv(fastq_table_paired_file, sep="\t", index=False, header=True)
         
     # PROCESSED DATA FILES
     # get files into an upload folder, get md5sums, keep organized to easily copy/paste
     # into seq_metadata
-
-
-    # submit: count matrices and tpms
-    
-    
-    
-    # NOTE: rep bigwigs not submitted since never used in paper, only pooled bigwigs used
     
     # submit: pooled bigwigs
-    #bigwigs = sorted(glob.glob("{}/*/signal/macs2/rep*/*bigwig".format(atac_processed_dir)))
-    bigwigs = sorted(glob.glob("{}/*/signal/macs2/pooled_rep/*bigwig".format(atac_processed_dir)))
+    # NOTE: rep bigwigs not submitted since never used in paper, only pooled bigwigs used
+    bigwig_dir = "/mnt/lab_data/kundaje/projects/skin/data/bds/processed.rna.2019-03-06.passeq_alignments_pooled"
+    bigwigs = sorted(glob.glob("{}/*/*UniqueMultiple*bw".format(bigwig_dir)))
     bigwig_table_file = "{}/bigwigs.metadata.tsv".format(WORK_DIR)
     if not os.path.isfile(bigwig_table_file):
         bigwig_table = setup_processed_files(
             bigwigs, "BIGWIG",
             upload_dir=WORK_DIR, table_name=bigwig_table_file)
 
-    quit()
-    
-    # submit: other useful processed files
+    # submit: count matrices and tpms
     GGR_DIR = "/mnt/lab_data/kundaje/users/dskim89/ggr/integrative/v1.0.0a"
     processed_files = []
-    processed_files += ["{}/data/ggr.atac.idr.master.bed.gz".format(GGR_DIR)] # union peaks
-    processed_files += ["{}/data/ggr.atac.idr.summits.bed.gz".format(GGR_DIR)] # union summits
-    processed_files += ["{}/data/ggr.atac.ends.counts.mat.txt.gz".format(GGR_DIR)] # count mat
-    processed_files += ["{}/data/ggr.atac.ends.counts.pooled.rlog.mat.txt.gz".format(GGR_DIR)] # rlog norm mat
+    processed_files += ["{}/data/ggr.rna.counts.mat.txt.gz".format(GGR_DIR)] # counts
+    processed_files += ["{}/data/ggr.rna.counts.pc.mat.txt.gz".format(GGR_DIR)] # counts, pc only
+    processed_files += ["{}/data/ggr.rna.counts.pc.expressed.mat.txt.gz".format(GGR_DIR)] # counts, pc only
+    processed_files += ["{}/data/ggr.rna.tpm.mat.txt.gz".format(GGR_DIR)] # tpms
 
-    ggr_traj_dir = "{}/results/atac/timeseries/dp_gp/reproducible/hard/reordered".format(GGR_DIR)
-    processed_files += ["{}/ggr.atac.reproducible.hard.reordered.clustering.txt".format(ggr_traj_dir)] # clusters
+    timeseries_dir = "{}/results/rna/timeseries/matrices".format(GGR_DIR)
+    processed_files += ["{}/ggr.rna.counts.pc.expressed.timeseries_adj.pooled.rlog.mat.txt.gz".format(timeseries_dir)] # rlog norm signal
 
+    ggr_traj_dir = "{}/results/rna/timeseries/dp_gp/reproducible/hard/reordered".format(GGR_DIR)
+    processed_files += ["{}/ggr.rna.reproducible.hard.reordered.clustering.txt".format(ggr_traj_dir)] # clusters
+    
     processed_table_file = "{}/other_processed.metadata.tsv".format(WORK_DIR)
     if not os.path.isfile(processed_table_file):
         processed_table = setup_processed_files(
